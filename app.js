@@ -1,11 +1,11 @@
-"use strict";
 const { useState, useEffect } = React;
+"use strict";
 /* ============================== BRAND TOKENS ============================== */
 const LOGO_DATA_URI = "icon-192.png";
 const BRAND = {
     sky: "#4FC3E8", skyDeep: "#2EA8D4", navy: "#0B2A55", navyDeep: "#081E3E",
     green: "#8FD14F", greenDeep: "#6FB733", bg: "#EFF7FB", card: "#FFFFFF",
-    ink: "#0B2A55", sub: "#4A6178", danger: "#D64545", warn: "#B9790F",
+    ink: "#0B2A55", sub: "#37485A", danger: "#D64545", warn: "#8A5A0A",
     label: "#33465C",
 };
 const fmt = (n) => (n === null || n === undefined || isNaN(n) ? "0" : Math.round(n).toLocaleString("th-TH"));
@@ -223,6 +223,37 @@ const HHP_MALE_C3 = [
     [[466950, 378522, 342502], [512589, 412409, 370390], [562005, 501250, 426783]], [[538300, 437606, 397858], [592004, 477990, 432165], [657681, 596737, 515654]],
 ];
 const HHP_TABLE = { female: { c12: HHP_FEMALE_C12, c3: HHP_FEMALE_C3 }, male: { c12: HHP_MALE_C12, c3: HHP_MALE_C3 } };
+// 7b) แวลู เฮลธ์ คิดส์ พรีเมียร์ รบข.31/2568 — สุขภาพเด็ก อายุแรกเข้า 1 เดือน - 10 ปี
+const VHKIDS_BANDS = [[0, 5], [6, 10], [11, 15], [16, 20], [21, 25], [26, 30], [31, 35], [36, 40], [41, 45], [46, 50], [51, 55], [56, 60], [61, 65], [66, 70], [71, 75], [76, 80], [81, 85], [86, 90], [91, 95], [96, 98]];
+const VHKIDS_PLANS = [3000, 4000, 5000];
+const VHKIDS_FEMALE = [
+    [43855, 58698, 67698], [20230, 26159, 29809], [15837, 20269, 22350], [14406, 18070, 19188], [14407, 17886, 19429],
+    [15596, 19662, 22014], [15636, 19817, 22591], [15953, 20164, 22618], [16623, 21189, 23850], [17119, 21741, 24558],
+    [20686, 25890, 30976], [24353, 31061, 37617], [49152, 57828, 66307], [59210, 72012, 84523], [88256, 108050, 127394],
+    [123307, 134070, 158536], [146563, 150216, 178135], [157758, 161844, 193068], [168974, 174843, 209763], [183979, 190601, 230000],
+];
+const VHKIDS_MALE = [
+    [43855, 58698, 67698], [20230, 26159, 29809], [15837, 20269, 22350], [14903, 18809, 21051], [16722, 19863, 21714],
+    [17276, 21994, 23416], [18156, 22180, 24861], [18577, 22597, 25542], [19210, 23827, 27019], [19854, 24490, 27869],
+    [23858, 30363, 36720], [28327, 36665, 44813], [54297, 65084, 75626], [66674, 82537, 98040], [99964, 124560, 131336],
+    [141685, 153973, 162465], [169633, 180055, 190317], [186481, 198396, 210128], [200743, 215721, 228840], [219824, 236723, 251526],
+];
+const VHKIDS_CATS = [
+    { no: "1", desc: "ค่าห้อง ค่าอาหาร และค่าบริการโรงพยาบาล (ผู้ป่วยใน) — ICU จ่าย 2 เท่า สูงสุดรวม 125 วัน", unit: "ต่อวัน", vals: { 3000: 3000, 4000: 4000, 5000: 5000 } },
+    { no: "2", desc: "ค่าตรวจวินิจฉัย/บำบัดรักษา/โลหิตและส่วนประกอบ/พยาบาล/ยา/เวชภัณฑ์ (รวมหมวดย่อย 2.1-2.4)", unit: "", vals: { 3000: 200000, 4000: 200000, 5000: 400000 }, sharedPlans: [4000, 5000], sharedWithNo: "4" },
+    { no: "2.4", desc: "ค่ายาและเวชภัณฑ์สิ้นเปลืองสำหรับกลับบ้าน (สูงสุด 7 วัน)", unit: "", vals: { 3000: 1000, 4000: 1000, 5000: 1000 } },
+    { no: "3", desc: "ค่าแพทย์ตรวจรักษา สูงสุด 125 วัน", unit: "ต่อวัน", vals: { 3000: 800, 4000: 1000, 5000: 1200 } },
+    { no: "4", desc: "ค่าผ่าตัด (ศัลยกรรม) และหัตถการ (รวมหมวดย่อย 4.1-4.5)", unit: "", vals: { 3000: 100000, 4000: "จ่ายตามจริง", 5000: "จ่ายตามจริง" }, sharedPlans: [4000, 5000], sharedWithNo: "2" },
+    { no: "4.5", desc: "ปลูกถ่ายอวัยวะ (จำกัด 1 ครั้งตลอดชีพของสัญญาเพิ่มเติมนี้)", unit: "", vals: { 3000: 200000, 4000: 200000, 5000: 400000 } },
+    { no: "5", desc: "ผ่าตัดใหญ่ไม่ต้องพักรักษาตัวเป็นผู้ป่วยใน (Day Surgery)", unit: "", vals: { 3000: "จ่ายเสมือนผู้ป่วยใน", 4000: "จ่ายเสมือนผู้ป่วยใน", 5000: "จ่ายเสมือนผู้ป่วยใน" } },
+    { no: "6", desc: "ตรวจวินิจฉัย/รักษาต่อเนื่อง ก่อน-หลังพักรักษาตัว (ผู้ป่วยนอก)", unit: "", vals: { 3000: 3500, 4000: 5000, 5000: 5000 } },
+    { no: "7", desc: "รักษาบาดเจ็บ กรณีผู้ป่วยนอกจากอุบัติเหตุ ภายใน 24 ชม.", unit: "ต่อครั้ง", vals: { 3000: 6000, 4000: 8000, 5000: 8000 } },
+    { no: "8", desc: "เวชศาสตร์ฟื้นฟู หลังพักรักษาตัวเป็นผู้ป่วยใน", unit: "", vals: { 3000: "ไม่คุ้มครอง", 4000: "ไม่คุ้มครอง", 5000: "ไม่คุ้มครอง" } },
+    { no: "9-11", desc: "ล้างไต (โรคไตวายเรื้อรัง) / รังสีรักษา / เคมีบำบัด (โรคเนื้องอกหรือมะเร็ง) ต่อรอบปีกรมธรรม์*", unit: "", vals: { 3000: 35000, 4000: 50000, 5000: 50000 } },
+    { no: "12", desc: "รถพยาบาลฉุกเฉิน", unit: "ต่อครั้ง", vals: { 3000: 3000, 4000: 4000, 5000: 5000 } },
+    { no: "13", desc: "ผ่าตัดเล็ก", unit: "ต่อครั้ง", vals: { 3000: 9000, 4000: 10000, 5000: 10000 } },
+    { no: "เพิ่มเติม", desc: "ค่ารักษาพยาบาลผู้ป่วยนอก ต่อครั้ง (สูงสุด 1 ครั้ง/วัน และสูงสุด 30 ครั้ง/รอบปีกรมธรรม์)", unit: "", vals: { 3000: 2000, 4000: 2000, 5000: 2000 } },
+];
 // 8) คช. คุ้มครองการชำระเบี้ย รบข.1/2545, 22/2551, 64/2567
 const CS_BANDS = [[20, 30], [31, 35], [36, 40], [41, 45], [46, 50], [51, 55]];
 const CS_FEMALE = [
@@ -275,7 +306,9 @@ const PRODUCTS = [
     { id: "SUPER", name: "ซูเปอร์แคร์", tag: "โรคร้ายแรง 47 โรค", ageMin: 1, ageMax: 65, coverAge: 79,
         occNote: "รับได้ทุกชั้นอาชีพ (เบี้ยเท่ากันทุกชั้น)", siNote: "ทุนประกัน 100,000-3,000,000 บาทต่อกรมธรรม์ (ไม่ผูกกับทุนหลัก แต่รวมทุกฉบับต้องไม่เกิน 5,000,000 บาท)" },
     { id: "VH", name: "แวลู เฮลธ์", tag: "สุขภาพ", ageMin: 11, ageMax: 80, coverAge: 98,
-        occNote: "รับได้ทุกชั้นอาชีพ (ชั้น 1-2 เบี้ยเดียวกัน / ชั้น 3 เบี้ยสูงกว่า)", siNote: "ต้องมีทุนประกันหลักขั้นต่ำ 50,000 บาท จึงซื้อได้" },
+        occNote: "รับได้ทุกชั้นอาชีพ (ชั้น 1-2 เบี้ยเดียวกัน / ชั้น 3 เบี้ยสูงกว่า)", siNote: "ต้องมีทุนประกันหลักขั้นต่ำ 50,000 บาท จึงซื้อได้ · ซื้อได้เพียง 1 สัญญา ระหว่าง แวลู เฮลธ์ หรือ แวลู เฮลธ์ คิดส์ พรีเมียร์" },
+    { id: "VHKIDS", name: "แวลู เฮลธ์ คิดส์ พรีเมียร์", tag: "สุขภาพเด็ก", ageMin: 0, ageMax: 10, coverAge: 98,
+        occNote: "ไม่ขึ้นกับชั้นอาชีพ", siNote: "ต้องมีทุนประกันหลักขั้นต่ำ 50,000 บาท จึงซื้อได้ · มีความรับผิดส่วนแรก 10,000 บาท/ครั้ง (เฉพาะช่วงอายุแรกเข้า 1 เดือน-10 ปี) · ซื้อได้เพียง 1 สัญญา ระหว่าง แวลู เฮลธ์ หรือ แวลู เฮลธ์ คิดส์ พรีเมียร์" },
     { id: "RPPR", name: "รพ.ปร. (ปัญจรักษ์)", tag: "ค่ารักษารายวัน", ageMin: 6, ageMax: 64, coverAge: 65,
         occNote: "รับได้ทุกชั้นอาชีพ (เบี้ยเท่ากันทุกชั้น)", siNote: "วงเงินต่อวันที่ซื้อได้ขึ้นกับทุนหลัก (เริ่มจาก): 50,000→300-500 / 100,000→300-2,000 / 500,000→300-2,500 / 750,000→300-3,000 / 1,000,000→300-4,000 / 3,000,000→300-5,000 บาท/วัน" },
     { id: "HHP", name: "แฮปปี้ เฮลธ์ พรีเมียร์", tag: "สุขภาพเหมาจ่าย", ageMin: 11, ageMax: 80, coverAge: 98,
@@ -290,12 +323,13 @@ function App() {
     const [occClass, setOccClass] = useState(1);
     const [payMode, setPayMode] = useState("year");
     const [mainSI, setMainSI] = useState(500000); // ทุนประกันตลอดชีพ สุดคุ้ม = ฐานของทุกแบบ
-    const [selected, setSelected] = useState({ SUD: true, ACC: true, ACC3: false, TPD: false, SUPER: false, VH: false, RPPR: false, HHP: false, CS: false });
+    const [selected, setSelected] = useState({ SUD: true, ACC: true, ACC3: false, TPD: false, SUPER: false, VH: false, VHKIDS: false, RPPR: false, HHP: false, CS: false });
     const [accPlan, setAccPlan] = useState(500000);
     const [acc3Plan, setAcc3Plan] = useState(10000);
     const [tpdSI, setTpdSI] = useState(1000000);
     const [supSI, setSupSI] = useState(500000);
     const [vhPlan, setVhPlan] = useState(3000);
+    const [vhkidsPlan, setVhkidsPlan] = useState(4000);
     const [rpprDaily, setRpprDaily] = useState(1000);
     const [hhpPlan, setHhpPlan] = useState(5000000);
     const [hhpDeduct, setHhpDeduct] = useState(0);
@@ -334,6 +368,8 @@ function App() {
                         setSupSI(s.supSI);
                     if (s.vhPlan !== undefined)
                         setVhPlan(s.vhPlan);
+                    if (s.vhkidsPlan !== undefined)
+                        setVhkidsPlan(s.vhkidsPlan);
                     if (s.rpprDaily !== undefined)
                         setRpprDaily(s.rpprDaily);
                     if (s.hhpPlan !== undefined)
@@ -354,9 +390,9 @@ function App() {
     useEffect(() => {
         if (!loadedFromStorage)
             return;
-        const snapshot = { gender, age, occClass, payMode, mainSI, selected, accPlan, acc3Plan, tpdSI, supSI, vhPlan, rpprDaily, hhpPlan, hhpDeduct, csPayorAge, csPayorGender };
+        const snapshot = { gender, age, occClass, payMode, mainSI, selected, accPlan, acc3Plan, tpdSI, supSI, vhPlan, vhkidsPlan, rpprDaily, hhpPlan, hhpDeduct, csPayorAge, csPayorGender };
         storageAdapter.set(STORAGE_KEY, JSON.stringify(snapshot));
-    }, [loadedFromStorage, gender, age, occClass, payMode, mainSI, selected, accPlan, acc3Plan, tpdSI, supSI, vhPlan, rpprDaily, hhpPlan, hhpDeduct, csPayorAge, csPayorGender]);
+    }, [loadedFromStorage, gender, age, occClass, payMode, mainSI, selected, accPlan, acc3Plan, tpdSI, supSI, vhPlan, vhkidsPlan, rpprDaily, hhpPlan, hhpDeduct, csPayorAge, csPayorGender]);
     const toggle = (id) => setSelected((s) => (Object.assign(Object.assign({}, s), { [id]: !s[id] })));
     const csDisabled = age > 14;
     useEffect(() => {
@@ -369,12 +405,13 @@ function App() {
         setOccClass(1);
         setPayMode("year");
         setMainSI(0);
-        setSelected({ SUD: false, ACC: false, ACC3: false, TPD: false, SUPER: false, VH: false, RPPR: false, HHP: false, CS: false });
+        setSelected({ SUD: false, ACC: false, ACC3: false, TPD: false, SUPER: false, VH: false, VHKIDS: false, RPPR: false, HHP: false, CS: false });
         setAccPlan(0);
         setAcc3Plan(0);
         setTpdSI(0);
         setSupSI(0);
         setVhPlan(0);
+        setVhkidsPlan(0);
         setRpprDaily(0);
         setHhpPlan(0);
         setHhpDeduct(0);
@@ -486,6 +523,8 @@ function App() {
         const bi = bandIndex(age, VH_BANDS);
         if (bi < 0)
             return { ok: false, msg: "อายุรับประกัน 11-80 ปี (คุ้มครองถึงอายุ 98 ปี)" };
+        if (selected.VHKIDS)
+            return { ok: false, msg: "ซื้อได้เพียง 1 สัญญา ระหว่าง แวลู เฮลธ์ หรือ แวลู เฮลธ์ คิดส์ พรีเมียร์ (ไม่สามารถเลือกพร้อมกันได้)" };
         if (mainSI < 50000)
             return { ok: false, msg: "ต้องมีทุนประกันตลอดชีพ สุดคุ้ม (ด้านบน) ขั้นต่ำ 50,000 บาท จึงจะซื้อ แวลู เฮลธ์ ได้" };
         const occGroup = occClass === 3 ? "c3" : "c12";
@@ -496,6 +535,26 @@ function App() {
         return { ok: true, premium, benefits: [
                 ...catRows(VH_CATS, vhPlan),
                 ["ระยะเวลาคุ้มครอง", "รับประกันตั้งแต่อายุ 11 ถึง 80 ปี และสามารถต่ออายุความคุ้มครองต่อเนื่องได้ถึงอายุ 98 ปี"],
+                ["หมายเหตุ", "*หมวดที่ 9-11 ใช้วงเงินตามเอกสารแนบ โปรดตรวจสอบตัวเลขแยกแต่ละหมวดกับตารางฉบับเต็มก่อนนำเสนอลูกค้า"],
+            ] };
+    }
+    function calcVHKIDS() {
+        const bi = bandIndex(age, VHKIDS_BANDS);
+        if (bi < 0)
+            return { ok: false, msg: "อายุรับประกัน 1 เดือน - 10 ปี (ต่ออายุความคุ้มครองต่อเนื่องได้ถึงอายุ 98 ปี)" };
+        if (selected.VH)
+            return { ok: false, msg: "ซื้อได้เพียง 1 สัญญา ระหว่าง แวลู เฮลธ์ หรือ แวลู เฮลธ์ คิดส์ พรีเมียร์ (ไม่สามารถเลือกพร้อมกันได้)" };
+        if (mainSI < 50000)
+            return { ok: false, msg: "ต้องมีทุนประกันตลอดชีพ สุดคุ้ม (ด้านบน) ขั้นต่ำ 50,000 บาท จึงจะซื้อ แวลู เฮลธ์ คิดส์ พรีเมียร์ ได้" };
+        const pi = VHKIDS_PLANS.indexOf(vhkidsPlan);
+        if (pi < 0)
+            return { ok: false, msg: "กรุณาเลือกแผนความคุ้มครอง" };
+        const premium = (gender === "female" ? VHKIDS_FEMALE : VHKIDS_MALE)[bi][pi];
+        return { ok: true, premium, benefits: [
+                ["ความรับผิดส่วนแรก (ซื้อครั้งแรก อายุ 1 เดือน-10 ปี)", "10,000 บาทต่อครั้ง"],
+                ["ต่ออายุกรมธรรม์ (อายุ 11-99 ปี)", "ไม่มีความรับผิดส่วนแรก"],
+                ...catRows(VHKIDS_CATS, vhkidsPlan),
+                ["ระยะเวลาคุ้มครอง", "รับประกันตั้งแต่อายุ 1 เดือน ถึง 10 ปี และสามารถต่ออายุความคุ้มครองต่อเนื่องได้ถึงอายุ 98 ปี"],
                 ["หมายเหตุ", "*หมวดที่ 9-11 ใช้วงเงินตามเอกสารแนบ โปรดตรวจสอบตัวเลขแยกแต่ละหมวดกับตารางฉบับเต็มก่อนนำเสนอลูกค้า"],
             ] };
     }
@@ -575,7 +634,7 @@ function App() {
                 ["เงื่อนไข", "หากผู้ชำระเบี้ยเสียชีวิต/ทุพพลภาพถาวรสิ้นเชิง บริษัทชำระเบี้ยแทนจนครบกำหนดระยะเวลาข้างต้น"],
             ] };
     }
-    const CALC = { SUD: calcSUD, ACC: calcACC, ACC3: calcACC3, TPD: calcTPD, SUPER: calcSUPER, VH: calcVH, RPPR: calcRPPR, HHP: calcHHP, CS: calcCS };
+    const CALC = { SUD: calcSUD, ACC: calcACC, ACC3: calcACC3, TPD: calcTPD, SUPER: calcSUPER, VH: calcVH, VHKIDS: calcVHKIDS, RPPR: calcRPPR, HHP: calcHHP, CS: calcCS };
     function grandTotal() {
         let sum = 0;
         for (const p of PRODUCTS) {
@@ -609,6 +668,10 @@ function App() {
                 { icon: "🛏️", value: baht(VH_BENEFITS.room[vhPlan]) + "/วัน", label: "ค่าห้องผู้ป่วยใน" },
                 { icon: "🩺", value: VH_BENEFITS.bigSurgeryMax[vhPlan] === "จ่ายตามจริง" ? "จ่ายตามจริง" : baht(VH_BENEFITS.bigSurgeryMax[vhPlan]), label: "ผ่าตัดใหญ่/หัตถการ" },
             ];
+            case "VHKIDS": return [
+                { icon: "🛏️", value: baht(vhkidsPlan) + "/วัน", label: "ค่าห้องผู้ป่วยใน (เด็ก)" },
+                { icon: "💉", value: "10,000 บาท", label: "ความรับผิดส่วนแรก (ซื้อครั้งแรก)" },
+            ];
             case "RPPR": return [
                 { icon: "🚑", value: baht(rpprDaily) + "/วัน", label: "ค่ารักษาพยาบาลรายวัน" },
                 { icon: "💓", value: "2 เท่า", label: "ICU และโรคร้ายแรง 4 โรค" },
@@ -624,7 +687,7 @@ function App() {
             default: return [];
         }
     }
-    const CATEGORY = { SUD: "life", ACC: "life", ACC3: "life", TPD: "life", SUPER: "life", VH: "ipd", HHP: "ipd", RPPR: "opd", CS: "opd" };
+    const CATEGORY = { SUD: "life", ACC: "life", ACC3: "life", TPD: "life", SUPER: "life", VH: "ipd", VHKIDS: "ipd", HHP: "ipd", RPPR: "opd", CS: "opd" };
     // live per-card premium preview (updates as you type, before pressing calculate)
     const liveResults = {};
     PRODUCTS.forEach((p) => { if (selected[p.id])
@@ -633,7 +696,7 @@ function App() {
     // in that case we show a gentle reminder instead of a red "invalid" outline.
     const PRIMARY_FIELD_ZERO = {
         SUD: mainSI === 0, ACC: accPlan === 0, ACC3: acc3Plan === 0, TPD: tpdSI === 0, SUPER: supSI === 0,
-        VH: vhPlan === 0, RPPR: rpprDaily === 0, HHP: hhpPlan === 0, CS: csPayorAge === 0,
+        VH: vhPlan === 0, VHKIDS: vhkidsPlan === 0, RPPR: rpprDaily === 0, HHP: hhpPlan === 0, CS: csPayorAge === 0,
     };
     function handleCalculate() {
         const errs = [];
@@ -671,19 +734,19 @@ function App() {
                     React.createElement("h1", { className: "text-2xl sm:text-3xl font-semibold leading-tight" }, "\u0E04\u0E33\u0E19\u0E27\u0E13\u0E40\u0E1A\u0E35\u0E49\u0E22\u0E2D\u0E22\u0E48\u0E32\u0E07\u0E07\u0E48\u0E32\u0E22"),
                     React.createElement("p", { className: "text-base sm:text-lg", style: { color: "#BFE3F5" } }, "\u0E1B\u0E49\u0E32\u0E40\u0E1B\u0E47\u0E14 CFP\u00AE \u00B7 \u0E01\u0E23\u0E38\u0E07\u0E40\u0E17\u0E1E\u0E1B\u0E23\u0E30\u0E01\u0E31\u0E19\u0E0A\u0E35\u0E27\u0E34\u0E15 \u0E2A\u0E32\u0E02\u0E32\u0E40\u0E0A\u0E35\u0E22\u0E07\u0E43\u0E2B\u0E21\u0E48")),
                 React.createElement("div", { className: "ml-auto hidden sm:flex items-center gap-1 text-base px-3 py-1.5 rounded-full", style: { background: "rgba(143,209,79,0.2)", color: BRAND.green } },
-                    React.createElement("span", { style: { fontSize: 18 } }, "\u2728"),
+                    React.createElement("span", { style: { fontSize: 18 } }, "✨"),
                     " \u0E40\u0E25\u0E37\u0E2D\u0E01\u0E44\u0E14\u0E49\u0E2B\u0E25\u0E32\u0E22\u0E41\u0E1A\u0E1A\u0E1E\u0E23\u0E49\u0E2D\u0E21\u0E01\u0E31\u0E19"))),
         React.createElement("main", { className: "max-w-5xl mx-auto px-5 py-6 space-y-6" },
-            React.createElement("div", { className: "flex items-start gap-2 text-base rounded-xl p-4", style: { background: "#FFF6E5", color: "#7A5A12", border: "1px solid #F3D98B" } },
-                React.createElement("span", { style: { fontSize: 22 }, className: "mt-0.5 shrink-0" }, "\u2139\uFE0F"),
+            React.createElement("div", { className: "flex items-start gap-2 text-base rounded-xl p-4", style: { background: "#FFF6E5", color: "#5C4310", border: "1px solid #F3D98B" } },
+                React.createElement("span", { style: { fontSize: 22 }, className: "mt-0.5 shrink-0" }, "ℹ️"),
                 React.createElement("span", null, "\u0E2D\u0E31\u0E15\u0E23\u0E32\u0E40\u0E1A\u0E35\u0E49\u0E22\u0E04\u0E33\u0E19\u0E27\u0E13\u0E08\u0E32\u0E01\u0E40\u0E2D\u0E01\u0E2A\u0E32\u0E23\u0E1B\u0E23\u0E30\u0E01\u0E2D\u0E1A\u0E01\u0E32\u0E23\u0E02\u0E32\u0E22\u0E17\u0E35\u0E48\u0E41\u0E19\u0E1A\u0E21\u0E32 \u0E01\u0E23\u0E38\u0E13\u0E32\u0E15\u0E23\u0E27\u0E08\u0E2A\u0E2D\u0E1A\u0E04\u0E27\u0E32\u0E21\u0E16\u0E39\u0E01\u0E15\u0E49\u0E2D\u0E07\u0E01\u0E31\u0E1A\u0E15\u0E32\u0E23\u0E32\u0E07\u0E2D\u0E31\u0E15\u0E23\u0E32\u0E40\u0E1A\u0E35\u0E49\u0E22\u0E09\u0E1A\u0E31\u0E1A\u0E17\u0E32\u0E07\u0E01\u0E32\u0E23\u0E01\u0E48\u0E2D\u0E19\u0E19\u0E33\u0E40\u0E2A\u0E19\u0E2D\u0E25\u0E39\u0E01\u0E04\u0E49\u0E32\u0E40\u0E2A\u0E21\u0E2D")),
             React.createElement("section", { className: "rounded-2xl p-5", style: { background: BRAND.card, boxShadow: "0 6px 24px rgba(11,42,85,0.07)" } },
                 React.createElement("div", { className: "flex items-center justify-between mb-4" },
                     React.createElement("h2", { className: "text-lg font-semibold flex items-center gap-2", style: { color: BRAND.navy } },
-                        React.createElement("span", { style: { fontSize: 20 } }, "\uD83D\uDC65"),
+                        React.createElement("span", { style: { fontSize: 20 } }, "👥"),
                         " \u0E02\u0E49\u0E2D\u0E21\u0E39\u0E25\u0E1C\u0E39\u0E49\u0E40\u0E2D\u0E32\u0E1B\u0E23\u0E30\u0E01\u0E31\u0E19\u0E20\u0E31\u0E22"),
                     React.createElement("button", { onClick: clearAll, className: "flex items-center gap-1.5 text-sm font-medium px-3 py-2 rounded-xl", style: { background: "#FDEAEA", color: BRAND.danger } },
-                        React.createElement("span", { style: { fontSize: 16 } }, "\uD83E\uDDF9"),
+                        React.createElement("span", { style: { fontSize: 16 } }, "🧹"),
                         " \u0E40\u0E04\u0E25\u0E35\u0E22\u0E23\u0E4C\u0E02\u0E49\u0E2D\u0E21\u0E39\u0E25\u0E17\u0E31\u0E49\u0E07\u0E2B\u0E21\u0E14")),
                 React.createElement("p", { className: "text-sm mb-3", style: { color: BRAND.sub } }, "\u0E02\u0E49\u0E2D\u0E21\u0E39\u0E25\u0E17\u0E35\u0E48\u0E04\u0E35\u0E22\u0E4C\u0E08\u0E30\u0E16\u0E39\u0E01\u0E1A\u0E31\u0E19\u0E17\u0E36\u0E01\u0E44\u0E27\u0E49\u0E2D\u0E31\u0E15\u0E42\u0E19\u0E21\u0E31\u0E15\u0E34\u0E43\u0E19\u0E40\u0E04\u0E23\u0E37\u0E48\u0E2D\u0E07\u0E19\u0E35\u0E49 \u0E41\u0E21\u0E49\u0E1B\u0E34\u0E14\u0E41\u0E2D\u0E1B\u0E41\u0E25\u0E49\u0E27\u0E40\u0E1B\u0E34\u0E14\u0E43\u0E2B\u0E21\u0E48\u0E01\u0E47\u0E22\u0E31\u0E07\u0E2D\u0E22\u0E39\u0E48 \u0E08\u0E19\u0E01\u0E27\u0E48\u0E32\u0E08\u0E30\u0E01\u0E14 \"\u0E40\u0E04\u0E25\u0E35\u0E22\u0E23\u0E4C\u0E02\u0E49\u0E2D\u0E21\u0E39\u0E25\u0E17\u0E31\u0E49\u0E07\u0E2B\u0E21\u0E14\""),
                 React.createElement("div", { className: "grid grid-cols-2 sm:grid-cols-4 gap-4" },
@@ -711,6 +774,8 @@ function App() {
                         React.createElement(NumInput, { value: supSI, onChange: setSupSI, min: 0 }))),
                     p.id === "VH" && selected.VH && (React.createElement(PlanRow, { label: "\u0E41\u0E1C\u0E19\u0E04\u0E27\u0E32\u0E21\u0E04\u0E38\u0E49\u0E21\u0E04\u0E23\u0E2D\u0E07" },
                         React.createElement(Chips, { options: VH_PLANS, value: vhPlan, onChange: setVhPlan, fmt: baht }))),
+                    p.id === "VHKIDS" && selected.VHKIDS && (React.createElement(PlanRow, { label: "\u0E41\u0E1C\u0E19\u0E04\u0E27\u0E32\u0E21\u0E04\u0E38\u0E49\u0E21\u0E04\u0E23\u0E2D\u0E07" },
+                        React.createElement(Chips, { options: VHKIDS_PLANS, value: vhkidsPlan, onChange: setVhkidsPlan, fmt: baht }))),
                     p.id === "RPPR" && selected.RPPR && (React.createElement(PlanRow, { label: "\u0E1C\u0E25\u0E1B\u0E23\u0E30\u0E42\u0E22\u0E0A\u0E19\u0E4C\u0E23\u0E32\u0E22\u0E27\u0E31\u0E19 (\u0E1A\u0E32\u0E17)" },
                         React.createElement(NumInput, { value: rpprDaily, onChange: setRpprDaily, min: 300, step: 100 }))),
                     p.id === "HHP" && selected.HHP && (React.createElement(React.Fragment, null,
@@ -736,7 +801,7 @@ function App() {
                                     65 - csPayorAge,
                                     " \u0E1B\u0E35"))))))))),
             React.createElement("button", { onClick: handleCalculate, className: "w-full rounded-2xl py-4 font-semibold text-white text-lg flex items-center justify-center gap-2 transition active:scale-[0.99]", style: { background: `linear-gradient(120deg, ${BRAND.skyDeep}, ${BRAND.navy})`, boxShadow: "0 8px 20px rgba(11,42,85,0.25)" } },
-                React.createElement("span", { style: { fontSize: 22 } }, "\uD83E\uDDEE"),
+                React.createElement("span", { style: { fontSize: 22 } }, "🧮"),
                 " \u0E04\u0E33\u0E19\u0E27\u0E13\u0E40\u0E1A\u0E35\u0E49\u0E22\u0E1B\u0E23\u0E30\u0E01\u0E31\u0E19\u0E41\u0E25\u0E30\u0E04\u0E27\u0E32\u0E21\u0E04\u0E38\u0E49\u0E21\u0E04\u0E23\u0E2D\u0E07"),
             result && (React.createElement("section", { className: "space-y-4" },
                 React.createElement("div", { className: "rounded-2xl p-5 text-white", style: { background: `linear-gradient(120deg, ${BRAND.green}, ${BRAND.greenDeep})` } },
@@ -764,13 +829,13 @@ function App() {
             React.createElement("div", { className: "w-full max-w-md rounded-2xl p-5", style: { background: BRAND.card } },
                 React.createElement("div", { className: "flex items-center gap-2 mb-3" },
                     React.createElement("div", { className: "w-10 h-10 rounded-xl flex items-center justify-center", style: { background: "#FDEAEA" } },
-                        React.createElement("span", { style: { fontSize: 22 } }, "\u26A0\uFE0F")),
+                        React.createElement("span", { style: { fontSize: 22 } }, "⚠️")),
                     React.createElement("h3", { className: "text-lg font-semibold", style: { color: BRAND.navy } }, "\u0E02\u0E49\u0E2D\u0E21\u0E39\u0E25\u0E44\u0E21\u0E48\u0E15\u0E23\u0E07\u0E15\u0E32\u0E21\u0E40\u0E07\u0E37\u0E48\u0E2D\u0E19\u0E44\u0E02\u0E23\u0E31\u0E1A\u0E1B\u0E23\u0E30\u0E01\u0E31\u0E19")),
                 React.createElement("div", { className: "space-y-2 max-h-72 overflow-y-auto" }, modal.map((e, i) => (React.createElement("div", { key: i, className: "text-base rounded-xl p-3", style: { background: "#FFF5F5" } },
                     React.createElement("p", { className: "font-medium", style: { color: BRAND.danger } }, e.product),
                     React.createElement("p", { style: { color: "#7A2E2E" } }, e.msg))))),
                 React.createElement("button", { onClick: () => setModal(null), className: "w-full mt-4 rounded-xl py-3 text-lg font-medium text-white flex items-center justify-center gap-1", style: { background: BRAND.navy } },
-                    React.createElement("span", { style: { fontSize: 18 } }, "\u2715"),
+                    React.createElement("span", { style: { fontSize: 18 } }, "✕"),
                     " \u0E1B\u0E34\u0E14\u0E41\u0E25\u0E30\u0E41\u0E01\u0E49\u0E44\u0E02\u0E02\u0E49\u0E2D\u0E21\u0E39\u0E25")))),
         React.createElement("footer", { className: "text-center text-sm py-6", style: { color: BRAND.sub } }, "\u0E40\u0E1E\u0E37\u0E48\u0E2D\u0E01\u0E32\u0E23\u0E19\u0E33\u0E40\u0E2A\u0E19\u0E2D\u0E40\u0E1A\u0E37\u0E49\u0E2D\u0E07\u0E15\u0E49\u0E19\u0E40\u0E17\u0E48\u0E32\u0E19\u0E31\u0E49\u0E19 \u0E44\u0E21\u0E48\u0E43\u0E0A\u0E48\u0E40\u0E2D\u0E01\u0E2A\u0E32\u0E23\u0E40\u0E2A\u0E19\u0E2D\u0E02\u0E32\u0E22\u0E2D\u0E22\u0E48\u0E32\u0E07\u0E40\u0E1B\u0E47\u0E19\u0E17\u0E32\u0E07\u0E01\u0E32\u0E23")));
 }
@@ -806,13 +871,13 @@ function BenefitBoard({ cards }) {
                     React.createElement("span", { className: "w-6 h-6 rounded-full bg-white/90 flex items-center justify-center text-sm font-bold shrink-0", style: { color: col.to } }, col.num),
                     React.createElement("p", { className: "text-white text-base font-semibold leading-tight" }, col.title)),
                 React.createElement("div", { className: "grid grid-cols-2 gap-px", style: { background: "#EEF3F7" } }, tiles.map((t, i) => (React.createElement("div", { key: i, className: "p-3", style: { background: col.tint } },
-                    React.createElement("p", { className: "text-[11px] font-medium mb-1.5 truncate", style: { color: BRAND.sub } }, t.productName),
+                    React.createElement("p", { className: "text-base font-medium mb-1.5 truncate", style: { color: BRAND.sub } }, t.productName),
                     React.createElement("div", { className: "flex items-center gap-2" },
                         React.createElement("span", { className: "w-8 h-8 rounded-lg flex items-center justify-center shrink-0 bg-white" },
                             React.createElement("span", { style: { fontSize: 16 } }, t.icon)),
                         React.createElement("div", { className: "leading-tight min-w-0" },
                             React.createElement("p", { className: "text-base font-bold truncate", style: { color: BRAND.navyDeep } }, t.value))),
-                    React.createElement("p", { className: "text-[11px] mt-1.5 leading-snug", style: { color: BRAND.sub } }, t.label)))))));
+                    React.createElement("p", { className: "text-base mt-1.5 leading-snug", style: { color: BRAND.sub } }, t.label)))))));
         }))));
 }
 /* ============================== UI PARTS ============================== */
@@ -863,7 +928,7 @@ function ProductRow({ product, checked, onToggle, age, live, pending, children, 
             filter: disabled ? "grayscale(0.4)" : "none",
         } },
         React.createElement("div", { className: "flex items-center gap-3" },
-            React.createElement("button", { onClick: disabled ? undefined : onToggle, disabled: disabled, className: "w-7 h-7 rounded-lg flex items-center justify-center shrink-0", style: { background: checked && !disabled ? (invalid ? BRAND.danger : BRAND.green) : "#EFF2F5", cursor: disabled ? "not-allowed" : "pointer" } }, checked && !disabled && React.createElement("span", { style: { color: "#fff", fontWeight: 700 } }, "\u2713")),
+            React.createElement("button", { onClick: disabled ? undefined : onToggle, disabled: disabled, className: "w-7 h-7 rounded-lg flex items-center justify-center shrink-0", style: { background: checked && !disabled ? (invalid ? BRAND.danger : BRAND.green) : "#EFF2F5", cursor: disabled ? "not-allowed" : "pointer" } }, checked && !disabled && React.createElement("span", { style: { color: "#fff", fontWeight: 700 } }, "✓")),
             React.createElement("div", { className: "flex-1" },
                 React.createElement("p", { className: "text-lg font-semibold", style: { color: disabled ? BRAND.sub : BRAND.navy } }, product.name),
                 React.createElement("p", { className: "text-sm", style: { color: BRAND.sub } },
