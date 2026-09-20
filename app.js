@@ -1305,15 +1305,7 @@ function App() {
         setSelectedConcerns((prev) => prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]);
         setPickedRecommendations([]); // ล้างการติ๊กเลือกเดิม เพราะรายการแนะนำอาจเปลี่ยนไปตามความกังวลใหม่
     }
-    // แบบประกันสะสมทรัพย์ — กดปุ่มพิเศษเพื่อเปิดกล่องภาพรวมแยกต่างหาก ไม่ปนกับคอลัมน์ทุนประกันหลัก
-    function openSavingsGroup() {
-        setSavingsGroupOpen(true);
-        setTimeout(() => {
-            const el = document.getElementById("savings-group-section");
-            if (el)
-                el.scrollIntoView({ behavior: "smooth", block: "start" });
-        }, 60);
-    }
+    // แบบประกันสะสมทรัพย์ — ปุ่มสลับเปิด/ปิดกล่องภาพรวมแยกต่างหาก เหมือนปุ่มความกังวลอื่นๆ (ไม่ได้เลือก = ปิดอัตโนมัติ)
     // หาอัตราผลตอบแทน IRR ตามหลัก TVM (คิดลดกระแสเงินสด) ด้วยวิธี bisection — cashflows[i] = กระแสเงินสดสุทธิ ณ เวลา t=i (i=0 คือวันเริ่มสัญญา)
     function calcIRR(cashflows) {
         const npv = (r) => cashflows.reduce((acc, cf, i) => acc + cf / Math.pow(1 + r, i), 0);
@@ -3227,7 +3219,7 @@ function App() {
                             " ",
                             c.label));
                     }),
-                    React.createElement("button", { onClick: openSavingsGroup, className: "flex items-center gap-1.5 text-[21px] font-bold px-3.5 py-2.5 rounded-full border-2", style: { borderColor: BRAND.warn, background: "#FFF9EE", color: BRAND.warn } },
+                    React.createElement("button", { onClick: () => setSavingsGroupOpen((o) => !o), className: "flex items-center gap-1.5 text-[21px] font-medium px-3.5 py-2.5 rounded-full border", style: { borderColor: savingsGroupOpen ? BRAND.green : "#D7E8F0", background: savingsGroupOpen ? "#F0FAE6" : "#fff", color: savingsGroupOpen ? BRAND.greenDeep : BRAND.navy } },
                         React.createElement("span", null, "\uD83D\uDCB0"),
                         " \u0E1B\u0E23\u0E30\u0E01\u0E31\u0E19\u0E2A\u0E30\u0E2A\u0E21\u0E17\u0E23\u0E31\u0E1E\u0E22\u0E4C"),
                     selectedConcerns.length > 0 && (React.createElement("button", { onClick: () => { setSelectedConcerns([]); setPickedRecommendations([]); }, className: "flex items-center gap-1.5 text-[21px] font-medium px-3.5 py-2.5 rounded-full", style: { background: "#FDEAEA", color: BRAND.danger } }, "\u2715 \u0E25\u0E49\u0E32\u0E07\u0E01\u0E32\u0E23\u0E40\u0E25\u0E37\u0E2D\u0E01")))),
