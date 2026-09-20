@@ -1220,7 +1220,7 @@ function App() {
         }, 60);
     }
     const MAIN_IDS = ["SUD", "LIFE99", "UNJAI", "CANCERMAX", "PLUS2", "PRESTIGE", "HAPPYPENSION", "HAPPYSAVING", "HAPPYWL", "HRP9920", "HRPDIV", "HRP9901", "HAPPYWL9901", "HAPPYKID", "PSAVE104", "PSAVE126", "HS208", "HS126", "HS157", "HS147", "HS168", "HS1810", "HS2515", "TAXSAVER105"];
-    const SAVINGS_IDS = ["PSAVE104", "PSAVE126", "HS208", "HS126", "HS157", "HS147", "HS168", "HS1810", "HS2515", "TAXSAVER105"]; // เฉพาะแบบประกันสะสมทรัพย์ชุดใหม่เท่านั้น — แบบเดิม (แฮปปี้เซฟวิ่ง/แฮปปี้โฮลไลฟ์/ห่วงรักพรีเมียร์ ฯลฯ) ยังคงอยู่ในคอลัมน์ทุนประกันหลักตามเดิม ไม่ย้าย
+    const SAVINGS_IDS = ["PSAVE104", "PSAVE126", "HS208", "HS126", "HS157", "HS147", "HS168", "HS1810", "HS2515", "TAXSAVER105", "HAPPYSAVING"]; // เฉพาะแบบประกันสะสมทรัพย์ชุดใหม่ + แฮปปี้เซฟวิ่ง (มีเงินปันผล) — แบบเดิมอื่นๆ ยังคงอยู่ในคอลัมน์ทุนประกันหลักตามเดิม
     const otherMainSelected = (id) => MAIN_IDS.some((m) => m !== id && selected[m]);
     // เช็คว่าแบบทุนประกันหลักแต่ละตัวเลือกได้จริงหรือไม่ ตามอายุปัจจุบัน (ใช้ช่วงอายุกว้างสุดของแต่ละแบบเป็นตัวกรองเบื้องต้น)
     // และล็อกไม่ให้เลือกซ้อนกับทุนหลักตัวอื่นที่เลือกไว้แล้ว
@@ -1348,6 +1348,10 @@ function App() {
         if (id === "PSAVE126") {
             return Math.round((adjPremium * 1000) / psave126Rate(age));
         }
+        if (id === "HAPPYSAVING") {
+            const table = happysavingTerm === 5 ? (gender === "female" ? HAPPYSAVING5_FEMALE : HAPPYSAVING5_MALE) : (gender === "female" ? HAPPYSAVING10_FEMALE : HAPPYSAVING10_MALE);
+            return Math.round((adjPremium * 1000) / table[age]);
+        }
         if (SAVINGS_DEFS[id]) {
             const def = SAVINGS_DEFS[id];
             let si = (adjPremium * 1000) / def.rate(age, gender);
@@ -1359,7 +1363,7 @@ function App() {
         return 0;
     }
     // ทุนประกันที่ใช้คำนวณจริง — อ่านจากช่องทุนประกันโดยตรง หรือย้อนคำนวณจากเบี้ยที่กรอก แล้วแต่โหมดที่เลือกไว้
-    const SAVINGS_SI_STATE = { PSAVE104: [psave104SI, setPsave104SI], PSAVE126: [psave126SI, setPsave126SI], HS208: [hs208SI, setHs208SI], HS126: [hs126SI, setHs126SI], HS157: [hs157SI, setHs157SI], HS147: [hs147SI, setHs147SI], HS168: [hs168SI, setHs168SI], HS1810: [hs1810SI, setHs1810SI], HS2515: [hs2515SI, setHs2515SI], TAXSAVER105: [taxsaver105SI, setTaxsaver105SI] };
+    const SAVINGS_SI_STATE = { PSAVE104: [psave104SI, setPsave104SI], PSAVE126: [psave126SI, setPsave126SI], HS208: [hs208SI, setHs208SI], HS126: [hs126SI, setHs126SI], HS157: [hs157SI, setHs157SI], HS147: [hs147SI, setHs147SI], HS168: [hs168SI, setHs168SI], HS1810: [hs1810SI, setHs1810SI], HS2515: [hs2515SI, setHs2515SI], TAXSAVER105: [taxsaver105SI, setTaxsaver105SI], HAPPYSAVING: [happysavingSI, setHappysavingSI] };
     function getEffectiveSI(id) {
         const mode = savingsMode[id] || "si";
         if (mode === "premium")
@@ -1495,8 +1499,17 @@ function App() {
             case "HAPPYSAVING": return selected.HAPPYSAVING && (React.createElement(React.Fragment, null,
                 React.createElement(PlanRow, { label: "\u0E23\u0E30\u0E22\u0E30\u0E40\u0E27\u0E25\u0E32\u0E0A\u0E33\u0E23\u0E30\u0E40\u0E1A\u0E35\u0E49\u0E22" },
                     React.createElement(Chips, { options: HAPPYSAVING_TERMS, value: happysavingTerm, onChange: setHappysavingTerm, fmt: (t) => t + " ปี" })),
-                React.createElement(PlanRow, { label: "\u0E17\u0E38\u0E19\u0E1B\u0E23\u0E30\u0E01\u0E31\u0E19\u0E20\u0E31\u0E22 (\u0E1A\u0E32\u0E17)" },
-                    React.createElement(NumInput, { value: happysavingSI, onChange: setHappysavingSI, min: 0, step: 50000 }))));
+                React.createElement(PlanRow, { label: "\u0E23\u0E30\u0E1A\u0E38\u0E02\u0E49\u0E2D\u0E21\u0E39\u0E25\u0E08\u0E32\u0E01" },
+                    React.createElement(SegButton, { options: [{ k: "si", l: "ทุนประกัน" }, { k: "premium", l: "เบี้ยประกัน" }], value: savingsMode.HAPPYSAVING || "si", onChange: (v) => setSavingsMode((m) => (Object.assign(Object.assign({}, m), { HAPPYSAVING: v }))) })),
+                (savingsMode.HAPPYSAVING || "si") === "si" ? (React.createElement(PlanRow, { label: "\u0E17\u0E38\u0E19\u0E1B\u0E23\u0E30\u0E01\u0E31\u0E19\u0E20\u0E31\u0E22 (\u0E1A\u0E32\u0E17)" },
+                    React.createElement(NumInput, { value: happysavingSI, onChange: setHappysavingSI, min: 0, step: 50000 }))) : (React.createElement(React.Fragment, null,
+                    React.createElement(PlanRow, { label: "\u0E40\u0E1A\u0E35\u0E49\u0E22\u0E1B\u0E23\u0E30\u0E01\u0E31\u0E19\u0E20\u0E31\u0E22\u0E17\u0E35\u0E48\u0E15\u0E49\u0E2D\u0E07\u0E01\u0E32\u0E23\u0E08\u0E48\u0E32\u0E22/\u0E1B\u0E35 (\u0E1A\u0E32\u0E17)" },
+                        React.createElement(NumInput, { value: savingsPremiumInput.HAPPYSAVING || 0, onChange: (v) => setSavingsPremiumInput((pr) => (Object.assign(Object.assign({}, pr), { HAPPYSAVING: v }))), min: 0, step: 5000 })),
+                    React.createElement("p", { className: "text-[19px] px-1", style: { color: BRAND.sub } },
+                        "\u0E17\u0E38\u0E19\u0E1B\u0E23\u0E30\u0E01\u0E31\u0E19\u0E20\u0E31\u0E22\u0E17\u0E35\u0E48\u0E04\u0E33\u0E19\u0E27\u0E13\u0E44\u0E14\u0E49: ",
+                        baht(getEffectiveSI("HAPPYSAVING"))))),
+                happysavingTerm > 0 && getEffectiveSI("HAPPYSAVING") >= HAPPYSAVING_MIN_SI && (React.createElement("button", { onClick: () => setSavingsScheduleOpen((o) => (Object.assign(Object.assign({}, o), { HAPPYSAVING: !o.HAPPYSAVING }))), className: "w-full text-[21px] font-semibold px-4 py-2.5 rounded-xl mt-1", style: { background: BRAND.bg, color: BRAND.navy, border: "1px solid #D7E8F0" } }, savingsScheduleOpen.HAPPYSAVING ? "▴ ซ่อนตารางเงินคืนตลอดสัญญา" : "▾ ดูตารางเงินคืนตลอดสัญญา (การันตี)")),
+                savingsScheduleOpen.HAPPYSAVING && (() => { const s = buildSavingsSchedule("HAPPYSAVING"); return React.createElement(SavingsScheduleTable, { rows: s.rows, irr: s.irr }); })()));
             case "HAPPYWL": return selected.HAPPYWL && (React.createElement(React.Fragment, null,
                 React.createElement(PlanRow, { label: "\u0E23\u0E30\u0E22\u0E30\u0E40\u0E27\u0E25\u0E32\u0E0A\u0E33\u0E23\u0E30\u0E40\u0E1A\u0E35\u0E49\u0E22" },
                     React.createElement(Chips, { options: HAPPYWL_TERMS, value: happywlTerm, onChange: setHappywlTerm, fmt: (t) => t + " ปี" })),
@@ -2343,17 +2356,18 @@ function App() {
             return { ok: false, msg: `อายุรับประกัน ${HAPPYSAVING_MIN_AGE}-${HAPPYSAVING_MAX_AGE} ปี` };
         if (!happysavingTerm)
             return { ok: false, msg: "กรุณาเลือกระยะเวลาชำระเบี้ย (5 ปี หรือ 10 ปี)" };
-        if (happysavingSI < HAPPYSAVING_MIN_SI)
-            return { ok: false, msg: `ทุนประกันขั้นต่ำ ${baht(HAPPYSAVING_MIN_SI)} บาท` };
+        const si = getEffectiveSI("HAPPYSAVING");
+        if (si < HAPPYSAVING_MIN_SI)
+            return { ok: false, msg: (savingsMode.HAPPYSAVING === "premium" ? `เบี้ยที่กรอกต่ำเกินไป (ทุนที่คำนวณได้ต้องไม่ต่ำกว่า ${baht(HAPPYSAVING_MIN_SI)})` : `ทุนประกันขั้นต่ำ ${baht(HAPPYSAVING_MIN_SI)} บาท`) };
         const table = happysavingTerm === 5
             ? (gender === "female" ? HAPPYSAVING5_FEMALE : HAPPYSAVING5_MALE)
             : (gender === "female" ? HAPPYSAVING10_FEMALE : HAPPYSAVING10_MALE);
         const rate = table[age];
-        const premium = (rate * happysavingSI) / 1000;
+        const premium = getDisplayPremium("HAPPYSAVING", (rate * si) / 1000);
         return { ok: true, premium, benefits: [
                 ["ระยะเวลาชำระเบี้ยที่เลือก", happysavingTerm + " ปี"],
-                ["ทุนประกันภัย", baht(happysavingSI)],
-                ["เงินคืนรายปี", baht(Math.round(happysavingSI * 0.04)) + " ต่อปี (4% ของทุนประกันภัย) ตั้งแต่ปีกรมธรรม์ที่ 1 จนถึงอายุครบ 98 ปี"],
+                ["ทุนประกันภัย", baht(si)],
+                ["เงินคืนรายปี", baht(Math.round(si * 0.04)) + " ต่อปี (4% ของทุนประกันภัย) ตั้งแต่ปีกรมธรรม์ที่ 1 จนถึงอายุครบ 98 ปี"],
                 ["คุ้มครองชีวิต ปีกรมธรรม์ที่ 1-5", "100% / 200% / 300% / 400% / 500% ของทุนประกันภัย ตามลำดับปี"],
                 ["คุ้มครองชีวิตเพิ่มพิเศษ ปีที่ 6 เป็นต้นไป", "เพิ่มขึ้นปีละ 10% ของทุนประกันภัย จากปีที่ 5 (500%) สูงสุดถึง 700% ของทุนประกันภัย"],
                 ["ครบกำหนดสัญญา (อายุ 99 ปี)", "รับ 700% ของทุนประกันภัย หรือเบี้ยประกันชีวิตสะสมตามจริง แล้วแต่จำนวนใดมากกว่า"],
@@ -2853,6 +2867,15 @@ function App() {
                 }
                 break;
             }
+            case "HAPPYSAVING": {
+                if (happysavingSI < HAPPYSAVING_MIN_SI || !happysavingTerm)
+                    break;
+                const table = happysavingTerm === 5 ? (gender === "female" ? HAPPYSAVING5_FEMALE : HAPPYSAVING5_MALE) : (gender === "female" ? HAPPYSAVING10_FEMALE : HAPPYSAVING10_MALE);
+                for (let a = age; a <= 98; a++) {
+                    rows.push({ label: `อายุ ${a} ปี`, premium: a < age + happysavingTerm ? (table[age] * happysavingSI) / 1000 : 0 });
+                }
+                break;
+            }
             default: break;
         }
         return rows;
@@ -2860,6 +2883,39 @@ function App() {
     // สร้างตารางกระแสเงินคืนรายปี (การันตี) + ความคุ้มครองแต่ละปี ตลอดสัญญา สำหรับแบบสะสมทรัพย์ ตามทุนประกันที่กรอกไว้ปัจจุบัน
     function buildSavingsSchedule(id) {
         const si = getEffectiveSI(id);
+        if (id === "HAPPYSAVING") {
+            if (si < HAPPYSAVING_MIN_SI || !happysavingTerm)
+                return { rows: [], irr: null };
+            const table = happysavingTerm === 5 ? (gender === "female" ? HAPPYSAVING5_FEMALE : HAPPYSAVING5_MALE) : (gender === "female" ? HAPPYSAVING10_FEMALE : HAPPYSAVING10_MALE);
+            const rate = table[age];
+            const yearlyPremium = Math.round(getDisplayPremium(id, (rate * si) / 1000));
+            const totalYears = 99 - age; // คุ้มครองถึงอายุ 99 ปี
+            let cumPremium = 0;
+            const rows = [];
+            for (let n = 1; n <= totalYears; n++) {
+                const isLast = n === totalYears;
+                const premium = n <= happysavingTerm ? yearlyPremium : 0;
+                cumPremium += premium;
+                const deathPct = n <= 5 ? n * 100 : Math.min(500 + (n - 5) * 10, 700);
+                let cashPct, note = "";
+                if (isLast) {
+                    const maturity = Math.max(si * 7, cumPremium); // 700% ของทุนประกันภัย หรือเบี้ยที่จ่ายจริงสะสม แล้วแต่มากกว่า
+                    cashPct = Math.round((maturity / si) * 10000) / 100;
+                    note = "ครบกำหนดสัญญา (อายุ 99 ปี) รับ 700% ของทุนประกันภัย หรือเบี้ยที่จ่ายจริงสะสม แล้วแต่จำนวนใดมากกว่า";
+                }
+                else {
+                    cashPct = 4;
+                }
+                rows.push({ year: n, age: age + n - 1, premium, cashPct, cashBaht: Math.round(si * (cashPct / 100)), coverageBaht: Math.round(si * (deathPct / 100)), note: n === happysavingTerm ? "ชำระเบี้ยปีสุดท้าย" : note });
+            }
+            const irr = calcIRR((() => {
+                const cf = new Array(totalYears + 1).fill(0);
+                rows.forEach((r) => { if (r.premium > 0)
+                    cf[r.year - 1] -= r.premium; cf[r.year] += r.cashBaht; });
+                return cf;
+            })());
+            return { rows, irr };
+        }
         let scheduleDef, payYears, rate;
         if (id === "PSAVE104") {
             if (si < PSAVE104_MIN_SI)
