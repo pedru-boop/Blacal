@@ -1034,6 +1034,8 @@ function App() {
     const [hs2515SI, setHs2515SI] = useState(0);
     const [taxsaver105SI, setTaxsaver105SI] = useState(0);
     const [savingsGroupOpen, setSavingsGroupOpen] = useState(false);
+    const [compareOpen, setCompareOpen] = useState(false);
+    const [compareSI, setCompareSI] = useState(500000);
     const [savingsMode, setSavingsMode] = useState({}); // { PSAVE104: "si"|"premium", ... } default "si"
     const [savingsPremiumInput, setSavingsPremiumInput] = useState({}); // { PSAVE104: number, ... } ใช้เมื่อโหมด = "premium"
     // ทุนประกันหลักที่ใช้เป็นค่าอ้างอิงให้อนุสัญญาอื่นๆ เช็คเงื่อนไข (ต้องมาหลังประกาศ state ของทุกแบบทุนหลักด้านบนแล้วเท่านั้น)
@@ -1338,19 +1340,19 @@ function App() {
     function savingsSIFromPremium(id, premium) {
         if (!premium || premium <= 0)
             return 0;
-        const adjPremium = premium + 0.4999; // ชดเชยการปัดเศษ ให้เบี้ยที่คำนวณย้อนกลับตรงกับที่กรอกพอดี
+        const adjPremium = premium + 0.49; // ชดเชยการปัดเศษ ให้เบี้ยที่คำนวณย้อนกลับตรงกับที่กรอกพอดี
         if (id === "PSAVE104") {
             let si = (adjPremium * 1000) / PSAVE104_RATE;
             if (psave104Discount(si) > 0)
                 si = (adjPremium * 1000) / (PSAVE104_RATE - psave104Discount(si));
-            return Math.round(si);
+            return Math.floor(si);
         }
         if (id === "PSAVE126") {
-            return Math.round((adjPremium * 1000) / psave126Rate(age));
+            return Math.floor((adjPremium * 1000) / psave126Rate(age));
         }
         if (id === "HAPPYSAVING") {
             const table = happysavingTerm === 5 ? (gender === "female" ? HAPPYSAVING5_FEMALE : HAPPYSAVING5_MALE) : (gender === "female" ? HAPPYSAVING10_FEMALE : HAPPYSAVING10_MALE);
-            return Math.round((adjPremium * 1000) / table[age]);
+            return Math.floor((adjPremium * 1000) / table[age]);
         }
         if (SAVINGS_DEFS[id]) {
             const def = SAVINGS_DEFS[id];
@@ -1358,7 +1360,7 @@ function App() {
             const d = def.discount(si, age);
             if (d > 0)
                 si = (adjPremium * 1000) / (def.rate(age, gender) - d);
-            return Math.round(si);
+            return Math.floor(si);
         }
         return 0;
     }
@@ -2967,6 +2969,54 @@ function App() {
         })());
         return { rows, irr };
     }
+    // เปรียบเทียบทุกแบบสะสมทรัพย์ที่ทุนประกัน/อายุ/เพศเดียวกัน — คำนวณตรงจากสูตรแต่ละแบบ ไม่ยุ่งกับค่าที่กรอกไว้จริงในแต่ละแบบ
+    function buildComparisonRows(si) {
+        const results = [];
+        const pushResult = (id, name, rate, payYears, scheduleDef) => {
+            const yearlyPremium = Math.round((rate * si) / 1000);
+            const rows = scheduleDef.map(([deathPct, cashPct], i) => {
+                const year = i + 1;
+                return { year, premium: year <= payYears ? yearlyPremium : 0, cashBaht: Math.round(si * (cashPct / 100)) };
+            });
+            const cf = new Array(scheduleDef.length + 1).fill(0);
+            rows.forEach((r) => { if (r.premium > 0)
+                cf[r.year - 1] -= r.premium; cf[r.year] += r.cashBaht; });
+            const irr = calcIRR(cf);
+            results.push({ id, name, premium: yearlyPremium, payYears, totalYears: scheduleDef.length, irr });
+        };
+        if (age >= PSAVE104_MIN_AGE && age <= PSAVE104_MAX_AGE && si >= PSAVE104_MIN_SI) {
+            pushResult("PSAVE104", "เพรสทีจ เซฟวิ่ง 10/4", PSAVE104_RATE - psave104Discount(si), PSAVE104_PAY_YEARS, PSAVE104_SCHEDULE);
+        }
+        if (age >= PSAVE126_MIN_AGE && age <= PSAVE126_MAX_AGE && si >= PSAVE126_MIN_SI) {
+            pushResult("PSAVE126", "เพรสทีจ เซฟวิ่ง 12/6", psave126Rate(age), PSAVE126_PAY_YEARS, PSAVE126_SCHEDULE);
+        }
+        if (age >= HAPPYSAVING_MIN_AGE && age <= HAPPYSAVING_MAX_AGE && si >= HAPPYSAVING_MIN_SI) {
+            const term = 5; // ใช้ระยะเวลาชำระเบี้ย 5 ปี (สั้นสุด) เป็นค่าเริ่มต้นสำหรับเปรียบเทียบ
+            const table = gender === "female" ? HAPPYSAVING5_FEMALE : HAPPYSAVING5_MALE;
+            const totalYears = 99 - age;
+            const yearlyPremium = Math.round((table[age] * si) / 1000);
+            let cumPremium = 0;
+            const rows = [];
+            for (let n = 1; n <= totalYears; n++) {
+                const premium = n <= term ? yearlyPremium : 0;
+                cumPremium += premium;
+                const isLast = n === totalYears;
+                const cashBaht = isLast ? Math.round(Math.max(si * 7, cumPremium)) : Math.round(si * 0.04);
+                rows.push({ year: n, premium, cashBaht });
+            }
+            const cf = new Array(totalYears + 1).fill(0);
+            rows.forEach((r) => { if (r.premium > 0)
+                cf[r.year - 1] -= r.premium; cf[r.year] += r.cashBaht; });
+            results.push({ id: "HAPPYSAVING", name: "แฮปปี้เซฟวิ่ง (มีเงินปันผล, เบี้ย 5 ปี)", premium: yearlyPremium, payYears: term, totalYears, irr: calcIRR(cf) });
+        }
+        Object.keys(SAVINGS_DEFS).forEach((id) => {
+            const def = SAVINGS_DEFS[id];
+            if (age < def.minAge || age > def.maxAge || si < def.minSI)
+                return;
+            pushResult(id, def.name, def.rate(age, gender) - def.discount(si, age), def.payYears, def.schedule);
+        });
+        return results.sort((a, b) => { var _a, _b; return ((_a = b.irr) !== null && _a !== void 0 ? _a : -Infinity) - ((_b = a.irr) !== null && _b !== void 0 ? _b : -Infinity); });
+    }
     const CALC = { SUD: calcSUD, LIFE99: calcLIFE99, UNJAI: calcUNJAI, CANCERMAX: calcCANCERMAX, PLUS2: calcPLUS2, PRESTIGE: calcPRESTIGE, ACC: calcACC, ACC3: calcACC3, TPD: calcTPD, SUPER: calcSUPER, VH: calcVH, VHKIDS: calcVHKIDS, RPPR: calcRPPR, HHP: calcHHP, OPD: calcOPD, HAPPYCI: calcHAPPYCI, LLC: calcLLC, SS: calcSS, HAPPYPENSION: calcHAPPYPENSION, HAPPYSAVING: calcHAPPYSAVING, HAPPYWL: calcHAPPYWL, HRP9920: calcHRP9920, HRPDIV: calcHRPDIV, HRP9901: calcHRP9901, HAPPYWL9901: calcHAPPYWL9901, HAPPYKID: calcHAPPYKID, CHAK: calcCHAK, CHAP: calcCHAP, PH: calcPH, PSAVE104: calcPSAVE104, PSAVE126: calcPSAVE126, HS208: calcHS208, HS126: calcHS126, HS157: calcHS157, HS147: calcHS147, HS168: calcHS168, HS1810: calcHS1810, HS2515: calcHS2515, TAXSAVER105: calcTAXSAVER105, CS: calcCS };
     function grandTotal() {
         let sum = 0;
@@ -3193,6 +3243,33 @@ function App() {
                         openEditor(p.id);
                     else
                         togglePicked(p.id); } })))),
+                React.createElement("button", { onClick: () => setCompareOpen((o) => !o), className: "w-full text-[21px] font-semibold px-4 py-2.5 rounded-xl mt-3", style: { background: "#fff", color: BRAND.warn, border: `1.5px solid ${BRAND.warn}` } }, compareOpen ? "▴ ซ่อนตารางเทียบทุกแบบ" : "▾ เทียบทุกแบบ (IRR)"),
+                compareOpen && (React.createElement("div", { className: "mt-2" },
+                    React.createElement(PlanRow, { label: "\u0E17\u0E38\u0E19\u0E1B\u0E23\u0E30\u0E01\u0E31\u0E19\u0E17\u0E35\u0E48\u0E43\u0E0A\u0E49\u0E40\u0E1B\u0E23\u0E35\u0E22\u0E1A\u0E40\u0E17\u0E35\u0E22\u0E1A (\u0E1A\u0E32\u0E17)" },
+                        React.createElement(NumInput, { value: compareSI, onChange: setCompareSI, min: 0, step: 100000 })),
+                    React.createElement("p", { className: "text-[16px] mb-2 px-1", style: { color: BRAND.sub } }, "\u0E43\u0E0A\u0E49\u0E2D\u0E32\u0E22\u0E38/\u0E40\u0E1E\u0E28\u0E1B\u0E31\u0E08\u0E08\u0E38\u0E1A\u0E31\u0E19\u0E02\u0E2D\u0E07\u0E25\u0E39\u0E01\u0E04\u0E49\u0E32\u0E17\u0E35\u0E48\u0E01\u0E23\u0E2D\u0E01\u0E44\u0E27\u0E49\u0E14\u0E49\u0E32\u0E19\u0E1A\u0E19 \u00B7 \u0E41\u0E2E\u0E1B\u0E1B\u0E35\u0E49\u0E40\u0E0B\u0E1F\u0E27\u0E34\u0E48\u0E07\u0E43\u0E0A\u0E49\u0E40\u0E1A\u0E35\u0E49\u0E22 5 \u0E1B\u0E35 (\u0E2A\u0E31\u0E49\u0E19\u0E2A\u0E38\u0E14) \u0E40\u0E1B\u0E47\u0E19\u0E04\u0E48\u0E32\u0E40\u0E23\u0E34\u0E48\u0E21\u0E15\u0E49\u0E19 \u00B7 \u0E40\u0E23\u0E35\u0E22\u0E07\u0E08\u0E32\u0E01 IRR \u0E2A\u0E39\u0E07\u0E44\u0E1B\u0E15\u0E48\u0E33"),
+                    React.createElement("div", { className: "rounded-xl border overflow-x-auto", style: { borderColor: "#D7E8F0" } },
+                        React.createElement("table", { className: "w-full text-[18px]", style: { minWidth: 560 } },
+                            React.createElement("thead", { style: { background: BRAND.bg } },
+                                React.createElement("tr", null,
+                                    React.createElement("th", { className: "text-left px-2 py-2", style: { color: BRAND.navy } }, "\u0E2D\u0E31\u0E19\u0E14\u0E31\u0E1A"),
+                                    React.createElement("th", { className: "text-left px-2 py-2", style: { color: BRAND.navy } }, "\u0E41\u0E1A\u0E1A\u0E1B\u0E23\u0E30\u0E01\u0E31\u0E19"),
+                                    React.createElement("th", { className: "text-right px-2 py-2", style: { color: BRAND.navy } }, "\u0E40\u0E1A\u0E35\u0E49\u0E22/\u0E1B\u0E35"),
+                                    React.createElement("th", { className: "text-center px-2 py-2", style: { color: BRAND.navy } }, "\u0E1B\u0E35\u0E0A\u0E33\u0E23\u0E30/\u0E04\u0E38\u0E49\u0E21\u0E04\u0E23\u0E2D\u0E07"),
+                                    React.createElement("th", { className: "text-right px-2 py-2", style: { color: BRAND.navy } }, "IRR"))),
+                            React.createElement("tbody", null, (() => {
+                                const cmp = buildComparisonRows(compareSI);
+                                return cmp.length === 0 ? (React.createElement("tr", null,
+                                    React.createElement("td", { colSpan: 5, className: "text-center px-2 py-4", style: { color: BRAND.sub } }, "\u0E44\u0E21\u0E48\u0E21\u0E35\u0E41\u0E1A\u0E1A\u0E43\u0E14\u0E23\u0E2D\u0E07\u0E23\u0E31\u0E1A\u0E17\u0E38\u0E19\u0E1B\u0E23\u0E30\u0E01\u0E31\u0E19/\u0E2D\u0E32\u0E22\u0E38\u0E19\u0E35\u0E49"))) : cmp.map((r, i) => (React.createElement("tr", { key: r.id, style: { borderTop: "1px solid #EEF3F7", background: i === 0 ? "#F3FBEF" : "transparent" } },
+                                    React.createElement("td", { className: "px-2 py-2", style: { color: BRAND.dataBlack } }, i + 1),
+                                    React.createElement("td", { className: "px-2 py-2", style: { color: BRAND.dataBlack } }, r.name),
+                                    React.createElement("td", { className: "text-right px-2 py-2", style: { color: BRAND.dataBlack } }, fmt(r.premium)),
+                                    React.createElement("td", { className: "text-center px-2 py-2", style: { color: BRAND.dataBlack } },
+                                        r.payYears,
+                                        "/",
+                                        r.totalYears),
+                                    React.createElement("td", { className: "text-right px-2 py-2 font-bold", style: { color: i === 0 ? BRAND.greenDeep : BRAND.dataBlack } }, r.irr !== null && r.irr !== undefined ? (r.irr * 100).toFixed(2) + "%" : "-"))));
+                            })()))))),
                 pickedRecommendations.some((id) => SAVINGS_IDS.includes(id)) && (React.createElement("div", { className: "flex justify-end mt-3 pt-3", style: { borderTop: "1px dashed #F3D98B" } },
                     React.createElement("button", { onClick: confirmPickedRecommendations, className: "text-[24px] font-bold px-6 py-3 rounded-full", style: { background: BRAND.navy, color: "#fff" } },
                         "\u2705 \u0E40\u0E25\u0E37\u0E2D\u0E01 (",
