@@ -611,12 +611,12 @@ const HS2515_PAY_YEARS = 15;
 const TAXSAVER105_MIN_AGE = 0, TAXSAVER105_MAX_AGE = 85, TAXSAVER105_MIN_SI = 50000;
 const taxsaver105Rate = (age) => age <= 50 ? 940 : age <= 60 ? 954.5 : 999;
 const taxsaver105Discount = (si, age) => {
-    if (age > 80)
-        return 0;
-    if (si >= 500000)
-        return 52;
+    // ตามเอกสารแนบท้าย 3 รบข.1/2567 (ทางการ) — ส่วนลดแยกตามช่วงอายุด้วย ไม่ใช่ตัวเลขเดียวทุกอายุ
+    const band = age <= 50 ? 0 : age <= 60 ? 1 : 2; // 0=0-50, 1=51-60, 2=61-85
+    if (si >= 200000)
+        return [21.5, 14.5, 30][band];
     if (si >= 100000)
-        return 10;
+        return [7, 7.5, 15][band];
     return 0;
 };
 // ปีกรมธรรม์ที่ 1-10: [% เสียชีวิต, % เงินคืนรายปีการันตี] — ปีที่10 รวมเงินคืนครบกำหนด 362%+พิเศษ117%=479%
