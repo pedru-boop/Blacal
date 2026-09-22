@@ -1095,6 +1095,22 @@ function App() {
     const [openCards, setOpenCards] = useState({});
     const [openProductCards, setOpenProductCards] = useState({ SUD: true, ACC: true });
     const [loadedFromStorage, setLoadedFromStorage] = useState(false);
+    const [uiScale, setUiScale] = useState(1);
+    const [presentMode, setPresentMode] = useState(false);
+    useEffect(() => {
+        // ปรับขนาดตัวอักษรอัตโนมัติครั้งแรก — แท็บเล็ต/จอกว้างคงขนาดใหญ่เดิม จอแคบเล็กปรับลดให้พอดี ไม่ล้นจอ
+        if (typeof window === "undefined")
+            return;
+        const w = window.innerWidth;
+        let auto = 1;
+        if (w >= 700)
+            auto = 1; // แท็บเล็ตขึ้นไป ใหญ่ชัดเหมือนเดิม
+        else if (w < 340)
+            auto = 0.82;
+        else if (w < 380)
+            auto = 0.9;
+        setUiScale(auto);
+    }, []);
     // โหลดข้อมูลที่บันทึกไว้ล่าสุด (ถ้ามี) ตอนเปิดแอปครั้งแรก
     useEffect(() => {
         (async () => {
@@ -3385,7 +3401,7 @@ function App() {
         setResult({ cards, totalYear, totalPay: totalYear * factor, factor, payLabel: PAY_MODE.find((m) => m.key === payMode).label });
     }
     const font = `@import url('https://fonts.googleapis.com/css2?family=Prompt:wght@400;500;600;700&family=IBM+Plex+Sans+Thai:wght@400;500;600;700&display=swap');`;
-    return (React.createElement("div", { style: { minHeight: "100vh", background: `linear-gradient(180deg, ${BRAND.bg} 0%, #FFFFFF 320px)`, fontFamily: "'IBM Plex Sans Thai','Prompt',sans-serif", color: BRAND.ink, fontSize: "17px", fontWeight: 500, WebkitFontSmoothing: "antialiased", textRendering: "optimizeLegibility" } },
+    return (React.createElement("div", { style: { minHeight: "100vh", background: `linear-gradient(180deg, ${BRAND.bg} 0%, #FFFFFF 320px)`, fontFamily: "'IBM Plex Sans Thai','Prompt',sans-serif", color: BRAND.ink, fontSize: "17px", fontWeight: 500, WebkitFontSmoothing: "antialiased", textRendering: "optimizeLegibility", zoom: uiScale } },
         React.createElement("style", null, font),
         React.createElement("header", { style: { background: `linear-gradient(120deg, ${BRAND.navy}, ${BRAND.navyDeep})` }, className: "text-white" },
             React.createElement("div", { className: "max-w-5xl mx-auto px-5 py-4 flex items-center gap-4 relative" },
@@ -3399,144 +3415,147 @@ function App() {
                     React.createElement("span", { style: { fontSize: 18 } }, "✨"),
                     " \u0E40\u0E25\u0E37\u0E2D\u0E01\u0E44\u0E14\u0E49\u0E2B\u0E25\u0E32\u0E22\u0E41\u0E1A\u0E1A\u0E1E\u0E23\u0E49\u0E2D\u0E21\u0E01\u0E31\u0E19"))),
         React.createElement("main", { className: "max-w-5xl mx-auto px-5 py-6 space-y-6" },
-            React.createElement("div", { className: "flex items-start gap-2 text-[24px] rounded-xl p-4", style: { background: "#FFF6E5", color: "#5C4310", border: "1px solid #F3D98B" } },
-                React.createElement("span", { style: { fontSize: 22 }, className: "mt-0.5 shrink-0" }, "ℹ️"),
-                React.createElement("span", null, "\u0E2D\u0E31\u0E15\u0E23\u0E32\u0E40\u0E1A\u0E35\u0E49\u0E22\u0E04\u0E33\u0E19\u0E27\u0E13\u0E08\u0E32\u0E01\u0E40\u0E2D\u0E01\u0E2A\u0E32\u0E23\u0E1B\u0E23\u0E30\u0E01\u0E2D\u0E1A\u0E01\u0E32\u0E23\u0E02\u0E32\u0E22\u0E17\u0E35\u0E48\u0E41\u0E19\u0E1A\u0E21\u0E32 \u0E01\u0E23\u0E38\u0E13\u0E32\u0E15\u0E23\u0E27\u0E08\u0E2A\u0E2D\u0E1A\u0E04\u0E27\u0E32\u0E21\u0E16\u0E39\u0E01\u0E15\u0E49\u0E2D\u0E07\u0E01\u0E31\u0E1A\u0E15\u0E32\u0E23\u0E32\u0E07\u0E2D\u0E31\u0E15\u0E23\u0E32\u0E40\u0E1A\u0E35\u0E49\u0E22\u0E09\u0E1A\u0E31\u0E1A\u0E17\u0E32\u0E07\u0E01\u0E32\u0E23\u0E01\u0E48\u0E2D\u0E19\u0E19\u0E33\u0E40\u0E2A\u0E19\u0E2D\u0E25\u0E39\u0E01\u0E04\u0E49\u0E32\u0E40\u0E2A\u0E21\u0E2D")),
-            React.createElement("section", { className: "rounded-2xl p-5", style: { background: BRAND.card, boxShadow: "0 6px 24px rgba(11,42,85,0.07)" } },
-                React.createElement("div", { className: "flex items-center justify-between mb-4" },
-                    React.createElement("h2", { className: "text-[27px] font-semibold flex items-center gap-2", style: { color: BRAND.navy } },
-                        React.createElement("span", { style: { fontSize: 20 } }, "👥"),
-                        " \u0E02\u0E49\u0E2D\u0E21\u0E39\u0E25\u0E1C\u0E39\u0E49\u0E40\u0E2D\u0E32\u0E1B\u0E23\u0E30\u0E01\u0E31\u0E19\u0E20\u0E31\u0E22"),
-                    React.createElement("button", { onClick: clearAll, className: "flex items-center gap-1.5 text-[21px] font-medium px-3 py-2 rounded-xl", style: { background: "#FDEAEA", color: BRAND.danger } },
-                        React.createElement("span", { style: { fontSize: 16 } }, "🧹"),
-                        " \u0E40\u0E04\u0E25\u0E35\u0E22\u0E23\u0E4C\u0E02\u0E49\u0E2D\u0E21\u0E39\u0E25\u0E17\u0E31\u0E49\u0E07\u0E2B\u0E21\u0E14")),
-                React.createElement("p", { className: "text-[21px] mb-3", style: { color: BRAND.sub } }, "\u0E02\u0E49\u0E2D\u0E21\u0E39\u0E25\u0E17\u0E35\u0E48\u0E04\u0E35\u0E22\u0E4C\u0E08\u0E30\u0E16\u0E39\u0E01\u0E1A\u0E31\u0E19\u0E17\u0E36\u0E01\u0E44\u0E27\u0E49\u0E2D\u0E31\u0E15\u0E42\u0E19\u0E21\u0E31\u0E15\u0E34\u0E43\u0E19\u0E40\u0E04\u0E23\u0E37\u0E48\u0E2D\u0E07\u0E19\u0E35\u0E49 \u0E41\u0E21\u0E49\u0E1B\u0E34\u0E14\u0E41\u0E2D\u0E1B\u0E41\u0E25\u0E49\u0E27\u0E40\u0E1B\u0E34\u0E14\u0E43\u0E2B\u0E21\u0E48\u0E01\u0E47\u0E22\u0E31\u0E07\u0E2D\u0E22\u0E39\u0E48 \u0E08\u0E19\u0E01\u0E27\u0E48\u0E32\u0E08\u0E30\u0E01\u0E14 \"\u0E40\u0E04\u0E25\u0E35\u0E22\u0E23\u0E4C\u0E02\u0E49\u0E2D\u0E21\u0E39\u0E25\u0E17\u0E31\u0E49\u0E07\u0E2B\u0E21\u0E14\""),
-                React.createElement("div", { className: "grid grid-cols-2 sm:grid-cols-4 gap-4" },
-                    React.createElement(Field, { label: "\u0E40\u0E1E\u0E28" },
-                        React.createElement(SegButton, { options: [{ k: "female", l: "หญิง" }, { k: "male", l: "ชาย" }], value: gender, onChange: setGender })),
-                    React.createElement(Field, { label: "\u0E2D\u0E32\u0E22\u0E38 (\u0E1B\u0E35)" },
-                        React.createElement(NumInput, { value: age, onChange: setAge, min: 0, max: 99 })),
-                    React.createElement(Field, { label: "\u0E0A\u0E31\u0E49\u0E19\u0E2D\u0E32\u0E0A\u0E35\u0E1E" },
-                        React.createElement(SegButton, { options: [{ k: 1, l: "1" }, { k: 2, l: "2" }, { k: 3, l: "3" }], value: occClass, onChange: setOccClass })),
-                    React.createElement(Field, { label: "\u0E07\u0E27\u0E14\u0E0A\u0E33\u0E23\u0E30\u0E40\u0E1A\u0E35\u0E49\u0E22" },
-                        React.createElement("select", { value: payMode, onChange: (e) => setPayMode(e.target.value), className: "w-full rounded-xl border px-3 py-2.5 text-[24px]", style: { borderColor: "#D7E8F0" } }, PAY_MODE.map((m) => React.createElement("option", { key: m.key, value: m.key }, m.label)))))),
-            age >= 0 && age <= 14 && (() => {
-                const csProduct = PRODUCTS.find((p) => p.id === "CS");
-                const csMandatory = selected.CANCERMAX && !csDisabled;
-                return (React.createElement("section", { className: "rounded-2xl p-5", style: { background: "#FFF9EE", boxShadow: "0 6px 24px rgba(11,42,85,0.07)", border: "1.5px solid #F3D98B" } },
-                    React.createElement("h2", { className: "text-[27px] font-bold mb-1", style: { color: BRAND.mainBlue } }, "\uD83D\uDEE1\uFE0F \u0E04\u0E38\u0E49\u0E21\u0E04\u0E23\u0E2D\u0E07\u0E01\u0E32\u0E23\u0E0A\u0E33\u0E23\u0E30\u0E40\u0E1A\u0E35\u0E49\u0E22 (\u0E04\u0E0A.)"),
-                    React.createElement("p", { className: "text-[21px] mb-3", style: { color: BRAND.sub } }, csMandatory
-                        ? "จำเป็นต้องซื้อคู่กับแคนเซอร์ แม็กซ์ สำหรับผู้เยาว์อายุ 0-14 ปี ระบบติ๊กเลือกให้อัตโนมัติแล้ว"
-                        : "ลูกค้าอายุ 0-14 ปี เข้าเงื่อนไขสัญญานี้ — คุ้มครองผู้ปกครองที่ชำระเบี้ย หากเสียชีวิตหรือทุพพลภาพถาวรสิ้นเชิง บริษัทจะชำระเบี้ยแทนให้จนครบกำหนด แนะนำให้พิจารณาทุกครั้ง"),
-                    React.createElement(ProductRow, { product: csProduct, checked: selected.CS, onToggle: () => toggle("CS"), age: age, live: liveResults.CS, pending: PRIMARY_FIELD_ZERO.CS, disabled: csDisabled || selected.UNJAI || selected.PRESTIGE, recommended: false, expanded: !!openProductCards.CS, onToggleExpand: () => toggleProductCard("CS") }, renderProductChildren(csProduct))));
-            })(),
-            React.createElement("section", { className: "rounded-2xl p-5", style: { background: BRAND.card, boxShadow: "0 6px 24px rgba(11,42,85,0.07)" } },
-                React.createElement("h2", { className: "text-[27px] font-semibold mb-1", style: { color: BRAND.navy } }, "\u0E25\u0E39\u0E01\u0E04\u0E49\u0E32\u0E01\u0E31\u0E07\u0E27\u0E25\u0E40\u0E23\u0E37\u0E48\u0E2D\u0E07\u0E2D\u0E30\u0E44\u0E23\u0E40\u0E1B\u0E47\u0E19\u0E1E\u0E34\u0E40\u0E28\u0E29?"),
-                React.createElement("p", { className: "text-[21px] mb-3", style: { color: BRAND.sub } }, "\u0E40\u0E25\u0E37\u0E2D\u0E01\u0E44\u0E14\u0E49\u0E21\u0E32\u0E01\u0E01\u0E27\u0E48\u0E32 1 \u0E02\u0E49\u0E2D \u0E23\u0E30\u0E1A\u0E1A\u0E08\u0E30\u0E02\u0E36\u0E49\u0E19\u0E1B\u0E49\u0E32\u0E22 \"\u2B50 \u0E41\u0E19\u0E30\u0E19\u0E33\" \u0E44\u0E27\u0E49\u0E17\u0E35\u0E48\u0E41\u0E1A\u0E1A\u0E1B\u0E23\u0E30\u0E01\u0E31\u0E19\u0E17\u0E35\u0E48\u0E40\u0E01\u0E35\u0E48\u0E22\u0E27\u0E02\u0E49\u0E2D\u0E07\u0E14\u0E49\u0E32\u0E19\u0E25\u0E48\u0E32\u0E07\u0E41\u0E25\u0E30\u0E40\u0E25\u0E37\u0E48\u0E2D\u0E19\u0E02\u0E36\u0E49\u0E19\u0E21\u0E32\u0E1A\u0E19\u0E2A\u0E38\u0E14 \u2014 \u0E16\u0E49\u0E32\u0E2D\u0E19\u0E38\u0E2A\u0E31\u0E0D\u0E0D\u0E32\u0E17\u0E35\u0E48\u0E41\u0E19\u0E30\u0E19\u0E33\u0E15\u0E49\u0E2D\u0E07\u0E0B\u0E37\u0E49\u0E2D\u0E04\u0E39\u0E48\u0E01\u0E31\u0E1A\u0E17\u0E38\u0E19\u0E1B\u0E23\u0E30\u0E01\u0E31\u0E19\u0E2B\u0E25\u0E31\u0E01 \u0E23\u0E30\u0E1A\u0E1A\u0E08\u0E30\u0E41\u0E19\u0E30\u0E19\u0E33\u0E17\u0E38\u0E19\u0E2B\u0E25\u0E31\u0E01\u0E17\u0E35\u0E48\u0E40\u0E1A\u0E35\u0E49\u0E22\u0E16\u0E39\u0E01\u0E17\u0E35\u0E48\u0E2A\u0E38\u0E14\u0E2A\u0E33\u0E2B\u0E23\u0E31\u0E1A\u0E2D\u0E32\u0E22\u0E38\u0E19\u0E35\u0E49\u0E21\u0E32\u0E04\u0E39\u0E48\u0E01\u0E31\u0E19\u0E43\u0E2B\u0E49\u0E14\u0E49\u0E27\u0E22 (\u0E40\u0E17\u0E35\u0E22\u0E1A\u0E40\u0E09\u0E1E\u0E32\u0E30\u0E2A\u0E38\u0E14\u0E04\u0E38\u0E49\u0E21/99-99 \u0E40\u0E1E\u0E23\u0E32\u0E30\u0E17\u0E38\u0E19\u0E02\u0E31\u0E49\u0E19\u0E15\u0E48\u0E33\u0E19\u0E49\u0E2D\u0E22\u0E2A\u0E38\u0E14) \u0E2B\u0E23\u0E37\u0E2D\u0E02\u0E49\u0E32\u0E21\u0E02\u0E31\u0E49\u0E19\u0E15\u0E2D\u0E19\u0E19\u0E35\u0E49\u0E41\u0E25\u0E49\u0E27\u0E40\u0E25\u0E37\u0E2D\u0E01\u0E41\u0E1A\u0E1A\u0E1B\u0E23\u0E30\u0E01\u0E31\u0E19\u0E40\u0E2D\u0E07\u0E44\u0E14\u0E49\u0E40\u0E25\u0E22"),
-                React.createElement("div", { className: "flex flex-wrap gap-2" },
-                    CONCERNS.map((c) => {
-                        const active = selectedConcerns.includes(c.id);
-                        return (React.createElement("button", { key: c.id, onClick: () => toggleConcern(c.id), className: "flex items-center gap-1.5 text-[21px] font-medium px-3.5 py-2.5 rounded-full border", style: { borderColor: active ? BRAND.green : "#D7E8F0", background: active ? "#F0FAE6" : "#fff", color: active ? BRAND.greenDeep : BRAND.navy } },
-                            React.createElement("span", null, c.icon),
-                            " ",
-                            c.label));
-                    }),
-                    React.createElement("button", { onClick: () => setSavingsGroupOpen((o) => !o), className: "flex items-center gap-1.5 text-[21px] font-medium px-3.5 py-2.5 rounded-full border", style: { borderColor: savingsGroupOpen ? BRAND.green : "#D7E8F0", background: savingsGroupOpen ? "#F0FAE6" : "#fff", color: savingsGroupOpen ? BRAND.greenDeep : BRAND.navy } },
-                        React.createElement("span", null, "\uD83D\uDCB0"),
-                        " \u0E1B\u0E23\u0E30\u0E01\u0E31\u0E19\u0E2A\u0E30\u0E2A\u0E21\u0E17\u0E23\u0E31\u0E1E\u0E22\u0E4C"),
-                    React.createElement("button", { onClick: () => setPensionGroupOpen((o) => !o), className: "flex items-center gap-1.5 text-[21px] font-medium px-3.5 py-2.5 rounded-full border", style: { borderColor: pensionGroupOpen ? BRAND.green : "#D7E8F0", background: pensionGroupOpen ? "#F0FAE6" : "#fff", color: pensionGroupOpen ? BRAND.greenDeep : BRAND.navy } },
-                        React.createElement("span", null, "\uD83C\uDFD6\uFE0F"),
-                        " \u0E1B\u0E23\u0E30\u0E01\u0E31\u0E19\u0E1A\u0E33\u0E19\u0E32\u0E0D"),
-                    selectedConcerns.length > 0 && (React.createElement("button", { onClick: () => { setSelectedConcerns([]); setPickedRecommendations([]); }, className: "flex items-center gap-1.5 text-[21px] font-medium px-3.5 py-2.5 rounded-full", style: { background: "#FDEAEA", color: BRAND.danger } }, "\u2715 \u0E25\u0E49\u0E32\u0E07\u0E01\u0E32\u0E23\u0E40\u0E25\u0E37\u0E2D\u0E01")))),
-            savingsGroupOpen && (React.createElement("section", { id: "savings-group-section", className: "rounded-2xl p-4", style: { background: "#FFF9EE", boxShadow: "0 6px 24px rgba(11,42,85,0.07)", border: "1.5px solid #F3D98B" } },
-                React.createElement("div", { className: "flex items-center justify-between mb-1" },
-                    React.createElement("h2", { className: "text-[24px] font-bold px-1", style: { color: BRAND.mainBlue } }, "\uD83D\uDCB0 \u0E1B\u0E23\u0E30\u0E01\u0E31\u0E19\u0E2A\u0E30\u0E2A\u0E21\u0E17\u0E23\u0E31\u0E1E\u0E22\u0E4C"),
-                    React.createElement("button", { onClick: () => setSavingsGroupOpen(false), className: "text-[19px] font-medium px-2 py-1", style: { color: BRAND.sub } }, "\u2715 \u0E1B\u0E34\u0E14")),
-                React.createElement("p", { className: "text-[16px] mb-3 px-1", style: { color: BRAND.sub } }, "\u0E15\u0E34\u0E4A\u0E01\u0E40\u0E25\u0E37\u0E2D\u0E01\u0E44\u0E14\u0E49\u0E2B\u0E25\u0E32\u0E22\u0E2D\u0E31\u0E19\u0E41\u0E25\u0E49\u0E27\u0E01\u0E14\u0E1B\u0E38\u0E48\u0E21 \"\u0E40\u0E25\u0E37\u0E2D\u0E01\" \u0E14\u0E49\u0E32\u0E19\u0E25\u0E48\u0E32\u0E07\u0E40\u0E1E\u0E37\u0E48\u0E2D\u0E44\u0E1B\u0E01\u0E23\u0E2D\u0E01\u0E02\u0E49\u0E2D\u0E21\u0E39\u0E25 \u00B7 \u0E40\u0E25\u0E37\u0E2D\u0E01\u0E44\u0E14\u0E49\u0E40\u0E1E\u0E35\u0E22\u0E07 1 \u0E41\u0E1A\u0E1A (\u0E17\u0E38\u0E19\u0E1B\u0E23\u0E30\u0E01\u0E31\u0E19\u0E2B\u0E25\u0E31\u0E01\u0E40\u0E25\u0E37\u0E2D\u0E01\u0E44\u0E14\u0E49 1 \u0E41\u0E1A\u0E1A\u0E40\u0E17\u0E48\u0E32\u0E19\u0E31\u0E49\u0E19)"),
-                React.createElement("div", { className: "grid grid-cols-2 sm:grid-cols-3 gap-1.5 sm:gap-2" }, sortByRecommended(PRODUCTS.filter((p) => SAVINGS_IDS.includes(p.id))).map((p) => (React.createElement(CompactChip, { key: p.id, product: p, checked: !!selected[p.id], picked: pickedRecommendations.includes(p.id), disabled: productDisabled(p), recommended: false, onCheckboxClick: () => { if (selected[p.id])
-                        toggle(p.id);
-                    else
-                        togglePicked(p.id); }, onNameClick: () => { if (selected[p.id])
-                        openEditor(p.id);
-                    else
-                        togglePicked(p.id); } })))),
-                React.createElement("button", { onClick: () => setCompareOpen((o) => !o), className: "w-full text-[21px] font-semibold px-4 py-2.5 rounded-xl mt-3", style: { background: "#fff", color: BRAND.warn, border: `1.5px solid ${BRAND.warn}` } }, compareOpen ? "▴ ซ่อนตารางเทียบทุกแบบ" : "▾ เทียบทุกแบบ (IRR)"),
-                compareOpen && (React.createElement("div", { className: "mt-2" },
-                    React.createElement(PlanRow, { label: "\u0E17\u0E38\u0E19\u0E1B\u0E23\u0E30\u0E01\u0E31\u0E19\u0E17\u0E35\u0E48\u0E43\u0E0A\u0E49\u0E40\u0E1B\u0E23\u0E35\u0E22\u0E1A\u0E40\u0E17\u0E35\u0E22\u0E1A (\u0E1A\u0E32\u0E17)" },
-                        React.createElement(NumInput, { value: compareSI, onChange: setCompareSI, min: 0, step: 100000 })),
-                    React.createElement("p", { className: "text-[16px] mb-2 px-1", style: { color: BRAND.sub } }, "\u0E43\u0E0A\u0E49\u0E2D\u0E32\u0E22\u0E38/\u0E40\u0E1E\u0E28\u0E1B\u0E31\u0E08\u0E08\u0E38\u0E1A\u0E31\u0E19\u0E02\u0E2D\u0E07\u0E25\u0E39\u0E01\u0E04\u0E49\u0E32\u0E17\u0E35\u0E48\u0E01\u0E23\u0E2D\u0E01\u0E44\u0E27\u0E49\u0E14\u0E49\u0E32\u0E19\u0E1A\u0E19 \u00B7 \u0E41\u0E2E\u0E1B\u0E1B\u0E35\u0E49\u0E40\u0E0B\u0E1F\u0E27\u0E34\u0E48\u0E07\u0E43\u0E0A\u0E49\u0E40\u0E1A\u0E35\u0E49\u0E22 5 \u0E1B\u0E35 (\u0E2A\u0E31\u0E49\u0E19\u0E2A\u0E38\u0E14) \u0E40\u0E1B\u0E47\u0E19\u0E04\u0E48\u0E32\u0E40\u0E23\u0E34\u0E48\u0E21\u0E15\u0E49\u0E19 \u00B7 \u0E40\u0E23\u0E35\u0E22\u0E07\u0E08\u0E32\u0E01 IRR \u0E2A\u0E39\u0E07\u0E44\u0E1B\u0E15\u0E48\u0E33"),
-                    React.createElement("div", { className: "rounded-xl border overflow-x-auto", style: { borderColor: "#D7E8F0" } },
-                        React.createElement("table", { className: "w-full text-[18px]", style: { minWidth: 560 } },
-                            React.createElement("thead", { style: { background: BRAND.bg } },
-                                React.createElement("tr", null,
-                                    React.createElement("th", { className: "text-left px-2 py-2", style: { color: BRAND.navy } }, "\u0E2D\u0E31\u0E19\u0E14\u0E31\u0E1A"),
-                                    React.createElement("th", { className: "text-left px-2 py-2", style: { color: BRAND.navy } }, "\u0E41\u0E1A\u0E1A\u0E1B\u0E23\u0E30\u0E01\u0E31\u0E19"),
-                                    React.createElement("th", { className: "text-right px-2 py-2", style: { color: BRAND.navy } }, "\u0E40\u0E1A\u0E35\u0E49\u0E22/\u0E1B\u0E35"),
-                                    React.createElement("th", { className: "text-center px-2 py-2", style: { color: BRAND.navy } }, "\u0E1B\u0E35\u0E0A\u0E33\u0E23\u0E30/\u0E04\u0E38\u0E49\u0E21\u0E04\u0E23\u0E2D\u0E07"),
-                                    React.createElement("th", { className: "text-right px-2 py-2", style: { color: BRAND.navy } }, "IRR"))),
-                            React.createElement("tbody", null, (() => {
-                                const cmp = buildComparisonRows(compareSI);
-                                return cmp.length === 0 ? (React.createElement("tr", null,
-                                    React.createElement("td", { colSpan: 5, className: "text-center px-2 py-4", style: { color: BRAND.sub } }, "\u0E44\u0E21\u0E48\u0E21\u0E35\u0E41\u0E1A\u0E1A\u0E43\u0E14\u0E23\u0E2D\u0E07\u0E23\u0E31\u0E1A\u0E17\u0E38\u0E19\u0E1B\u0E23\u0E30\u0E01\u0E31\u0E19/\u0E2D\u0E32\u0E22\u0E38\u0E19\u0E35\u0E49"))) : cmp.map((r, i) => (React.createElement("tr", { key: r.id, style: { borderTop: "1px solid #EEF3F7", background: i === 0 ? "#F3FBEF" : "transparent" } },
-                                    React.createElement("td", { className: "px-2 py-2", style: { color: BRAND.dataBlack } }, i + 1),
-                                    React.createElement("td", { className: "px-2 py-2", style: { color: BRAND.dataBlack } }, r.name),
-                                    React.createElement("td", { className: "text-right px-2 py-2", style: { color: BRAND.dataBlack } }, fmt(r.premium)),
-                                    React.createElement("td", { className: "text-center px-2 py-2", style: { color: BRAND.dataBlack } },
-                                        r.payYears,
-                                        "/",
-                                        r.totalYears),
-                                    React.createElement("td", { className: "text-right px-2 py-2 font-bold", style: { color: i === 0 ? BRAND.greenDeep : BRAND.dataBlack } }, r.irr !== null && r.irr !== undefined ? (r.irr * 100).toFixed(2) + "%" : "-"))));
-                            })()))))),
-                pickedRecommendations.some((id) => SAVINGS_IDS.includes(id)) && (React.createElement("div", { className: "flex justify-end mt-3 pt-3", style: { borderTop: "1px dashed #F3D98B" } },
-                    React.createElement("button", { onClick: confirmPickedRecommendations, className: "text-[24px] font-bold px-6 py-3 rounded-full", style: { background: BRAND.navy, color: "#fff" } },
-                        "\u2705 \u0E40\u0E25\u0E37\u0E2D\u0E01 (",
-                        pickedRecommendations.filter((id) => SAVINGS_IDS.includes(id)).length,
-                        ")"))))),
-            pensionGroupOpen && (React.createElement("section", { id: "pension-group-section", className: "rounded-2xl p-4", style: { background: "#EFF7FB", boxShadow: "0 6px 24px rgba(11,42,85,0.07)", border: "1.5px solid #BFE0F0" } },
-                React.createElement("div", { className: "flex items-center justify-between mb-1" },
-                    React.createElement("h2", { className: "text-[24px] font-bold px-1", style: { color: BRAND.mainBlue } }, "\uD83C\uDFD6\uFE0F \u0E1B\u0E23\u0E30\u0E01\u0E31\u0E19\u0E1A\u0E33\u0E19\u0E32\u0E0D"),
-                    React.createElement("button", { onClick: () => setPensionGroupOpen(false), className: "text-[19px] font-medium px-2 py-1", style: { color: BRAND.sub } }, "\u2715 \u0E1B\u0E34\u0E14")),
-                React.createElement("p", { className: "text-[16px] mb-3 px-1", style: { color: BRAND.sub } }, "\u0E15\u0E34\u0E4A\u0E01\u0E40\u0E25\u0E37\u0E2D\u0E01\u0E44\u0E14\u0E49\u0E2B\u0E25\u0E32\u0E22\u0E2D\u0E31\u0E19\u0E41\u0E25\u0E49\u0E27\u0E01\u0E14\u0E1B\u0E38\u0E48\u0E21 \"\u0E40\u0E25\u0E37\u0E2D\u0E01\" \u0E14\u0E49\u0E32\u0E19\u0E25\u0E48\u0E32\u0E07\u0E40\u0E1E\u0E37\u0E48\u0E2D\u0E44\u0E1B\u0E01\u0E23\u0E2D\u0E01\u0E02\u0E49\u0E2D\u0E21\u0E39\u0E25 \u00B7 \u0E40\u0E25\u0E37\u0E2D\u0E01\u0E44\u0E14\u0E49\u0E40\u0E1E\u0E35\u0E22\u0E07 1 \u0E41\u0E1A\u0E1A (\u0E17\u0E38\u0E19\u0E1B\u0E23\u0E30\u0E01\u0E31\u0E19\u0E2B\u0E25\u0E31\u0E01\u0E40\u0E25\u0E37\u0E2D\u0E01\u0E44\u0E14\u0E49 1 \u0E41\u0E1A\u0E1A\u0E40\u0E17\u0E48\u0E32\u0E19\u0E31\u0E49\u0E19)"),
-                React.createElement("div", { className: "grid grid-cols-2 sm:grid-cols-3 gap-1.5 sm:gap-2" }, sortByRecommended(PRODUCTS.filter((p) => PENSION_IDS.includes(p.id))).map((p) => (React.createElement(CompactChip, { key: p.id, product: p, checked: !!selected[p.id], picked: pickedRecommendations.includes(p.id), disabled: productDisabled(p), recommended: false, onCheckboxClick: () => { if (selected[p.id])
-                        toggle(p.id);
-                    else
-                        togglePicked(p.id); }, onNameClick: () => { if (selected[p.id])
-                        openEditor(p.id);
-                    else
-                        togglePicked(p.id); } })))),
-                pickedRecommendations.some((id) => PENSION_IDS.includes(id)) && (React.createElement("div", { className: "flex justify-end mt-3 pt-3", style: { borderTop: "1px dashed #BFE0F0" } },
-                    React.createElement("button", { onClick: confirmPickedRecommendations, className: "text-[24px] font-bold px-6 py-3 rounded-full", style: { background: BRAND.navy, color: "#fff" } },
-                        "\u2705 \u0E40\u0E25\u0E37\u0E2D\u0E01 (",
-                        pickedRecommendations.filter((id) => PENSION_IDS.includes(id)).length,
-                        ")"))))),
-            React.createElement("section", { className: "rounded-2xl p-4", style: { background: BRAND.card, boxShadow: "0 6px 24px rgba(11,42,85,0.07)" } },
-                React.createElement("h2", { className: "text-[24px] font-bold mb-1 px-1", style: { color: BRAND.mainBlue } }, "\u0E20\u0E32\u0E1E\u0E23\u0E27\u0E21\u0E41\u0E1A\u0E1A\u0E1B\u0E23\u0E30\u0E01\u0E31\u0E19\u0E17\u0E31\u0E49\u0E07\u0E2B\u0E21\u0E14"),
-                React.createElement("p", { className: "text-[16px] mb-3 px-1", style: { color: BRAND.sub } }, "\u0E15\u0E34\u0E4A\u0E01\u0E40\u0E25\u0E37\u0E2D\u0E01\u0E44\u0E14\u0E49\u0E2B\u0E25\u0E32\u0E22\u0E2D\u0E31\u0E19\u0E1E\u0E23\u0E49\u0E2D\u0E21\u0E01\u0E31\u0E19 \u0E41\u0E25\u0E49\u0E27\u0E01\u0E14\u0E1B\u0E38\u0E48\u0E21 \"\u0E40\u0E25\u0E37\u0E2D\u0E01\" \u0E14\u0E49\u0E32\u0E19\u0E25\u0E48\u0E32\u0E07\u0E40\u0E1E\u0E37\u0E48\u0E2D\u0E44\u0E1B\u0E01\u0E23\u0E2D\u0E01\u0E02\u0E49\u0E2D\u0E21\u0E39\u0E25 \u00B7 \u0E17\u0E38\u0E19\u0E2B\u0E25\u0E31\u0E01\u0E40\u0E25\u0E37\u0E2D\u0E01\u0E44\u0E14\u0E49 1 \u0E41\u0E1A\u0E1A"),
-                (selected.UNJAI || selected.CANCERMAX) && (React.createElement("p", { className: "text-[16px] mb-2 px-1 font-medium", style: { color: BRAND.warn } },
-                    "\u26A0 ",
-                    selected.UNJAI ? "อุ่นใจ โรคร้าย" : "แคนเซอร์ แม็กซ์",
-                    " \u0E40\u0E1B\u0E47\u0E19\u0E41\u0E1E\u0E47\u0E01\u0E40\u0E01\u0E08\u0E1B\u0E34\u0E14 \u0E44\u0E21\u0E48\u0E2A\u0E32\u0E21\u0E32\u0E23\u0E16\u0E0B\u0E37\u0E49\u0E2D\u0E2A\u0E31\u0E0D\u0E0D\u0E32\u0E40\u0E1E\u0E34\u0E48\u0E21\u0E40\u0E15\u0E34\u0E21\u0E2D\u0E37\u0E48\u0E19\u0E40\u0E1E\u0E34\u0E48\u0E21\u0E44\u0E14\u0E49",
-                    selected.CANCERMAX ? " ยกเว้น คช. ซึ่งผู้เยาว์อายุ 0-14 ปี ต้องซื้อเพิ่มด้วย" : "")),
-                React.createElement("div", { className: "grid grid-cols-4 gap-1.5 sm:gap-2" }, CATEGORY_GROUPS.map((group) => (React.createElement("div", { key: group.id, className: "space-y-1" },
-                    React.createElement("p", { className: "text-[13px] sm:text-[14px] font-bold text-center leading-tight px-0.5 py-1.5 rounded-lg", style: { background: BRAND.bg, color: BRAND.navy } }, group.label),
-                    sortByRecommended(PRODUCTS.filter((p) => group.ids.includes(p.id))).map((p) => (React.createElement(CompactChip, { key: p.id, product: p, checked: !!selected[p.id], picked: pickedRecommendations.includes(p.id), disabled: productDisabled(p), recommended: recommendedProductIds.has(p.id), tag: COMPACT_TAG[p.id], onCheckboxClick: () => { if (selected[p.id])
+            !presentMode && (React.createElement(React.Fragment, null,
+                React.createElement("div", { className: "flex items-start gap-2 text-[24px] rounded-xl p-4", style: { background: "#FFF6E5", color: "#5C4310", border: "1px solid #F3D98B" } },
+                    React.createElement("span", { style: { fontSize: 22 }, className: "mt-0.5 shrink-0" }, "ℹ️"),
+                    React.createElement("span", null, "\u0E2D\u0E31\u0E15\u0E23\u0E32\u0E40\u0E1A\u0E35\u0E49\u0E22\u0E04\u0E33\u0E19\u0E27\u0E13\u0E08\u0E32\u0E01\u0E40\u0E2D\u0E01\u0E2A\u0E32\u0E23\u0E1B\u0E23\u0E30\u0E01\u0E2D\u0E1A\u0E01\u0E32\u0E23\u0E02\u0E32\u0E22\u0E17\u0E35\u0E48\u0E41\u0E19\u0E1A\u0E21\u0E32 \u0E01\u0E23\u0E38\u0E13\u0E32\u0E15\u0E23\u0E27\u0E08\u0E2A\u0E2D\u0E1A\u0E04\u0E27\u0E32\u0E21\u0E16\u0E39\u0E01\u0E15\u0E49\u0E2D\u0E07\u0E01\u0E31\u0E1A\u0E15\u0E32\u0E23\u0E32\u0E07\u0E2D\u0E31\u0E15\u0E23\u0E32\u0E40\u0E1A\u0E35\u0E49\u0E22\u0E09\u0E1A\u0E31\u0E1A\u0E17\u0E32\u0E07\u0E01\u0E32\u0E23\u0E01\u0E48\u0E2D\u0E19\u0E19\u0E33\u0E40\u0E2A\u0E19\u0E2D\u0E25\u0E39\u0E01\u0E04\u0E49\u0E32\u0E40\u0E2A\u0E21\u0E2D")),
+                React.createElement("section", { className: "rounded-2xl p-5", style: { background: BRAND.card, boxShadow: "0 6px 24px rgba(11,42,85,0.07)" } },
+                    React.createElement("div", { className: "flex items-center justify-between mb-4" },
+                        React.createElement("h2", { className: "text-[27px] font-semibold flex items-center gap-2", style: { color: BRAND.navy } },
+                            React.createElement("span", { style: { fontSize: 20 } }, "👥"),
+                            " \u0E02\u0E49\u0E2D\u0E21\u0E39\u0E25\u0E1C\u0E39\u0E49\u0E40\u0E2D\u0E32\u0E1B\u0E23\u0E30\u0E01\u0E31\u0E19\u0E20\u0E31\u0E22"),
+                        React.createElement("button", { onClick: clearAll, className: "flex items-center gap-1.5 text-[21px] font-medium px-3 py-2 rounded-xl", style: { background: "#FDEAEA", color: BRAND.danger } },
+                            React.createElement("span", { style: { fontSize: 16 } }, "🧹"),
+                            " \u0E40\u0E04\u0E25\u0E35\u0E22\u0E23\u0E4C\u0E02\u0E49\u0E2D\u0E21\u0E39\u0E25\u0E17\u0E31\u0E49\u0E07\u0E2B\u0E21\u0E14")),
+                    React.createElement("p", { className: "text-[21px] mb-3", style: { color: BRAND.sub } }, "\u0E02\u0E49\u0E2D\u0E21\u0E39\u0E25\u0E17\u0E35\u0E48\u0E04\u0E35\u0E22\u0E4C\u0E08\u0E30\u0E16\u0E39\u0E01\u0E1A\u0E31\u0E19\u0E17\u0E36\u0E01\u0E44\u0E27\u0E49\u0E2D\u0E31\u0E15\u0E42\u0E19\u0E21\u0E31\u0E15\u0E34\u0E43\u0E19\u0E40\u0E04\u0E23\u0E37\u0E48\u0E2D\u0E07\u0E19\u0E35\u0E49 \u0E41\u0E21\u0E49\u0E1B\u0E34\u0E14\u0E41\u0E2D\u0E1B\u0E41\u0E25\u0E49\u0E27\u0E40\u0E1B\u0E34\u0E14\u0E43\u0E2B\u0E21\u0E48\u0E01\u0E47\u0E22\u0E31\u0E07\u0E2D\u0E22\u0E39\u0E48 \u0E08\u0E19\u0E01\u0E27\u0E48\u0E32\u0E08\u0E30\u0E01\u0E14 \"\u0E40\u0E04\u0E25\u0E35\u0E22\u0E23\u0E4C\u0E02\u0E49\u0E2D\u0E21\u0E39\u0E25\u0E17\u0E31\u0E49\u0E07\u0E2B\u0E21\u0E14\""),
+                    React.createElement("div", { className: "grid grid-cols-2 sm:grid-cols-4 gap-4" },
+                        React.createElement(Field, { label: "\u0E40\u0E1E\u0E28" },
+                            React.createElement(SegButton, { options: [{ k: "female", l: "หญิง" }, { k: "male", l: "ชาย" }], value: gender, onChange: setGender })),
+                        React.createElement(Field, { label: "\u0E2D\u0E32\u0E22\u0E38 (\u0E1B\u0E35)" },
+                            React.createElement(NumInput, { value: age, onChange: setAge, min: 0, max: 99 })),
+                        React.createElement(Field, { label: "\u0E0A\u0E31\u0E49\u0E19\u0E2D\u0E32\u0E0A\u0E35\u0E1E" },
+                            React.createElement(SegButton, { options: [{ k: 1, l: "1" }, { k: 2, l: "2" }, { k: 3, l: "3" }], value: occClass, onChange: setOccClass })),
+                        React.createElement(Field, { label: "\u0E07\u0E27\u0E14\u0E0A\u0E33\u0E23\u0E30\u0E40\u0E1A\u0E35\u0E49\u0E22" },
+                            React.createElement("select", { value: payMode, onChange: (e) => setPayMode(e.target.value), className: "w-full rounded-xl border px-3 py-2.5 text-[24px]", style: { borderColor: "#D7E8F0" } }, PAY_MODE.map((m) => React.createElement("option", { key: m.key, value: m.key }, m.label)))))),
+                age >= 0 && age <= 14 && (() => {
+                    const csProduct = PRODUCTS.find((p) => p.id === "CS");
+                    const csMandatory = selected.CANCERMAX && !csDisabled;
+                    return (React.createElement("section", { className: "rounded-2xl p-5", style: { background: "#FFF9EE", boxShadow: "0 6px 24px rgba(11,42,85,0.07)", border: "1.5px solid #F3D98B" } },
+                        React.createElement("h2", { className: "text-[27px] font-bold mb-1", style: { color: BRAND.mainBlue } }, "\uD83D\uDEE1\uFE0F \u0E04\u0E38\u0E49\u0E21\u0E04\u0E23\u0E2D\u0E07\u0E01\u0E32\u0E23\u0E0A\u0E33\u0E23\u0E30\u0E40\u0E1A\u0E35\u0E49\u0E22 (\u0E04\u0E0A.)"),
+                        React.createElement("p", { className: "text-[21px] mb-3", style: { color: BRAND.sub } }, csMandatory
+                            ? "จำเป็นต้องซื้อคู่กับแคนเซอร์ แม็กซ์ สำหรับผู้เยาว์อายุ 0-14 ปี ระบบติ๊กเลือกให้อัตโนมัติแล้ว"
+                            : "ลูกค้าอายุ 0-14 ปี เข้าเงื่อนไขสัญญานี้ — คุ้มครองผู้ปกครองที่ชำระเบี้ย หากเสียชีวิตหรือทุพพลภาพถาวรสิ้นเชิง บริษัทจะชำระเบี้ยแทนให้จนครบกำหนด แนะนำให้พิจารณาทุกครั้ง"),
+                        React.createElement(ProductRow, { product: csProduct, checked: selected.CS, onToggle: () => toggle("CS"), age: age, live: liveResults.CS, pending: PRIMARY_FIELD_ZERO.CS, disabled: csDisabled || selected.UNJAI || selected.PRESTIGE, recommended: false, expanded: !!openProductCards.CS, onToggleExpand: () => toggleProductCard("CS") }, renderProductChildren(csProduct))));
+                })(),
+                React.createElement("section", { className: "rounded-2xl p-5", style: { background: BRAND.card, boxShadow: "0 6px 24px rgba(11,42,85,0.07)" } },
+                    React.createElement("h2", { className: "text-[27px] font-semibold mb-1", style: { color: BRAND.navy } }, "\u0E25\u0E39\u0E01\u0E04\u0E49\u0E32\u0E01\u0E31\u0E07\u0E27\u0E25\u0E40\u0E23\u0E37\u0E48\u0E2D\u0E07\u0E2D\u0E30\u0E44\u0E23\u0E40\u0E1B\u0E47\u0E19\u0E1E\u0E34\u0E40\u0E28\u0E29?"),
+                    React.createElement("p", { className: "text-[21px] mb-3", style: { color: BRAND.sub } }, "\u0E40\u0E25\u0E37\u0E2D\u0E01\u0E44\u0E14\u0E49\u0E21\u0E32\u0E01\u0E01\u0E27\u0E48\u0E32 1 \u0E02\u0E49\u0E2D \u0E23\u0E30\u0E1A\u0E1A\u0E08\u0E30\u0E02\u0E36\u0E49\u0E19\u0E1B\u0E49\u0E32\u0E22 \"\u2B50 \u0E41\u0E19\u0E30\u0E19\u0E33\" \u0E44\u0E27\u0E49\u0E17\u0E35\u0E48\u0E41\u0E1A\u0E1A\u0E1B\u0E23\u0E30\u0E01\u0E31\u0E19\u0E17\u0E35\u0E48\u0E40\u0E01\u0E35\u0E48\u0E22\u0E27\u0E02\u0E49\u0E2D\u0E07\u0E14\u0E49\u0E32\u0E19\u0E25\u0E48\u0E32\u0E07\u0E41\u0E25\u0E30\u0E40\u0E25\u0E37\u0E48\u0E2D\u0E19\u0E02\u0E36\u0E49\u0E19\u0E21\u0E32\u0E1A\u0E19\u0E2A\u0E38\u0E14 \u2014 \u0E16\u0E49\u0E32\u0E2D\u0E19\u0E38\u0E2A\u0E31\u0E0D\u0E0D\u0E32\u0E17\u0E35\u0E48\u0E41\u0E19\u0E30\u0E19\u0E33\u0E15\u0E49\u0E2D\u0E07\u0E0B\u0E37\u0E49\u0E2D\u0E04\u0E39\u0E48\u0E01\u0E31\u0E1A\u0E17\u0E38\u0E19\u0E1B\u0E23\u0E30\u0E01\u0E31\u0E19\u0E2B\u0E25\u0E31\u0E01 \u0E23\u0E30\u0E1A\u0E1A\u0E08\u0E30\u0E41\u0E19\u0E30\u0E19\u0E33\u0E17\u0E38\u0E19\u0E2B\u0E25\u0E31\u0E01\u0E17\u0E35\u0E48\u0E40\u0E1A\u0E35\u0E49\u0E22\u0E16\u0E39\u0E01\u0E17\u0E35\u0E48\u0E2A\u0E38\u0E14\u0E2A\u0E33\u0E2B\u0E23\u0E31\u0E1A\u0E2D\u0E32\u0E22\u0E38\u0E19\u0E35\u0E49\u0E21\u0E32\u0E04\u0E39\u0E48\u0E01\u0E31\u0E19\u0E43\u0E2B\u0E49\u0E14\u0E49\u0E27\u0E22 (\u0E40\u0E17\u0E35\u0E22\u0E1A\u0E40\u0E09\u0E1E\u0E32\u0E30\u0E2A\u0E38\u0E14\u0E04\u0E38\u0E49\u0E21/99-99 \u0E40\u0E1E\u0E23\u0E32\u0E30\u0E17\u0E38\u0E19\u0E02\u0E31\u0E49\u0E19\u0E15\u0E48\u0E33\u0E19\u0E49\u0E2D\u0E22\u0E2A\u0E38\u0E14) \u0E2B\u0E23\u0E37\u0E2D\u0E02\u0E49\u0E32\u0E21\u0E02\u0E31\u0E49\u0E19\u0E15\u0E2D\u0E19\u0E19\u0E35\u0E49\u0E41\u0E25\u0E49\u0E27\u0E40\u0E25\u0E37\u0E2D\u0E01\u0E41\u0E1A\u0E1A\u0E1B\u0E23\u0E30\u0E01\u0E31\u0E19\u0E40\u0E2D\u0E07\u0E44\u0E14\u0E49\u0E40\u0E25\u0E22"),
+                    React.createElement("div", { className: "flex flex-wrap gap-2" },
+                        CONCERNS.map((c) => {
+                            const active = selectedConcerns.includes(c.id);
+                            return (React.createElement("button", { key: c.id, onClick: () => toggleConcern(c.id), className: "flex items-center gap-1.5 text-[21px] font-medium px-3.5 py-2.5 rounded-full border", style: { borderColor: active ? BRAND.green : "#D7E8F0", background: active ? "#F0FAE6" : "#fff", color: active ? BRAND.greenDeep : BRAND.navy } },
+                                React.createElement("span", null, c.icon),
+                                " ",
+                                c.label));
+                        }),
+                        React.createElement("button", { onClick: () => setSavingsGroupOpen((o) => !o), className: "flex items-center gap-1.5 text-[21px] font-medium px-3.5 py-2.5 rounded-full border", style: { borderColor: savingsGroupOpen ? BRAND.green : "#D7E8F0", background: savingsGroupOpen ? "#F0FAE6" : "#fff", color: savingsGroupOpen ? BRAND.greenDeep : BRAND.navy } },
+                            React.createElement("span", null, "\uD83D\uDCB0"),
+                            " \u0E1B\u0E23\u0E30\u0E01\u0E31\u0E19\u0E2A\u0E30\u0E2A\u0E21\u0E17\u0E23\u0E31\u0E1E\u0E22\u0E4C"),
+                        React.createElement("button", { onClick: () => setPensionGroupOpen((o) => !o), className: "flex items-center gap-1.5 text-[21px] font-medium px-3.5 py-2.5 rounded-full border", style: { borderColor: pensionGroupOpen ? BRAND.green : "#D7E8F0", background: pensionGroupOpen ? "#F0FAE6" : "#fff", color: pensionGroupOpen ? BRAND.greenDeep : BRAND.navy } },
+                            React.createElement("span", null, "\uD83C\uDFD6\uFE0F"),
+                            " \u0E1B\u0E23\u0E30\u0E01\u0E31\u0E19\u0E1A\u0E33\u0E19\u0E32\u0E0D"),
+                        selectedConcerns.length > 0 && (React.createElement("button", { onClick: () => { setSelectedConcerns([]); setPickedRecommendations([]); }, className: "flex items-center gap-1.5 text-[21px] font-medium px-3.5 py-2.5 rounded-full", style: { background: "#FDEAEA", color: BRAND.danger } }, "\u2715 \u0E25\u0E49\u0E32\u0E07\u0E01\u0E32\u0E23\u0E40\u0E25\u0E37\u0E2D\u0E01")))),
+                savingsGroupOpen && (React.createElement("section", { id: "savings-group-section", className: "rounded-2xl p-4", style: { background: "#FFF9EE", boxShadow: "0 6px 24px rgba(11,42,85,0.07)", border: "1.5px solid #F3D98B" } },
+                    React.createElement("div", { className: "flex items-center justify-between mb-1" },
+                        React.createElement("h2", { className: "text-[24px] font-bold px-1", style: { color: BRAND.mainBlue } }, "\uD83D\uDCB0 \u0E1B\u0E23\u0E30\u0E01\u0E31\u0E19\u0E2A\u0E30\u0E2A\u0E21\u0E17\u0E23\u0E31\u0E1E\u0E22\u0E4C"),
+                        React.createElement("button", { onClick: () => setSavingsGroupOpen(false), className: "text-[19px] font-medium px-2 py-1", style: { color: BRAND.sub } }, "\u2715 \u0E1B\u0E34\u0E14")),
+                    React.createElement("p", { className: "text-[16px] mb-3 px-1", style: { color: BRAND.sub } }, "\u0E15\u0E34\u0E4A\u0E01\u0E40\u0E25\u0E37\u0E2D\u0E01\u0E44\u0E14\u0E49\u0E2B\u0E25\u0E32\u0E22\u0E2D\u0E31\u0E19\u0E41\u0E25\u0E49\u0E27\u0E01\u0E14\u0E1B\u0E38\u0E48\u0E21 \"\u0E40\u0E25\u0E37\u0E2D\u0E01\" \u0E14\u0E49\u0E32\u0E19\u0E25\u0E48\u0E32\u0E07\u0E40\u0E1E\u0E37\u0E48\u0E2D\u0E44\u0E1B\u0E01\u0E23\u0E2D\u0E01\u0E02\u0E49\u0E2D\u0E21\u0E39\u0E25 \u00B7 \u0E40\u0E25\u0E37\u0E2D\u0E01\u0E44\u0E14\u0E49\u0E40\u0E1E\u0E35\u0E22\u0E07 1 \u0E41\u0E1A\u0E1A (\u0E17\u0E38\u0E19\u0E1B\u0E23\u0E30\u0E01\u0E31\u0E19\u0E2B\u0E25\u0E31\u0E01\u0E40\u0E25\u0E37\u0E2D\u0E01\u0E44\u0E14\u0E49 1 \u0E41\u0E1A\u0E1A\u0E40\u0E17\u0E48\u0E32\u0E19\u0E31\u0E49\u0E19)"),
+                    React.createElement("div", { className: "grid grid-cols-2 sm:grid-cols-3 gap-1.5 sm:gap-2" }, sortByRecommended(PRODUCTS.filter((p) => SAVINGS_IDS.includes(p.id))).map((p) => (React.createElement(CompactChip, { key: p.id, product: p, checked: !!selected[p.id], picked: pickedRecommendations.includes(p.id), disabled: productDisabled(p), recommended: false, onCheckboxClick: () => { if (selected[p.id])
                             toggle(p.id);
                         else
                             togglePicked(p.id); }, onNameClick: () => { if (selected[p.id])
                             openEditor(p.id);
                         else
-                            togglePicked(p.id); } }))))))),
-                pickedRecommendations.length > 0 && (React.createElement("div", { className: "flex justify-end mt-3 pt-3", style: { borderTop: "1px dashed #D7E8F0" } },
-                    React.createElement("button", { onClick: confirmPickedRecommendations, className: "text-[24px] font-bold px-6 py-3 rounded-full", style: { background: BRAND.navy, color: "#fff" } },
-                        "\u2705 \u0E40\u0E25\u0E37\u0E2D\u0E01 (",
-                        pickedRecommendations.length,
-                        ")")))),
-            PRODUCTS.some((p) => selected[p.id] && openProductCards[p.id]) && (React.createElement("section", { className: "space-y-3" },
-                React.createElement("h2", { className: "text-[24px] font-bold px-1", style: { color: BRAND.mainBlue } }, "\uD83D\uDCDD \u0E01\u0E23\u0E2D\u0E01\u0E02\u0E49\u0E2D\u0E21\u0E39\u0E25\u0E41\u0E1A\u0E1A\u0E1B\u0E23\u0E30\u0E01\u0E31\u0E19\u0E17\u0E35\u0E48\u0E40\u0E25\u0E37\u0E2D\u0E01"),
-                PRODUCTS.filter((p) => selected[p.id] && openProductCards[p.id]).map((p) => (React.createElement(ProductRow, { key: p.id, product: p, checked: selected[p.id], onToggle: () => toggle(p.id), age: age, live: liveResults[p.id], pending: PRIMARY_FIELD_ZERO[p.id], disabled: productDisabled(p), recommended: recommendedProductIds.has(p.id), recommendedReason: autoMainReason[p.id] ? `companion-${autoMainReason[p.id]}` : undefined, expanded: true, onToggleExpand: () => toggleProductCard(p.id), onShowSchedule: () => setScheduleModal({ name: p.name, rows: buildPremiumSchedule(p.id) }) }, renderProductChildren(p)))))),
-            React.createElement("button", { onClick: handleCalculate, className: "w-full rounded-2xl py-4 font-semibold text-white text-[27px] flex items-center justify-center gap-2 transition active:scale-[0.99]", style: { background: `linear-gradient(120deg, ${BRAND.skyDeep}, ${BRAND.navy})`, boxShadow: "0 8px 20px rgba(11,42,85,0.25)" } },
-                React.createElement("span", { style: { fontSize: 22 } }, "🧮"),
-                " \u0E04\u0E33\u0E19\u0E27\u0E13\u0E40\u0E1A\u0E35\u0E49\u0E22\u0E1B\u0E23\u0E30\u0E01\u0E31\u0E19\u0E41\u0E25\u0E30\u0E04\u0E27\u0E32\u0E21\u0E04\u0E38\u0E49\u0E21\u0E04\u0E23\u0E2D\u0E07"),
+                            togglePicked(p.id); } })))),
+                    React.createElement("button", { onClick: () => setCompareOpen((o) => !o), className: "w-full text-[21px] font-semibold px-4 py-2.5 rounded-xl mt-3", style: { background: "#fff", color: BRAND.warn, border: `1.5px solid ${BRAND.warn}` } }, compareOpen ? "▴ ซ่อนตารางเทียบทุกแบบ" : "▾ เทียบทุกแบบ (IRR)"),
+                    compareOpen && (React.createElement("div", { className: "mt-2" },
+                        React.createElement(PlanRow, { label: "\u0E17\u0E38\u0E19\u0E1B\u0E23\u0E30\u0E01\u0E31\u0E19\u0E17\u0E35\u0E48\u0E43\u0E0A\u0E49\u0E40\u0E1B\u0E23\u0E35\u0E22\u0E1A\u0E40\u0E17\u0E35\u0E22\u0E1A (\u0E1A\u0E32\u0E17)" },
+                            React.createElement(NumInput, { value: compareSI, onChange: setCompareSI, min: 0, step: 100000 })),
+                        React.createElement("p", { className: "text-[16px] mb-2 px-1", style: { color: BRAND.sub } }, "\u0E43\u0E0A\u0E49\u0E2D\u0E32\u0E22\u0E38/\u0E40\u0E1E\u0E28\u0E1B\u0E31\u0E08\u0E08\u0E38\u0E1A\u0E31\u0E19\u0E02\u0E2D\u0E07\u0E25\u0E39\u0E01\u0E04\u0E49\u0E32\u0E17\u0E35\u0E48\u0E01\u0E23\u0E2D\u0E01\u0E44\u0E27\u0E49\u0E14\u0E49\u0E32\u0E19\u0E1A\u0E19 \u00B7 \u0E41\u0E2E\u0E1B\u0E1B\u0E35\u0E49\u0E40\u0E0B\u0E1F\u0E27\u0E34\u0E48\u0E07\u0E43\u0E0A\u0E49\u0E40\u0E1A\u0E35\u0E49\u0E22 5 \u0E1B\u0E35 (\u0E2A\u0E31\u0E49\u0E19\u0E2A\u0E38\u0E14) \u0E40\u0E1B\u0E47\u0E19\u0E04\u0E48\u0E32\u0E40\u0E23\u0E34\u0E48\u0E21\u0E15\u0E49\u0E19 \u00B7 \u0E40\u0E23\u0E35\u0E22\u0E07\u0E08\u0E32\u0E01 IRR \u0E2A\u0E39\u0E07\u0E44\u0E1B\u0E15\u0E48\u0E33"),
+                        React.createElement("div", { className: "rounded-xl border overflow-x-auto", style: { borderColor: "#D7E8F0" } },
+                            React.createElement("table", { className: "w-full text-[18px]", style: { minWidth: 560 } },
+                                React.createElement("thead", { style: { background: BRAND.bg } },
+                                    React.createElement("tr", null,
+                                        React.createElement("th", { className: "text-left px-2 py-2", style: { color: BRAND.navy } }, "\u0E2D\u0E31\u0E19\u0E14\u0E31\u0E1A"),
+                                        React.createElement("th", { className: "text-left px-2 py-2", style: { color: BRAND.navy } }, "\u0E41\u0E1A\u0E1A\u0E1B\u0E23\u0E30\u0E01\u0E31\u0E19"),
+                                        React.createElement("th", { className: "text-right px-2 py-2", style: { color: BRAND.navy } }, "\u0E40\u0E1A\u0E35\u0E49\u0E22/\u0E1B\u0E35"),
+                                        React.createElement("th", { className: "text-center px-2 py-2", style: { color: BRAND.navy } }, "\u0E1B\u0E35\u0E0A\u0E33\u0E23\u0E30/\u0E04\u0E38\u0E49\u0E21\u0E04\u0E23\u0E2D\u0E07"),
+                                        React.createElement("th", { className: "text-right px-2 py-2", style: { color: BRAND.navy } }, "IRR"))),
+                                React.createElement("tbody", null, (() => {
+                                    const cmp = buildComparisonRows(compareSI);
+                                    return cmp.length === 0 ? (React.createElement("tr", null,
+                                        React.createElement("td", { colSpan: 5, className: "text-center px-2 py-4", style: { color: BRAND.sub } }, "\u0E44\u0E21\u0E48\u0E21\u0E35\u0E41\u0E1A\u0E1A\u0E43\u0E14\u0E23\u0E2D\u0E07\u0E23\u0E31\u0E1A\u0E17\u0E38\u0E19\u0E1B\u0E23\u0E30\u0E01\u0E31\u0E19/\u0E2D\u0E32\u0E22\u0E38\u0E19\u0E35\u0E49"))) : cmp.map((r, i) => (React.createElement("tr", { key: r.id, style: { borderTop: "1px solid #EEF3F7", background: i === 0 ? "#F3FBEF" : "transparent" } },
+                                        React.createElement("td", { className: "px-2 py-2", style: { color: BRAND.dataBlack } }, i + 1),
+                                        React.createElement("td", { className: "px-2 py-2", style: { color: BRAND.dataBlack } }, r.name),
+                                        React.createElement("td", { className: "text-right px-2 py-2", style: { color: BRAND.dataBlack } }, fmt(r.premium)),
+                                        React.createElement("td", { className: "text-center px-2 py-2", style: { color: BRAND.dataBlack } },
+                                            r.payYears,
+                                            "/",
+                                            r.totalYears),
+                                        React.createElement("td", { className: "text-right px-2 py-2 font-bold", style: { color: i === 0 ? BRAND.greenDeep : BRAND.dataBlack } }, r.irr !== null && r.irr !== undefined ? (r.irr * 100).toFixed(2) + "%" : "-"))));
+                                })()))))),
+                    pickedRecommendations.some((id) => SAVINGS_IDS.includes(id)) && (React.createElement("div", { className: "flex justify-end mt-3 pt-3", style: { borderTop: "1px dashed #F3D98B" } },
+                        React.createElement("button", { onClick: confirmPickedRecommendations, className: "text-[24px] font-bold px-6 py-3 rounded-full", style: { background: BRAND.navy, color: "#fff" } },
+                            "\u2705 \u0E40\u0E25\u0E37\u0E2D\u0E01 (",
+                            pickedRecommendations.filter((id) => SAVINGS_IDS.includes(id)).length,
+                            ")"))))),
+                pensionGroupOpen && (React.createElement("section", { id: "pension-group-section", className: "rounded-2xl p-4", style: { background: "#EFF7FB", boxShadow: "0 6px 24px rgba(11,42,85,0.07)", border: "1.5px solid #BFE0F0" } },
+                    React.createElement("div", { className: "flex items-center justify-between mb-1" },
+                        React.createElement("h2", { className: "text-[24px] font-bold px-1", style: { color: BRAND.mainBlue } }, "\uD83C\uDFD6\uFE0F \u0E1B\u0E23\u0E30\u0E01\u0E31\u0E19\u0E1A\u0E33\u0E19\u0E32\u0E0D"),
+                        React.createElement("button", { onClick: () => setPensionGroupOpen(false), className: "text-[19px] font-medium px-2 py-1", style: { color: BRAND.sub } }, "\u2715 \u0E1B\u0E34\u0E14")),
+                    React.createElement("p", { className: "text-[16px] mb-3 px-1", style: { color: BRAND.sub } }, "\u0E15\u0E34\u0E4A\u0E01\u0E40\u0E25\u0E37\u0E2D\u0E01\u0E44\u0E14\u0E49\u0E2B\u0E25\u0E32\u0E22\u0E2D\u0E31\u0E19\u0E41\u0E25\u0E49\u0E27\u0E01\u0E14\u0E1B\u0E38\u0E48\u0E21 \"\u0E40\u0E25\u0E37\u0E2D\u0E01\" \u0E14\u0E49\u0E32\u0E19\u0E25\u0E48\u0E32\u0E07\u0E40\u0E1E\u0E37\u0E48\u0E2D\u0E44\u0E1B\u0E01\u0E23\u0E2D\u0E01\u0E02\u0E49\u0E2D\u0E21\u0E39\u0E25 \u00B7 \u0E40\u0E25\u0E37\u0E2D\u0E01\u0E44\u0E14\u0E49\u0E40\u0E1E\u0E35\u0E22\u0E07 1 \u0E41\u0E1A\u0E1A (\u0E17\u0E38\u0E19\u0E1B\u0E23\u0E30\u0E01\u0E31\u0E19\u0E2B\u0E25\u0E31\u0E01\u0E40\u0E25\u0E37\u0E2D\u0E01\u0E44\u0E14\u0E49 1 \u0E41\u0E1A\u0E1A\u0E40\u0E17\u0E48\u0E32\u0E19\u0E31\u0E49\u0E19)"),
+                    React.createElement("div", { className: "grid grid-cols-2 sm:grid-cols-3 gap-1.5 sm:gap-2" }, sortByRecommended(PRODUCTS.filter((p) => PENSION_IDS.includes(p.id))).map((p) => (React.createElement(CompactChip, { key: p.id, product: p, checked: !!selected[p.id], picked: pickedRecommendations.includes(p.id), disabled: productDisabled(p), recommended: false, onCheckboxClick: () => { if (selected[p.id])
+                            toggle(p.id);
+                        else
+                            togglePicked(p.id); }, onNameClick: () => { if (selected[p.id])
+                            openEditor(p.id);
+                        else
+                            togglePicked(p.id); } })))),
+                    pickedRecommendations.some((id) => PENSION_IDS.includes(id)) && (React.createElement("div", { className: "flex justify-end mt-3 pt-3", style: { borderTop: "1px dashed #BFE0F0" } },
+                        React.createElement("button", { onClick: confirmPickedRecommendations, className: "text-[24px] font-bold px-6 py-3 rounded-full", style: { background: BRAND.navy, color: "#fff" } },
+                            "\u2705 \u0E40\u0E25\u0E37\u0E2D\u0E01 (",
+                            pickedRecommendations.filter((id) => PENSION_IDS.includes(id)).length,
+                            ")"))))),
+                React.createElement("section", { className: "rounded-2xl p-4", style: { background: BRAND.card, boxShadow: "0 6px 24px rgba(11,42,85,0.07)" } },
+                    React.createElement("h2", { className: "text-[24px] font-bold mb-1 px-1", style: { color: BRAND.mainBlue } }, "\u0E20\u0E32\u0E1E\u0E23\u0E27\u0E21\u0E41\u0E1A\u0E1A\u0E1B\u0E23\u0E30\u0E01\u0E31\u0E19\u0E17\u0E31\u0E49\u0E07\u0E2B\u0E21\u0E14"),
+                    React.createElement("p", { className: "text-[16px] mb-3 px-1", style: { color: BRAND.sub } }, "\u0E15\u0E34\u0E4A\u0E01\u0E40\u0E25\u0E37\u0E2D\u0E01\u0E44\u0E14\u0E49\u0E2B\u0E25\u0E32\u0E22\u0E2D\u0E31\u0E19\u0E1E\u0E23\u0E49\u0E2D\u0E21\u0E01\u0E31\u0E19 \u0E41\u0E25\u0E49\u0E27\u0E01\u0E14\u0E1B\u0E38\u0E48\u0E21 \"\u0E40\u0E25\u0E37\u0E2D\u0E01\" \u0E14\u0E49\u0E32\u0E19\u0E25\u0E48\u0E32\u0E07\u0E40\u0E1E\u0E37\u0E48\u0E2D\u0E44\u0E1B\u0E01\u0E23\u0E2D\u0E01\u0E02\u0E49\u0E2D\u0E21\u0E39\u0E25 \u00B7 \u0E17\u0E38\u0E19\u0E2B\u0E25\u0E31\u0E01\u0E40\u0E25\u0E37\u0E2D\u0E01\u0E44\u0E14\u0E49 1 \u0E41\u0E1A\u0E1A"),
+                    (selected.UNJAI || selected.CANCERMAX) && (React.createElement("p", { className: "text-[16px] mb-2 px-1 font-medium", style: { color: BRAND.warn } },
+                        "\u26A0 ",
+                        selected.UNJAI ? "อุ่นใจ โรคร้าย" : "แคนเซอร์ แม็กซ์",
+                        " \u0E40\u0E1B\u0E47\u0E19\u0E41\u0E1E\u0E47\u0E01\u0E40\u0E01\u0E08\u0E1B\u0E34\u0E14 \u0E44\u0E21\u0E48\u0E2A\u0E32\u0E21\u0E32\u0E23\u0E16\u0E0B\u0E37\u0E49\u0E2D\u0E2A\u0E31\u0E0D\u0E0D\u0E32\u0E40\u0E1E\u0E34\u0E48\u0E21\u0E40\u0E15\u0E34\u0E21\u0E2D\u0E37\u0E48\u0E19\u0E40\u0E1E\u0E34\u0E48\u0E21\u0E44\u0E14\u0E49",
+                        selected.CANCERMAX ? " ยกเว้น คช. ซึ่งผู้เยาว์อายุ 0-14 ปี ต้องซื้อเพิ่มด้วย" : "")),
+                    React.createElement("div", { className: "grid grid-cols-4 gap-1.5 sm:gap-2" }, CATEGORY_GROUPS.map((group) => (React.createElement("div", { key: group.id, className: "space-y-1" },
+                        React.createElement("p", { className: "text-[13px] sm:text-[14px] font-bold text-center leading-tight px-0.5 py-1.5 rounded-lg", style: { background: BRAND.bg, color: BRAND.navy } }, group.label),
+                        sortByRecommended(PRODUCTS.filter((p) => group.ids.includes(p.id))).map((p) => (React.createElement(CompactChip, { key: p.id, product: p, checked: !!selected[p.id], picked: pickedRecommendations.includes(p.id), disabled: productDisabled(p), recommended: recommendedProductIds.has(p.id), tag: COMPACT_TAG[p.id], onCheckboxClick: () => { if (selected[p.id])
+                                toggle(p.id);
+                            else
+                                togglePicked(p.id); }, onNameClick: () => { if (selected[p.id])
+                                openEditor(p.id);
+                            else
+                                togglePicked(p.id); } }))))))),
+                    pickedRecommendations.length > 0 && (React.createElement("div", { className: "flex justify-end mt-3 pt-3", style: { borderTop: "1px dashed #D7E8F0" } },
+                        React.createElement("button", { onClick: confirmPickedRecommendations, className: "text-[24px] font-bold px-6 py-3 rounded-full", style: { background: BRAND.navy, color: "#fff" } },
+                            "\u2705 \u0E40\u0E25\u0E37\u0E2D\u0E01 (",
+                            pickedRecommendations.length,
+                            ")")))),
+                PRODUCTS.some((p) => selected[p.id] && openProductCards[p.id]) && (React.createElement("section", { className: "space-y-3" },
+                    React.createElement("h2", { className: "text-[24px] font-bold px-1", style: { color: BRAND.mainBlue } }, "\uD83D\uDCDD \u0E01\u0E23\u0E2D\u0E01\u0E02\u0E49\u0E2D\u0E21\u0E39\u0E25\u0E41\u0E1A\u0E1A\u0E1B\u0E23\u0E30\u0E01\u0E31\u0E19\u0E17\u0E35\u0E48\u0E40\u0E25\u0E37\u0E2D\u0E01"),
+                    PRODUCTS.filter((p) => selected[p.id] && openProductCards[p.id]).map((p) => (React.createElement(ProductRow, { key: p.id, product: p, checked: selected[p.id], onToggle: () => toggle(p.id), age: age, live: liveResults[p.id], pending: PRIMARY_FIELD_ZERO[p.id], disabled: productDisabled(p), recommended: recommendedProductIds.has(p.id), recommendedReason: autoMainReason[p.id] ? `companion-${autoMainReason[p.id]}` : undefined, expanded: true, onToggleExpand: () => toggleProductCard(p.id), onShowSchedule: () => setScheduleModal({ name: p.name, rows: buildPremiumSchedule(p.id) }) }, renderProductChildren(p)))))),
+                React.createElement("button", { onClick: handleCalculate, className: "w-full rounded-2xl py-4 font-semibold text-white text-[27px] flex items-center justify-center gap-2 transition active:scale-[0.99]", style: { background: `linear-gradient(120deg, ${BRAND.skyDeep}, ${BRAND.navy})`, boxShadow: "0 8px 20px rgba(11,42,85,0.25)" } },
+                    React.createElement("span", { style: { fontSize: 22 } }, "🧮"),
+                    " \u0E04\u0E33\u0E19\u0E27\u0E13\u0E40\u0E1A\u0E35\u0E49\u0E22\u0E1B\u0E23\u0E30\u0E01\u0E31\u0E19\u0E41\u0E25\u0E30\u0E04\u0E27\u0E32\u0E21\u0E04\u0E38\u0E49\u0E21\u0E04\u0E23\u0E2D\u0E07"))),
+            presentMode && !result && (React.createElement("div", { className: "rounded-2xl p-8 text-center", style: { background: BRAND.card, color: BRAND.sub } },
+                React.createElement("p", { className: "text-[24px]" }, "\u0E22\u0E31\u0E07\u0E44\u0E21\u0E48\u0E21\u0E35\u0E1C\u0E25\u0E25\u0E31\u0E1E\u0E18\u0E4C\u0E17\u0E35\u0E48\u0E04\u0E33\u0E19\u0E27\u0E13\u0E44\u0E27\u0E49 \u2014 \u0E01\u0E23\u0E38\u0E13\u0E32\u0E2D\u0E2D\u0E01\u0E08\u0E32\u0E01\u0E42\u0E2B\u0E21\u0E14\u0E19\u0E33\u0E40\u0E2A\u0E19\u0E2D\u0E40\u0E1E\u0E37\u0E48\u0E2D\u0E40\u0E25\u0E37\u0E2D\u0E01\u0E41\u0E1A\u0E1A\u0E1B\u0E23\u0E30\u0E01\u0E31\u0E19\u0E41\u0E25\u0E30\u0E01\u0E14\u0E04\u0E33\u0E19\u0E27\u0E13\u0E01\u0E48\u0E2D\u0E19"))),
             result && (React.createElement("section", { className: "space-y-4" },
                 React.createElement("div", { className: "rounded-2xl p-5 text-white", style: { background: `linear-gradient(120deg, ${BRAND.green}, ${BRAND.greenDeep})` } },
                     React.createElement("p", { className: "text-[24px] opacity-90" },
@@ -3618,6 +3637,17 @@ function App() {
                 React.createElement("button", { onClick: () => setPensionYearModal(null), className: "w-full mt-4 rounded-xl py-3 text-[24px] font-medium text-white flex items-center justify-center gap-1", style: { background: BRAND.navy } },
                     React.createElement("span", { style: { fontSize: 18 } }, "✕"),
                     " \u0E1B\u0E34\u0E14")))),
+        React.createElement("div", { className: "fixed z-40 flex flex-col gap-2 items-end", style: { bottom: 16, right: 16 } },
+            presentMode && (React.createElement("button", { onClick: () => setPresentMode(false), className: "rounded-full px-4 py-3 text-[21px] font-bold text-white shadow-lg flex items-center gap-1.5", style: { background: BRAND.danger } },
+                React.createElement("span", { style: { fontSize: 18 } }, "✕"),
+                " \u0E2D\u0E2D\u0E01\u0E08\u0E32\u0E01\u0E42\u0E2B\u0E21\u0E14\u0E19\u0E33\u0E40\u0E2A\u0E19\u0E2D")),
+            !presentMode && (React.createElement("button", { onClick: () => setPresentMode(true), className: "rounded-full px-4 py-3 text-[21px] font-bold text-white shadow-lg flex items-center gap-1.5", style: { background: BRAND.navy } }, "\uD83D\uDDA5\uFE0F \u0E42\u0E2B\u0E21\u0E14\u0E19\u0E33\u0E40\u0E2A\u0E19\u0E2D")),
+            React.createElement("div", { className: "rounded-full shadow-lg flex items-center overflow-hidden", style: { background: "#fff", border: "1.5px solid #D7E8F0" } },
+                React.createElement("button", { onClick: () => setUiScale((s) => Math.max(0.6, Math.round((s - 0.05) * 100) / 100)), className: "w-11 h-11 flex items-center justify-center text-[27px] font-bold", style: { color: BRAND.navy } }, "\u2212"),
+                React.createElement("span", { className: "text-[18px] font-medium px-1", style: { color: BRAND.sub, minWidth: 44, textAlign: "center" } },
+                    Math.round(uiScale * 100),
+                    "%"),
+                React.createElement("button", { onClick: () => setUiScale((s) => Math.min(1.3, Math.round((s + 0.05) * 100) / 100)), className: "w-11 h-11 flex items-center justify-center text-[27px] font-bold", style: { color: BRAND.navy } }, "+"))),
         React.createElement("footer", { className: "text-center text-[21px] py-6", style: { color: BRAND.sub } }, "\u0E40\u0E1E\u0E37\u0E48\u0E2D\u0E01\u0E32\u0E23\u0E19\u0E33\u0E40\u0E2A\u0E19\u0E2D\u0E40\u0E1A\u0E37\u0E49\u0E2D\u0E07\u0E15\u0E49\u0E19\u0E40\u0E17\u0E48\u0E32\u0E19\u0E31\u0E49\u0E19 \u0E44\u0E21\u0E48\u0E43\u0E0A\u0E48\u0E40\u0E2D\u0E01\u0E2A\u0E32\u0E23\u0E40\u0E2A\u0E19\u0E2D\u0E02\u0E32\u0E22\u0E2D\u0E22\u0E48\u0E32\u0E07\u0E40\u0E1B\u0E47\u0E19\u0E17\u0E32\u0E07\u0E01\u0E32\u0E23")));
 }
 /* ============================== BENEFIT BOARD (compact dashboard style) ============================== */
