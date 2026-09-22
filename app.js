@@ -624,6 +624,36 @@ const TAXSAVER105_SCHEDULE = [
     [100, 3], [200, 3], [300, 3], [400, 4], [500, 4], [500, 4], [500, 5], [500, 5], [500, 5], [500, 479],
 ];
 const TAXSAVER105_PAY_YEARS = 5;
+// 25) บีแอลเอ เซฟวิ่ง 168 (รบข.24/2569) — อายุรับประกัน 0-83 ปี คุ้มครอง 16 ปี ชำระเบี้ย 8 ปี ทุนขั้นต่ำ 100,000 บาท เบี้ยคงที่ 978/1000 ทุกอายุทุกเพศ
+const BLASAVE168_MIN_AGE = 0, BLASAVE168_MAX_AGE = 83, BLASAVE168_MIN_SI = 100000, BLASAVE168_RATE = 978;
+const blasave168Discount = (si, age) => {
+    if (age > 80)
+        return 0;
+    if (si >= 3000000)
+        return 78;
+    if (si >= 1000000)
+        return 53;
+    if (si >= 500000)
+        return 37;
+    if (si >= 300000)
+        return 22;
+    return 0;
+};
+// ปีกรมธรรม์ที่ 1-16: [% เสียชีวิต, % เงินคืนรายปีการันตี] — ปีที่16 รวมเงินคืนครบกำหนด 680%+พิเศษ128%=808%
+const BLASAVE168_SCHEDULE = [
+    [100, 8], [200, 8], [300, 8], [400, 8], [500, 8], [600, 8], [700, 8], [800, 8], [800, 8], [800, 8],
+    [800, 8], [800, 8], [800, 8], [800, 8], [800, 8], [800, 808],
+];
+const BLASAVE168_PAY_YEARS = 8;
+// 26) บีแอลเอ เพนชั่น 888 (รบข.25/2569) — บำนาญแบบลดหย่อนได้ อายุรับประกัน 20-52 ปี คุ้มครองถึงอายุ 88 ปี ชำระเบี้ย 8 ปี ทุนขั้นต่ำ 50,000 บาท
+const PENSION888_MIN_AGE = 20, PENSION888_MAX_AGE = 52, PENSION888_MIN_SI = 50000, PENSION888_PAY_YEARS = 8;
+const PENSION888_PENSION_START_AGE = 60, PENSION888_PENSION_END_AGE = 88;
+const PENSION888_FIRST_PENSION_PCT = 0.30, PENSION888_ANNUAL_PENSION_PCT = 0.08; // งวดแรกอายุครบ 60 = 30% งวดต่อไปอายุ 61-88 = 8%/ปี
+// ดัชนีแถว = อายุ (20-52), แต่ละแถว = [เพศหญิง, เพศชาย]
+const PENSION888_FEMALE = [98.95, 103.23, 106.54, 109.75, 112.75, 115.96, 119.27, 122.44, 125.64, 129.19, 132.54, 135.96, 139.65, 143.43, 147.13, 151.03, 154.97, 159.13, 163.25, 167.70, 172.00, 177.26, 183.09, 187.60, 192.52, 197.70, 203.56, 209.21, 214.70, 220.53, 229.69, 235.97, 244.00];
+const PENSION888_MALE = [86.33, 89.67, 92.80, 95.88, 98.82, 102.20, 105.11, 108.33, 111.64, 115.10, 118.91, 122.05, 125.85, 129.50, 133.50, 137.49, 141.51, 145.71, 150.04, 154.46, 159.00, 164.55, 170.55, 175.21, 180.66, 185.95, 192.20, 197.72, 203.56, 210.02, 219.69, 226.36, 234.96];
+// ส่วนลดเป็นเปอร์เซ็นต์ (ไม่ใช่บาท) ตามทุนประกัน อายุ 20-52 ปีทุกอายุใช้ตารางเดียวกัน
+const pension888Discount = (si) => si >= 5000000 ? 0.12 : si >= 3000000 ? 0.10 : si >= 1000000 ? 0.05 : si >= 500000 ? 0.02 : 0;
 // 6) แฮปปี้ เพนชั่น (มีเงินปันผล) — บำนาญตลอดชีพ 60 รบข.62/2567 — เลือกงวดชำระเบี้ยได้ 4 แบบ
 const HAPPYPENSION_TERMS = ["once", "5y", "10y", "to60"];
 const HAPPYPENSION_TERM_LABELS = { once: "ชำระครั้งเดียว", "5y": "5 ปี", "10y": "10 ปี", to60: "ถึงอายุ 60 ปี" };
@@ -886,19 +916,19 @@ const PRODUCTS = [
     { id: "CS", name: "คช. คุ้มครองการชำระเบี้ย", tag: "คุ้มครองผู้ชำระเบี้ย (ผู้ปกครอง 20-55 ปี) สำหรับผู้เยาว์ 0-14 ปี", ageMin: 0, ageMax: 14, coverAge: 21, isTop: true, renewalNote: "เบี้ยคงที่",
         occNote: "ไม่ขึ้นกับชั้นอาชีพ", siNote: "เบี้ยคิดจากผลรวมเบี้ยประกันภัยของทุกแบบที่เลือกไว้" },
     { id: "SUD", name: "ตลอดชีพ สุดคุ้ม", tag: "แบบประกันหลัก · ชำระเบี้ย 20 ปี", ageMin: 0, ageMax: 70, coverAge: 99, isMain: true, renewalNote: "เบี้ยคงที่",
-        occNote: "รับประกันเฉพาะชั้นอาชีพ 1-2 เท่านั้น (ไม่รับชั้นอาชีพ 3)", siNote: "ทุนประกันขั้นต่ำ 100,000 บาท · ถ้าทุนต่ำกว่า 500,000 บาท ต้องซื้อสัญญาเพิ่มเติมอย่างน้อย 1 รายการควบคู่ด้วย (ทุนตั้งแต่ 500,000 บาทขึ้นไป ซื้อเดี่ยวได้) · เลือกได้เพียง 1 แบบ จาก 24 แบบทุนประกันหลัก" },
+        occNote: "รับประกันเฉพาะชั้นอาชีพ 1-2 เท่านั้น (ไม่รับชั้นอาชีพ 3)", siNote: "ทุนประกันขั้นต่ำ 100,000 บาท · ถ้าทุนต่ำกว่า 500,000 บาท ต้องซื้อสัญญาเพิ่มเติมอย่างน้อย 1 รายการควบคู่ด้วย (ทุนตั้งแต่ 500,000 บาทขึ้นไป ซื้อเดี่ยวได้) · เลือกได้เพียง 1 แบบ จาก 26 แบบทุนประกันหลัก" },
     { id: "LIFE99", name: "ตลอดชีพ 99/99", tag: "แบบประกันหลัก · ชำระเบี้ยถึงอายุ 99 ปี", ageMin: 0, ageMax: 80, coverAge: 99, isMain: true, renewalNote: "เบี้ยคงที่",
-        occNote: "รับได้ทุกชั้นอาชีพ", siNote: "ทุนประกันขั้นต่ำ 50,000 บาท ไม่จำกัดสูงสุด · เลือกได้เพียง 1 แบบ จาก 24 แบบทุนประกันหลัก" },
+        occNote: "รับได้ทุกชั้นอาชีพ", siNote: "ทุนประกันขั้นต่ำ 50,000 บาท ไม่จำกัดสูงสุด · เลือกได้เพียง 1 แบบ จาก 26 แบบทุนประกันหลัก" },
     { id: "PRESTIGE", name: "เพรสทีจ ไลฟ์", tag: "แบบประกันหลัก · เลือกระยะชำระเบี้ย 5/10/15/20 ปี ทุนสูง", ageMin: 0, ageMax: 70, coverAge: 99, isMain: true, renewalNote: "เบี้ยคงที่",
-        occNote: "รับประกันเฉพาะชั้นอาชีพ 1-2 เท่านั้น (ไม่รับชั้นอาชีพ 3)", siNote: "ทุนประกันขั้นต่ำ 5,000,000 บาท ไม่จำกัดสูงสุด · ระยะ 5/10 ปี อายุรับประกันถึง 70 ปี · ระยะ 15/20 ปี อายุรับประกันถึง 65 ปี · ไม่สามารถซื้อ คช. ร่วมกับแบบนี้ได้ · เลือกได้เพียง 1 แบบ จาก 24 แบบทุนประกันหลัก" },
+        occNote: "รับประกันเฉพาะชั้นอาชีพ 1-2 เท่านั้น (ไม่รับชั้นอาชีพ 3)", siNote: "ทุนประกันขั้นต่ำ 5,000,000 บาท ไม่จำกัดสูงสุด · ระยะ 5/10 ปี อายุรับประกันถึง 70 ปี · ระยะ 15/20 ปี อายุรับประกันถึง 65 ปี · ไม่สามารถซื้อ คช. ร่วมกับแบบนี้ได้ · เลือกได้เพียง 1 แบบ จาก 26 แบบทุนประกันหลัก" },
     { id: "UNJAI", name: "อุ่นใจ โรคร้าย", tag: "แบบประกันหลัก · แพ็กเกจชีวิต + โรคร้ายแรง 11 โรค", ageMin: 20, ageMax: 75, coverAge: 90, isMain: true, renewalNote: "เบี้ยคงที่",
-        occNote: "รับได้ทุกชั้นอาชีพ", siNote: "แพ็กเกจปิด 7 แผนสำเร็จรูป (ทุนชีวิต 50,000 บาทคงที่ + ทุนอีซีแคร์ 100,000-1,000,000 บาท) · ไม่สามารถซื้อสัญญาเพิ่มเติมอื่นเพิ่มได้ · เลือกได้เพียง 1 แบบ จาก 24 แบบทุนประกันหลัก" },
+        occNote: "รับได้ทุกชั้นอาชีพ", siNote: "แพ็กเกจปิด 7 แผนสำเร็จรูป (ทุนชีวิต 50,000 บาทคงที่ + ทุนอีซีแคร์ 100,000-1,000,000 บาท) · ไม่สามารถซื้อสัญญาเพิ่มเติมอื่นเพิ่มได้ · เลือกได้เพียง 1 แบบ จาก 26 แบบทุนประกันหลัก" },
     { id: "CANCERMAX", name: "แคนเซอร์ แม็กซ์", tag: "แบบประกันหลัก · แพ็กเกจชีวิต + คุ้มครองมะเร็ง 3 สัญญา", ageMin: 0, ageMax: 70, coverAge: 90, isMain: true, renewalNote: "เบี้ยคงที่",
-        occNote: "รับได้ทุกชั้นอาชีพ", siNote: "แพ็กเกจปิด 5 แผน (Bronze/Silver/Gold/Emerald/Diamond) · ไม่สามารถซื้อสัญญาเพิ่มเติมอื่นเพิ่มได้ ยกเว้น คช. (ผู้เยาว์อายุ 0-14 ปี ต้องซื้อ คช. เพิ่มด้วย) · เลือกได้เพียง 1 แบบ จาก 24 แบบทุนประกันหลัก" },
+        occNote: "รับได้ทุกชั้นอาชีพ", siNote: "แพ็กเกจปิด 5 แผน (Bronze/Silver/Gold/Emerald/Diamond) · ไม่สามารถซื้อสัญญาเพิ่มเติมอื่นเพิ่มได้ ยกเว้น คช. (ผู้เยาว์อายุ 0-14 ปี ต้องซื้อ คช. เพิ่มด้วย) · เลือกได้เพียง 1 แบบ จาก 26 แบบทุนประกันหลัก" },
     { id: "PLUS2", name: "คุ้มครอง 2 พลัส", tag: "แบบประกันหลัก · ชีวิต + ทุพพลภาพ 3 เท่า เลือกระยะชำระเบี้ย 10/15/20 ปี", ageMin: 20, ageMax: 65, coverAge: 65, isMain: true, renewalNote: "เบี้ยคงที่",
-        occNote: "รับประกันเฉพาะชั้นอาชีพ 1-2 เท่านั้น (ไม่รับชั้นอาชีพ 3)", siNote: "ทุนประกันขั้นต่ำ 1,000,000 บาท · ทุพพลภาพถาวรสิ้นเชิงจ่าย 3 เท่าของทุนชีวิต สูงสุดไม่เกิน 30,000,000 บาท · อายุรับประกันสูงสุดขึ้นกับระยะที่เลือก (10 ปี→65, 15 ปี→60, 20 ปี→55) · เลือกได้เพียง 1 แบบ จาก 24 แบบทุนประกันหลัก" },
+        occNote: "รับประกันเฉพาะชั้นอาชีพ 1-2 เท่านั้น (ไม่รับชั้นอาชีพ 3)", siNote: "ทุนประกันขั้นต่ำ 1,000,000 บาท · ทุพพลภาพถาวรสิ้นเชิงจ่าย 3 เท่าของทุนชีวิต สูงสุดไม่เกิน 30,000,000 บาท · อายุรับประกันสูงสุดขึ้นกับระยะที่เลือก (10 ปี→65, 15 ปี→60, 20 ปี→55) · เลือกได้เพียง 1 แบบ จาก 26 แบบทุนประกันหลัก" },
     { id: "HAPPYPENSION", name: "แฮปปี้ เพนชั่น (มีเงินปันผล)", tag: "แบบประกันหลัก · บำนาญตลอดชีพ 60", ageMin: 20, ageMax: 55, coverAge: 99, isMain: true, renewalNote: "เบี้ยคงที่",
-        occNote: "รับได้ทุกชั้นอาชีพ (เบี้ยเท่ากันทุกชั้น)", siNote: "เลือกงวดชำระเบี้ยได้ 4 แบบ (ครั้งเดียว/5ปี/10ปี/ถึงอายุ60) แต่ละงวดมีช่วงอายุรับประกันและอัตราบำนาญต่างกัน · เลือกได้เพียง 1 แบบ จาก 24 แบบทุนประกันหลัก" },
+        occNote: "รับได้ทุกชั้นอาชีพ (เบี้ยเท่ากันทุกชั้น)", siNote: "เลือกงวดชำระเบี้ยได้ 4 แบบ (ครั้งเดียว/5ปี/10ปี/ถึงอายุ60) แต่ละงวดมีช่วงอายุรับประกันและอัตราบำนาญต่างกัน · เลือกได้เพียง 1 แบบ จาก 26 แบบทุนประกันหลัก" },
     { id: "VH", name: "แวลู เฮลธ์", tag: "สุขภาพ", ageMin: 11, ageMax: 80, coverAge: 98, renewalNote: "ปรับทุก 5 ปี",
         occNote: "รับได้ทุกชั้นอาชีพ (ชั้น 1-2 เบี้ยเดียวกัน / ชั้น 3 เบี้ยสูงกว่า)", siNote: "ต้องมีทุนประกันหลักขั้นต่ำ 50,000 บาท จึงซื้อได้ · ซื้อได้เพียง 1 สัญญา ระหว่าง แวลู เฮลธ์ หรือ แวลู เฮลธ์ คิดส์ พรีเมียร์" },
     { id: "VHKIDS", name: "แวลู เฮลธ์ คิดส์ พรีเมียร์", tag: "สุขภาพเด็ก", ageMin: 0, ageMax: 10, coverAge: 98, renewalNote: "ปรับทุก 5 ปี",
@@ -924,19 +954,19 @@ const PRODUCTS = [
     { id: "SS", name: "คุ้มครองโรคร้ายแรงและมรณกรรม (รร.)", tag: "โรคร้ายแรง 17 โรค + เสียชีวิต", ageMin: 15, ageMax: 55, coverAge: 65, renewalNote: "ปรับทุก 5 ปี",
         occNote: "รับได้ทุกชั้นอาชีพ (เบี้ยเท่ากันทุกชั้น)", siNote: "ทุนประกันขั้นต่ำ 50,000 บาท ไม่ผูกกับทุนหลัก" },
     { id: "HAPPYSAVING", name: "แฮปปี้เซฟวิ่ง (มีเงินปันผล)", tag: "แบบประกันหลัก · สร้างมูลค่าออม เลือกชำระเบี้ย 5/10 ปี", ageMin: 0, ageMax: 70, coverAge: 99, isMain: true, renewalNote: "เบี้ยคงที่",
-        occNote: "รับได้ทุกชั้นอาชีพ", siNote: "ทุนประกันขั้นต่ำ 50,000 บาท ไม่จำกัดสูงสุด · รับเงินคืนรายปี 4% ของทุนประกันภัยทุกปี + คุ้มครองชีวิตเพิ่มขึ้นตามปีกรมธรรม์ (100%→700%) · เลือกได้เพียง 1 แบบ จาก 24 แบบทุนประกันหลัก" },
+        occNote: "รับได้ทุกชั้นอาชีพ", siNote: "ทุนประกันขั้นต่ำ 50,000 บาท ไม่จำกัดสูงสุด · รับเงินคืนรายปี 4% ของทุนประกันภัยทุกปี + คุ้มครองชีวิตเพิ่มขึ้นตามปีกรมธรรม์ (100%→700%) · เลือกได้เพียง 1 แบบ จาก 26 แบบทุนประกันหลัก" },
     { id: "HAPPYWL", name: "แฮปปี้ โฮลไลฟ์ (มีเงินปันผล)", tag: "แบบประกันหลัก · เลือกระยะชำระเบี้ย 5/10/15 ปี ทุนสูง", ageMin: 0, ageMax: 65, coverAge: 99, isMain: true, renewalNote: "เบี้ยคงที่",
-        occNote: "รับประกันเฉพาะชั้นอาชีพ 1-2 เท่านั้น (ไม่รับชั้นอาชีพ 3)", siNote: "ทุนประกันขั้นต่ำ 500,000 บาท สูงสุด 100,000,000 บาท (รวมทุกกรมธรรม์ตระกูลเพรสทีจา ไลฟ์/แฮปปี้ โฮลไลฟ์) · เลือกได้เพียง 1 แบบ จาก 24 แบบทุนประกันหลัก" },
+        occNote: "รับประกันเฉพาะชั้นอาชีพ 1-2 เท่านั้น (ไม่รับชั้นอาชีพ 3)", siNote: "ทุนประกันขั้นต่ำ 500,000 บาท สูงสุด 100,000,000 บาท (รวมทุกกรมธรรม์ตระกูลเพรสทีจา ไลฟ์/แฮปปี้ โฮลไลฟ์) · เลือกได้เพียง 1 แบบ จาก 26 แบบทุนประกันหลัก" },
     { id: "HRP9920", name: "ห่วงรัก พรีเมียร์ (99/20)", tag: "แบบประกันหลัก · ชำระเบี้ย 20 ปี", ageMin: 0, ageMax: 70, coverAge: 99, isMain: true, renewalNote: "เบี้ยคงที่",
-        occNote: "รับได้ทุกชั้นอาชีพ", siNote: "ทุนประกันขั้นต่ำ 200,000 บาท ไม่จำกัดสูงสุด · เลือกได้เพียง 1 แบบ จาก 24 แบบทุนประกันหลัก" },
+        occNote: "รับได้ทุกชั้นอาชีพ", siNote: "ทุนประกันขั้นต่ำ 200,000 บาท ไม่จำกัดสูงสุด · เลือกได้เพียง 1 แบบ จาก 26 แบบทุนประกันหลัก" },
     { id: "HRPDIV", name: "ห่วงรัก พรีเมียร์ (มีเงินปันผล)", tag: "แบบประกันหลัก · เลือกระยะชำระเบี้ย 5/10/15/20 ปี", ageMin: 0, ageMax: 70, coverAge: 99, isMain: true, renewalNote: "เบี้ยคงที่",
-        occNote: "รับได้ทุกชั้นอาชีพ", siNote: "ทุนประกันขั้นต่ำ 100,000 บาท ไม่จำกัดสูงสุด · เลือกได้เพียง 1 แบบ จาก 24 แบบทุนประกันหลัก" },
+        occNote: "รับได้ทุกชั้นอาชีพ", siNote: "ทุนประกันขั้นต่ำ 100,000 บาท ไม่จำกัดสูงสุด · เลือกได้เพียง 1 แบบ จาก 26 แบบทุนประกันหลัก" },
     { id: "HRP9901", name: "ห่วงรัก พรีเมียร์ 9901 (มีเงินปันผล)", tag: "แบบประกันหลัก · ชำระเบี้ยครั้งเดียว", ageMin: 0, ageMax: 70, coverAge: 99, isMain: true, renewalNote: "เบี้ยคงที่",
-        occNote: "รับได้ทุกชั้นอาชีพ", siNote: "ทุนประกันขั้นต่ำ 100,000 บาท ไม่จำกัดสูงสุด · ชำระเบี้ยครั้งเดียว · เลือกได้เพียง 1 แบบ จาก 24 แบบทุนประกันหลัก" },
+        occNote: "รับได้ทุกชั้นอาชีพ", siNote: "ทุนประกันขั้นต่ำ 100,000 บาท ไม่จำกัดสูงสุด · ชำระเบี้ยครั้งเดียว · เลือกได้เพียง 1 แบบ จาก 26 แบบทุนประกันหลัก" },
     { id: "HAPPYWL9901", name: "แฮปปี้ โฮลไลฟ์ 9901 (มีเงินปันผล)", tag: "แบบประกันหลัก · ชำระเบี้ยครั้งเดียว ทุนสูง", ageMin: 0, ageMax: 65, coverAge: 99, isMain: true, renewalNote: "เบี้ยคงที่",
-        occNote: "รับประกันเฉพาะชั้นอาชีพ 1-2 เท่านั้น (ไม่รับชั้นอาชีพ 3)", siNote: "ทุนประกันขั้นต่ำ 500,000 บาท สูงสุด 100,000,000 บาท (รวมทุกกรมธรรม์ตระกูลเพรสทีจา ไลฟ์/แฮปปี้ โฮลไลฟ์) · ชำระเบี้ยครั้งเดียว · เลือกได้เพียง 1 แบบ จาก 24 แบบทุนประกันหลัก" },
+        occNote: "รับประกันเฉพาะชั้นอาชีพ 1-2 เท่านั้น (ไม่รับชั้นอาชีพ 3)", siNote: "ทุนประกันขั้นต่ำ 500,000 บาท สูงสุด 100,000,000 บาท (รวมทุกกรมธรรม์ตระกูลเพรสทีจา ไลฟ์/แฮปปี้ โฮลไลฟ์) · ชำระเบี้ยครั้งเดียว · เลือกได้เพียง 1 แบบ จาก 26 แบบทุนประกันหลัก" },
     { id: "HAPPYKID", name: "กรุงเทพ แฮปปี้ คิดส์ 99/20", tag: "แบบประกันหลัก · สำหรับเด็ก ชำระเบี้ย 20 ปี", ageMin: 0, ageMax: 14, coverAge: 99, isMain: true, renewalNote: "เบี้ยคงที่",
-        occNote: "รับได้ทุกเพศ (สำหรับผู้เยาว์)", siNote: "ทุนประกันขั้นต่ำ 150,000 บาท สูงสุด 10,000,000 บาท · รวมสัญญาเพิ่มเติมเพยเยอร์ โพรเทค (ทุพพลภาพผู้ชำระเบี้ย) และ คช. แถมฟรีไม่มีค่าใช้จ่ายเพิ่ม · เลือกได้เพียง 1 แบบ จาก 24 แบบทุนประกันหลัก" },
+        occNote: "รับได้ทุกเพศ (สำหรับผู้เยาว์)", siNote: "ทุนประกันขั้นต่ำ 150,000 บาท สูงสุด 10,000,000 บาท · รวมสัญญาเพิ่มเติมเพยเยอร์ โพรเทค (ทุพพลภาพผู้ชำระเบี้ย) และ คช. แถมฟรีไม่มีค่าใช้จ่ายเพิ่ม · เลือกได้เพียง 1 แบบ จาก 26 แบบทุนประกันหลัก" },
     { id: "CHAK", name: "เฉพาะกาล (ฉก.)", tag: "คุ้มครองชีวิตเพิ่มเติมชั่วระยะเวลา 5/10/15/18 ปี", ageMin: 15, ageMax: 60, coverAge: 78, renewalNote: "เบี้ยคงที่",
         occNote: "รับประกันเฉพาะชั้นอาชีพ 1-2 เท่านั้น (ไม่รับชั้นอาชีพ 3)", siNote: "ทุนประกันขั้นต่ำ 100,000 บาท สูงสุดไม่เกิน 10 เท่าของทุนประกันชีวิตหลัก · ระยะเวลาเอาประกันต้องไม่เกินระยะเวลาของกรมธรรม์หลัก" },
     { id: "CHAP", name: "เฉพาะกาลผู้ปกครอง (ฉป.)", tag: "คุ้มครองชีวิตผู้ปกครอง จ่ายให้ผู้เยาว์หากผู้ปกครองเสียชีวิต", ageMin: 0, ageMax: 14, coverAge: 14, renewalNote: "เบี้ยคงที่",
@@ -944,9 +974,9 @@ const PRODUCTS = [
     { id: "PH", name: "เพรสทีจ เฮลธ์ ปลดล็อค", tag: "คุ้มครองสุขภาพวงเงินสูง 5 แผน (20-200 ล้านบาท) ต่ออายุถึง 98 ปี", ageMin: 11, ageMax: 80, coverAge: 98, renewalNote: "ปรับทุกปี",
         occNote: "รับได้ทุกชั้นอาชีพ", siNote: "ต้องแนบกับสัญญาประกันชีวิตทุนขั้นต่ำ 50,000 บาท · แต่ละแผนเลือกความรับผิดส่วนแรกได้ 2 ระดับ · แผน 100/200 ล้าน เลือกพื้นที่คุ้มครองได้ (ไทย/เอเชีย/ทั่วโลกยกเว้นสหรัฐฯ/ทั่วโลก) ส่วนแผน 20/30/50 ล้าน คุ้มครองเฉพาะประเทศไทยเท่านั้น" },
     { id: "PSAVE104", name: "เพรสทีจ เซฟวิ่ง 10/4", tag: "แบบประกันหลัก · สร้างมูลค่าออม คุ้มครอง 10 ปี ชำระเบี้ย 4 ปี", ageMin: 0, ageMax: 80, coverAge: 10, isMain: true, renewalNote: "เบี้ยคงที่",
-        occNote: "รับได้ทุกชั้นอาชีพ (เบี้ยเท่ากันทุกชั้น)", siNote: "ทุนประกันขั้นต่ำ 100,000 บาท ไม่จำกัดทุนสูงสุด (ADB ที่แถมมาคุ้มครองสูงสุด 10,000,000 บาท) · ชำระเบี้ยรายปีเท่านั้น (ไม่รับชำระผ่านบัตรเครดิต) · เลือกได้เพียง 1 แบบ จาก 24 แบบทุนประกันหลัก" },
+        occNote: "รับได้ทุกชั้นอาชีพ (เบี้ยเท่ากันทุกชั้น)", siNote: "ทุนประกันขั้นต่ำ 100,000 บาท ไม่จำกัดทุนสูงสุด (ADB ที่แถมมาคุ้มครองสูงสุด 10,000,000 บาท) · ชำระเบี้ยรายปีเท่านั้น (ไม่รับชำระผ่านบัตรเครดิต) · เลือกได้เพียง 1 แบบ จาก 26 แบบทุนประกันหลัก" },
     { id: "PSAVE126", name: "เพรสทีจ เซฟวิ่ง 12/6", tag: "แบบประกันหลัก · สร้างมูลค่าออม คุ้มครอง 12 ปี ชำระเบี้ย 6 ปี", ageMin: 0, ageMax: 85, coverAge: 12, isMain: true, renewalNote: "เบี้ยคงที่",
-        occNote: "รับได้ทุกชั้นอาชีพ (เบี้ยเท่ากันทุกชั้น)", siNote: "ทุนประกันขั้นต่ำ 300,000 บาท ไม่จำกัดทุนสูงสุด (ADB ที่แถมมาคุ้มครองสูงสุด 6,000,000 บาท) · ชำระเบี้ยรายปีเท่านั้น (ไม่รับชำระผ่านบัตรเครดิต) · เลือกได้เพียง 1 แบบ จาก 24 แบบทุนประกันหลัก" },
+        occNote: "รับได้ทุกชั้นอาชีพ (เบี้ยเท่ากันทุกชั้น)", siNote: "ทุนประกันขั้นต่ำ 300,000 บาท ไม่จำกัดทุนสูงสุด (ADB ที่แถมมาคุ้มครองสูงสุด 6,000,000 บาท) · ชำระเบี้ยรายปีเท่านั้น (ไม่รับชำระผ่านบัตรเครดิต) · เลือกได้เพียง 1 แบบ จาก 26 แบบทุนประกันหลัก" },
     { id: "HS208", name: "บีแอลเอ แฮปปี้เซฟวิ่ง 208", tag: "แบบประกันหลัก · สร้างมูลค่าออม คุ้มครอง 20 ปี ชำระเบี้ย 8 ปี", ageMin: 0, ageMax: 65, coverAge: 20, isMain: true, renewalNote: "เบี้ยคงที่",
         occNote: "รับได้ทุกชั้นอาชีพ (เบี้ยเท่ากันทุกชั้น)", siNote: "ทุนประกันขั้นต่ำ 30,000 บาท ไม่จำกัดทุนสูงสุด · ชำระเบี้ยรายปีเท่านั้น" },
     { id: "HS126", name: "บีแอลเอ แฮปปี้เซฟวิ่ง 126", tag: "แบบประกันหลัก · สร้างมูลค่าออม คุ้มครอง 12 ปี ชำระเบี้ย 6 ปี", ageMin: 0, ageMax: 80, coverAge: 12, isMain: true, renewalNote: "เบี้ยคงที่",
@@ -963,6 +993,10 @@ const PRODUCTS = [
         occNote: "รับได้ทุกชั้นอาชีพ (เบี้ยเท่ากันทุกชั้น)", siNote: "ทุนประกันขั้นต่ำ 100,000 บาท ไม่จำกัดทุนสูงสุด (ADB+ทพ. แถมฟรี) · เสียชีวิตจากอุบัติเหตุจ่ายเพิ่ม 100% · ตัวเลขในตารางเป็นเงินคืนที่การันตีเท่านั้น" },
     { id: "TAXSAVER105", name: "แท็กซ์ เซฟเวอร์ 10/5 (มีเงินปันผล)", tag: "แบบประกันหลัก · สร้างมูลค่าออม คุ้มครอง 10 ปี ชำระเบี้ย 5 ปี (ชื่อสัญญา: แฮปปี้เซฟวิ่ง 10/5)", ageMin: 0, ageMax: 85, coverAge: 10, isMain: true, renewalNote: "เบี้ยคงที่",
         occNote: "รับได้ทุกชั้นอาชีพ (เบี้ยเท่ากันทุกชั้น)", siNote: "ทุนประกันขั้นต่ำ 50,000 บาท ไม่จำกัดทุนสูงสุด · ชำระเบี้ยรายปีเท่านั้น · ตัวเลขในตารางเป็นเงินคืนที่การันตีเท่านั้น (มีโอกาสรับเงินปันผลเพิ่มเติมซึ่งไม่การันตี)" },
+    { id: "BLASAVE168", name: "บีแอลเอ เซฟวิ่ง 168", tag: "แบบประกันหลัก · สร้างมูลค่าออม คุ้มครอง 16 ปี ชำระเบี้ย 8 ปี", ageMin: 0, ageMax: 83, coverAge: 16, isMain: true, renewalNote: "เบี้ยคงที่",
+        occNote: "รับได้ทุกชั้นอาชีพ (เบี้ยเท่ากันทุกชั้น)", siNote: "ทุนประกันขั้นต่ำ 100,000 บาท ไม่จำกัดทุนสูงสุด · ชำระเบี้ยรายปีเท่านั้น" },
+    { id: "PENSION888", name: "บีแอลเอ เพนชั่น 888", tag: "แบบประกันหลัก · บำนาญตลอดชีพ 60 (บำนาญแบบลดหย่อนได้)", ageMin: 20, ageMax: 52, coverAge: 88, isMain: true, renewalNote: "เบี้ยคงที่",
+        occNote: "รับได้ทุกชั้นอาชีพ (เบี้ยเท่ากันทุกชั้น)", siNote: "ทุนประกันขั้นต่ำ 50,000 บาท ไม่จำกัดทุนสูงสุด · ชำระเบี้ยรายปีเท่านั้น (อายุ 20-52 ปีเท่านั้นที่ซื้อได้)" },
 ];
 const RIDER_IDS = PRODUCTS.filter((p) => !p.isMain).map((p) => p.id); // ทุกอย่างที่ไม่ใช่ทุนประกันหลัก (รวม คช.)
 const RIDER_IDS_NO_CS = RIDER_IDS.filter((id) => id !== "CS"); // สำหรับแพ็กเกจที่ยกเว้น คช. ได้ (แคนเซอร์ แม็กซ์)
@@ -974,7 +1008,7 @@ function App() {
     const [age, setAge] = useState(35);
     const [occClass, setOccClass] = useState(1);
     const [payMode, setPayMode] = useState("year");
-    const [selected, setSelected] = useState({ SUD: true, LIFE99: false, UNJAI: false, CANCERMAX: false, PLUS2: false, PRESTIGE: false, ACC: true, ACC3: false, TPD: false, SUPER: false, VH: false, VHKIDS: false, RPPR: false, HHP: false, OPD: false, HAPPYCI: false, LLC: false, SS: false, HAPPYPENSION: false, HAPPYSAVING: false, HAPPYWL: false, HRP9920: false, HRPDIV: false, HRP9901: false, HAPPYWL9901: false, HAPPYKID: false, CHAK: false, CHAP: false, PH: false, PSAVE104: false, PSAVE126: false, HS208: false, HS126: false, HS157: false, HS147: false, HS168: false, HS1810: false, HS2515: false, TAXSAVER105: false, CS: false });
+    const [selected, setSelected] = useState({ SUD: true, LIFE99: false, UNJAI: false, CANCERMAX: false, PLUS2: false, PRESTIGE: false, ACC: true, ACC3: false, TPD: false, SUPER: false, VH: false, VHKIDS: false, RPPR: false, HHP: false, OPD: false, HAPPYCI: false, LLC: false, SS: false, HAPPYPENSION: false, HAPPYSAVING: false, HAPPYWL: false, HRP9920: false, HRPDIV: false, HRP9901: false, HAPPYWL9901: false, HAPPYKID: false, CHAK: false, CHAP: false, PH: false, PSAVE104: false, PSAVE126: false, HS208: false, HS126: false, HS157: false, HS147: false, HS168: false, HS1810: false, HS2515: false, TAXSAVER105: false, BLASAVE168: false, PENSION888: false, CS: false });
     const [sudSI, setSudSI] = useState(500000);
     const [life99SI, setLife99SI] = useState(0);
     const [unjaiPlan, setUnjaiPlan] = useState(0);
@@ -1033,6 +1067,11 @@ function App() {
     const [hs1810SI, setHs1810SI] = useState(0);
     const [hs2515SI, setHs2515SI] = useState(0);
     const [taxsaver105SI, setTaxsaver105SI] = useState(0);
+    const [blasave168SI, setBlasave168SI] = useState(0);
+    const [pension888SI, setPension888SI] = useState(0);
+    const [pensionGroupOpen, setPensionGroupOpen] = useState(false);
+    const [pensionScheduleOpen, setPensionScheduleOpen] = useState({});
+    const [pensionYearModal, setPensionYearModal] = useState(null); // { name, age, irr }
     const [savingsGroupOpen, setSavingsGroupOpen] = useState(false);
     const [compareOpen, setCompareOpen] = useState(false);
     const [compareSI, setCompareSI] = useState(500000);
@@ -1165,6 +1204,10 @@ function App() {
                         setHs2515SI(s.hs2515SI);
                     if (s.taxsaver105SI !== undefined)
                         setTaxsaver105SI(s.taxsaver105SI);
+                    if (s.blasave168SI !== undefined)
+                        setBlasave168SI(s.blasave168SI);
+                    if (s.pension888SI !== undefined)
+                        setPension888SI(s.pension888SI);
                     if (s.selectedConcerns)
                         setSelectedConcerns(s.selectedConcerns);
                     if (s.opdPlan !== undefined)
@@ -1197,9 +1240,9 @@ function App() {
     useEffect(() => {
         if (!loadedFromStorage)
             return;
-        const snapshot = { gender, age, occClass, payMode, sudSI, life99SI, unjaiPlan, cancermaxPlan, plus2SI, plus2Term, prestigeSI, prestigeTerm, selected, accPlan, acc3Plan, tpdSI, supSI, vhPlan, vhkidsPlan, rpprDaily, hhpPlan, hhpDeduct, opdPlan, happyciSI, happyciTerm, llcSI, llcVariant, ssSI, happypensionPremiumInput, happypensionTerm, happypensionMode, happypensionTargetPension, happysavingSI, happysavingTerm, happywlSI, happywlTerm, hrp9920SI, hrpdivSI, hrpdivTerm, hrp9901SI, happywl9901SI, happykidSI, chakSI, chakTerm, chapSI, chapTerm, chapPayorAge, chapPayorGender, phPlan, phDeduct, phArea, psave104SI, psave126SI, hs208SI, hs126SI, hs157SI, hs147SI, hs168SI, hs1810SI, hs2515SI, taxsaver105SI, csPayorAge, csPayorGender, selectedConcerns };
+        const snapshot = { gender, age, occClass, payMode, sudSI, life99SI, unjaiPlan, cancermaxPlan, plus2SI, plus2Term, prestigeSI, prestigeTerm, selected, accPlan, acc3Plan, tpdSI, supSI, vhPlan, vhkidsPlan, rpprDaily, hhpPlan, hhpDeduct, opdPlan, happyciSI, happyciTerm, llcSI, llcVariant, ssSI, happypensionPremiumInput, happypensionTerm, happypensionMode, happypensionTargetPension, happysavingSI, happysavingTerm, happywlSI, happywlTerm, hrp9920SI, hrpdivSI, hrpdivTerm, hrp9901SI, happywl9901SI, happykidSI, chakSI, chakTerm, chapSI, chapTerm, chapPayorAge, chapPayorGender, phPlan, phDeduct, phArea, psave104SI, psave126SI, hs208SI, hs126SI, hs157SI, hs147SI, hs168SI, hs1810SI, hs2515SI, taxsaver105SI, blasave168SI, pension888SI, csPayorAge, csPayorGender, selectedConcerns };
         storageAdapter.set(STORAGE_KEY, JSON.stringify(snapshot));
-    }, [loadedFromStorage, gender, age, occClass, payMode, sudSI, life99SI, unjaiPlan, cancermaxPlan, plus2SI, plus2Term, prestigeSI, prestigeTerm, selected, accPlan, acc3Plan, tpdSI, supSI, vhPlan, vhkidsPlan, rpprDaily, hhpPlan, hhpDeduct, opdPlan, happyciSI, happyciTerm, llcSI, llcVariant, ssSI, happypensionPremiumInput, happypensionTerm, happypensionMode, happypensionTargetPension, happysavingSI, happysavingTerm, happywlSI, happywlTerm, hrp9920SI, hrpdivSI, hrpdivTerm, hrp9901SI, happywl9901SI, happykidSI, chakSI, chakTerm, chapSI, chapTerm, chapPayorAge, chapPayorGender, phPlan, phDeduct, phArea, psave104SI, psave126SI, hs208SI, hs126SI, hs157SI, hs147SI, hs168SI, hs1810SI, hs2515SI, taxsaver105SI, csPayorAge, csPayorGender, selectedConcerns]);
+    }, [loadedFromStorage, gender, age, occClass, payMode, sudSI, life99SI, unjaiPlan, cancermaxPlan, plus2SI, plus2Term, prestigeSI, prestigeTerm, selected, accPlan, acc3Plan, tpdSI, supSI, vhPlan, vhkidsPlan, rpprDaily, hhpPlan, hhpDeduct, opdPlan, happyciSI, happyciTerm, llcSI, llcVariant, ssSI, happypensionPremiumInput, happypensionTerm, happypensionMode, happypensionTargetPension, happysavingSI, happysavingTerm, happywlSI, happywlTerm, hrp9920SI, hrpdivSI, hrpdivTerm, hrp9901SI, happywl9901SI, happykidSI, chakSI, chakTerm, chapSI, chapTerm, chapPayorAge, chapPayorGender, phPlan, phDeduct, phArea, psave104SI, psave126SI, hs208SI, hs126SI, hs157SI, hs147SI, hs168SI, hs1810SI, hs2515SI, taxsaver105SI, blasave168SI, pension888SI, csPayorAge, csPayorGender, selectedConcerns]);
     const toggle = (id) => setSelected((s) => {
         const next = Object.assign(Object.assign({}, s), { [id]: !s[id] });
         if (next[id])
@@ -1221,8 +1264,9 @@ function App() {
                 el.scrollIntoView({ behavior: "smooth", block: "center" });
         }, 60);
     }
-    const MAIN_IDS = ["SUD", "LIFE99", "UNJAI", "CANCERMAX", "PLUS2", "PRESTIGE", "HAPPYPENSION", "HAPPYSAVING", "HAPPYWL", "HRP9920", "HRPDIV", "HRP9901", "HAPPYWL9901", "HAPPYKID", "PSAVE104", "PSAVE126", "HS208", "HS126", "HS157", "HS147", "HS168", "HS1810", "HS2515", "TAXSAVER105"];
-    const SAVINGS_IDS = ["PSAVE104", "PSAVE126", "HS208", "HS126", "HS157", "HS147", "HS168", "HS1810", "HS2515", "TAXSAVER105", "HAPPYSAVING"]; // เฉพาะแบบประกันสะสมทรัพย์ชุดใหม่ + แฮปปี้เซฟวิ่ง (มีเงินปันผล) — แบบเดิมอื่นๆ ยังคงอยู่ในคอลัมน์ทุนประกันหลักตามเดิม
+    const MAIN_IDS = ["SUD", "LIFE99", "UNJAI", "CANCERMAX", "PLUS2", "PRESTIGE", "HAPPYPENSION", "HAPPYSAVING", "HAPPYWL", "HRP9920", "HRPDIV", "HRP9901", "HAPPYWL9901", "HAPPYKID", "PSAVE104", "PSAVE126", "HS208", "HS126", "HS157", "HS147", "HS168", "HS1810", "HS2515", "TAXSAVER105", "BLASAVE168", "PENSION888"];
+    const SAVINGS_IDS = ["PSAVE104", "PSAVE126", "HS208", "HS126", "HS157", "HS147", "HS168", "HS1810", "HS2515", "TAXSAVER105", "HAPPYSAVING", "BLASAVE168"]; // เฉพาะแบบประกันสะสมทรัพย์ชุดใหม่ + แฮปปี้เซฟวิ่ง (มีเงินปันผล) — แบบเดิมอื่นๆ ยังคงอยู่ในคอลัมน์ทุนประกันหลักตามเดิม
+    const PENSION_IDS = ["HAPPYPENSION", "PENSION888"]; // แบบบำนาญทั้งหมด — ใช้ตารางการจ่ายบำนาญ+จุดคุ้มทุนร่วมกัน
     const otherMainSelected = (id) => MAIN_IDS.some((m) => m !== id && selected[m]);
     // เช็คว่าแบบทุนประกันหลักแต่ละตัวเลือกได้จริงหรือไม่ ตามอายุปัจจุบัน (ใช้ช่วงอายุกว้างสุดของแต่ละแบบเป็นตัวกรองเบื้องต้น)
     // และล็อกไม่ให้เลือกซ้อนกับทุนหลักตัวอื่นที่เลือกไว้แล้ว
@@ -1346,6 +1390,14 @@ function App() {
             const table = happysavingTerm === 5 ? (gender === "female" ? HAPPYSAVING5_FEMALE : HAPPYSAVING5_MALE) : (gender === "female" ? HAPPYSAVING10_FEMALE : HAPPYSAVING10_MALE);
             return Math.floor((adjPremium * 1000) / table[age]);
         }
+        if (id === "PENSION888") {
+            const rate = (gender === "female" ? PENSION888_FEMALE : PENSION888_MALE)[age - PENSION888_MIN_AGE];
+            let si = (adjPremium * 1000) / rate;
+            const d = pension888Discount(si);
+            if (d > 0)
+                si = (adjPremium * 1000) / (rate * (1 - d));
+            return Math.floor(si);
+        }
         if (SAVINGS_DEFS[id]) {
             const def = SAVINGS_DEFS[id];
             let si = (adjPremium * 1000) / def.rate(age, gender);
@@ -1357,7 +1409,7 @@ function App() {
         return 0;
     }
     // ทุนประกันที่ใช้คำนวณจริง — อ่านจากช่องทุนประกันโดยตรง หรือย้อนคำนวณจากเบี้ยที่กรอก แล้วแต่โหมดที่เลือกไว้
-    const SAVINGS_SI_STATE = { PSAVE104: [psave104SI, setPsave104SI], PSAVE126: [psave126SI, setPsave126SI], HS208: [hs208SI, setHs208SI], HS126: [hs126SI, setHs126SI], HS157: [hs157SI, setHs157SI], HS147: [hs147SI, setHs147SI], HS168: [hs168SI, setHs168SI], HS1810: [hs1810SI, setHs1810SI], HS2515: [hs2515SI, setHs2515SI], TAXSAVER105: [taxsaver105SI, setTaxsaver105SI], HAPPYSAVING: [happysavingSI, setHappysavingSI] };
+    const SAVINGS_SI_STATE = { PSAVE104: [psave104SI, setPsave104SI], PSAVE126: [psave126SI, setPsave126SI], HS208: [hs208SI, setHs208SI], HS126: [hs126SI, setHs126SI], HS157: [hs157SI, setHs157SI], HS147: [hs147SI, setHs147SI], HS168: [hs168SI, setHs168SI], HS1810: [hs1810SI, setHs1810SI], HS2515: [hs2515SI, setHs2515SI], TAXSAVER105: [taxsaver105SI, setTaxsaver105SI], HAPPYSAVING: [happysavingSI, setHappysavingSI], BLASAVE168: [blasave168SI, setBlasave168SI], PENSION888: [pension888SI, setPension888SI] };
     function getEffectiveSI(id) {
         const mode = savingsMode[id] || "si";
         if (mode === "premium")
@@ -1409,7 +1461,7 @@ function App() {
     }
     // จัดกลุ่มแบบประกันเป็น 4 หมวดให้เห็นภาพรวมได้ง่ายขึ้น — โรคร้ายแรงรวมทั้งทุนหลัก (อุ่นใจ/แคนเซอร์แม็กซ์) และสัญญาเพิ่มเติมไว้ด้วยกัน
     const CATEGORY_GROUPS = [
-        { id: "main", label: "💰 ทุนประกันหลัก", ids: MAIN_IDS.filter((id) => id !== "UNJAI" && id !== "CANCERMAX" && !SAVINGS_IDS.includes(id)) },
+        { id: "main", label: "💰 ทุนประกันหลัก", ids: MAIN_IDS.filter((id) => id !== "UNJAI" && id !== "CANCERMAX" && !SAVINGS_IDS.includes(id) && !PENSION_IDS.includes(id)) },
         { id: "health", label: "🏥 สุขภาพ", ids: ["VH", "VHKIDS", "HHP", "OPD", "PH"] },
         { id: "critical", label: "🎗️ โรคร้ายแรง (ทุนหลัก + สัญญาเพิ่มเติม)", ids: ["UNJAI", "CANCERMAX", "SUPER", "HAPPYCI", "LLC", "SS"] },
         { id: "other", label: "🧩 อื่นๆ (อุบัติเหตุ / ทุพพลภาพ / เฉพาะกาล)", ids: ["ACC", "ACC3", "TPD", "RPPR", "CHAK", "CHAP"] },
@@ -1489,7 +1541,12 @@ function App() {
                                 React.createElement("div", { className: "px-2 py-2", style: { color: BRAND.dataBlack } }, baht(Math.round(row.totalPensionPaid))))) : (React.createElement("div", { className: "px-2 py-2 col-span-4", style: { color: BRAND.sub } }, row.msg))));
                     })),
                 React.createElement(PlanRow, { label: "\u0E40\u0E25\u0E37\u0E2D\u0E01\u0E07\u0E27\u0E14\u0E17\u0E35\u0E48\u0E08\u0E30\u0E43\u0E0A\u0E49\u0E04\u0E33\u0E19\u0E27\u0E13\u0E23\u0E27\u0E21\u0E01\u0E31\u0E1A\u0E2A\u0E31\u0E0D\u0E0D\u0E32\u0E40\u0E1E\u0E34\u0E48\u0E21\u0E40\u0E15\u0E34\u0E21\u0E2D\u0E37\u0E48\u0E19" },
-                    React.createElement(Chips, { options: HAPPYPENSION_TERMS, value: happypensionTerm, onChange: setHappypensionTerm, fmt: (t) => HAPPYPENSION_TERM_LABELS[t] }))));
+                    React.createElement(Chips, { options: HAPPYPENSION_TERMS, value: happypensionTerm, onChange: setHappypensionTerm, fmt: (t) => HAPPYPENSION_TERM_LABELS[t] })),
+                happypensionTerm && (React.createElement("button", { onClick: () => setPensionScheduleOpen((o) => (Object.assign(Object.assign({}, o), { HAPPYPENSION: !o.HAPPYPENSION }))), className: "w-full text-[21px] font-semibold px-4 py-2.5 rounded-xl mt-1", style: { background: BRAND.bg, color: BRAND.navy, border: "1px solid #D7E8F0" } }, pensionScheduleOpen.HAPPYPENSION ? "▴ ซ่อนตารางบำนาญ" : "▾ ดูตารางการจ่ายบำนาญ + จุดคุ้มทุน")),
+                pensionScheduleOpen.HAPPYPENSION && (() => {
+                    const s = buildPensionSchedule("HAPPYPENSION");
+                    return React.createElement(PensionScheduleTable, { rows: s.rows, breakEvenAge: s.breakEvenAge, onRowClick: (a) => setPensionYearModal({ name: "แฮปปี้ เพนชั่น (มีเงินปันผล)", age: a, irr: computePensionIRRUpToAge("HAPPYPENSION", a) }) });
+                })()));
             case "HAPPYSAVING": return selected.HAPPYSAVING && (React.createElement(React.Fragment, null,
                 React.createElement(PlanRow, { label: "\u0E23\u0E30\u0E22\u0E30\u0E40\u0E27\u0E25\u0E32\u0E0A\u0E33\u0E23\u0E30\u0E40\u0E1A\u0E35\u0E49\u0E22" },
                     React.createElement(Chips, { options: HAPPYSAVING_TERMS, value: happysavingTerm, onChange: setHappysavingTerm, fmt: (t) => t + " ปี" })),
@@ -1615,7 +1672,8 @@ function App() {
             case "HS168":
             case "HS1810":
             case "HS2515":
-            case "TAXSAVER105": {
+            case "TAXSAVER105":
+            case "BLASAVE168": {
                 const id = p.id;
                 const def = SAVINGS_DEFS[id];
                 return selected[id] && (React.createElement(React.Fragment, null,
@@ -1631,6 +1689,21 @@ function App() {
                     getEffectiveSI(id) >= def.minSI && (React.createElement("button", { onClick: () => setSavingsScheduleOpen((o) => (Object.assign(Object.assign({}, o), { [id]: !o[id] }))), className: "w-full text-[21px] font-semibold px-4 py-2.5 rounded-xl mt-1", style: { background: BRAND.bg, color: BRAND.navy, border: "1px solid #D7E8F0" } }, savingsScheduleOpen[id] ? "▴ ซ่อนตารางเงินคืนตลอดสัญญา" : "▾ ดูตารางเงินคืนตลอดสัญญา (การันตี)")),
                     savingsScheduleOpen[id] && (() => { const s = buildSavingsSchedule(id); return React.createElement(SavingsScheduleTable, { rows: s.rows, irr: s.irr }); })()));
             }
+            case "PENSION888": return selected.PENSION888 && (React.createElement(React.Fragment, null,
+                React.createElement(PlanRow, { label: "\u0E23\u0E30\u0E1A\u0E38\u0E02\u0E49\u0E2D\u0E21\u0E39\u0E25\u0E08\u0E32\u0E01" },
+                    React.createElement(SegButton, { options: [{ k: "si", l: "ทุนประกัน" }, { k: "premium", l: "เบี้ยประกัน" }], value: savingsMode.PENSION888 || "si", onChange: (v) => setSavingsMode((m) => (Object.assign(Object.assign({}, m), { PENSION888: v }))) })),
+                (savingsMode.PENSION888 || "si") === "si" ? (React.createElement(PlanRow, { label: "\u0E17\u0E38\u0E19\u0E1B\u0E23\u0E30\u0E01\u0E31\u0E19\u0E20\u0E31\u0E22 (\u0E1A\u0E32\u0E17)" },
+                    React.createElement(NumInput, { value: pension888SI, onChange: setPension888SI, min: 0, step: 10000 }))) : (React.createElement(React.Fragment, null,
+                    React.createElement(PlanRow, { label: "\u0E40\u0E1A\u0E35\u0E49\u0E22\u0E1B\u0E23\u0E30\u0E01\u0E31\u0E19\u0E20\u0E31\u0E22\u0E17\u0E35\u0E48\u0E15\u0E49\u0E2D\u0E07\u0E01\u0E32\u0E23\u0E08\u0E48\u0E32\u0E22/\u0E1B\u0E35 (\u0E1A\u0E32\u0E17)" },
+                        React.createElement(NumInput, { value: savingsPremiumInput.PENSION888 || 0, onChange: (v) => setSavingsPremiumInput((pr) => (Object.assign(Object.assign({}, pr), { PENSION888: v }))), min: 0, step: 5000 })),
+                    React.createElement("p", { className: "text-[19px] px-1", style: { color: BRAND.sub } },
+                        "\u0E17\u0E38\u0E19\u0E1B\u0E23\u0E30\u0E01\u0E31\u0E19\u0E20\u0E31\u0E22\u0E17\u0E35\u0E48\u0E04\u0E33\u0E19\u0E27\u0E13\u0E44\u0E14\u0E49: ",
+                        baht(getEffectiveSI("PENSION888"))))),
+                getEffectiveSI("PENSION888") >= PENSION888_MIN_SI && (React.createElement("button", { onClick: () => setPensionScheduleOpen((o) => (Object.assign(Object.assign({}, o), { PENSION888: !o.PENSION888 }))), className: "w-full text-[21px] font-semibold px-4 py-2.5 rounded-xl mt-1", style: { background: BRAND.bg, color: BRAND.navy, border: "1px solid #D7E8F0" } }, pensionScheduleOpen.PENSION888 ? "▴ ซ่อนตารางบำนาญ" : "▾ ดูตารางการจ่ายบำนาญ + จุดคุ้มทุน")),
+                pensionScheduleOpen.PENSION888 && (() => {
+                    const s = buildPensionSchedule("PENSION888");
+                    return React.createElement(PensionScheduleTable, { rows: s.rows, breakEvenAge: s.breakEvenAge, onRowClick: (a) => setPensionYearModal({ name: "บีแอลเอ เพนชั่น 888", age: a, irr: computePensionIRRUpToAge("PENSION888", a) }) });
+                })()));
             default: return null;
         }
     }
@@ -1740,7 +1813,7 @@ function App() {
         setPayMode("year");
         setSelectedConcerns([]);
         setPickedRecommendations([]);
-        setSelected({ SUD: false, LIFE99: false, UNJAI: false, CANCERMAX: false, PLUS2: false, PRESTIGE: false, ACC: false, ACC3: false, TPD: false, SUPER: false, VH: false, VHKIDS: false, RPPR: false, HHP: false, OPD: false, HAPPYCI: false, LLC: false, SS: false, HAPPYPENSION: false, HAPPYSAVING: false, HAPPYWL: false, HRP9920: false, HRPDIV: false, HRP9901: false, HAPPYWL9901: false, HAPPYKID: false, CHAK: false, CHAP: false, PH: false, PSAVE104: false, PSAVE126: false, HS208: false, HS126: false, HS157: false, HS147: false, HS168: false, HS1810: false, HS2515: false, TAXSAVER105: false, CS: false });
+        setSelected({ SUD: false, LIFE99: false, UNJAI: false, CANCERMAX: false, PLUS2: false, PRESTIGE: false, ACC: false, ACC3: false, TPD: false, SUPER: false, VH: false, VHKIDS: false, RPPR: false, HHP: false, OPD: false, HAPPYCI: false, LLC: false, SS: false, HAPPYPENSION: false, HAPPYSAVING: false, HAPPYWL: false, HRP9920: false, HRPDIV: false, HRP9901: false, HAPPYWL9901: false, HAPPYKID: false, CHAK: false, CHAP: false, PH: false, PSAVE104: false, PSAVE126: false, HS208: false, HS126: false, HS157: false, HS147: false, HS168: false, HS1810: false, HS2515: false, TAXSAVER105: false, BLASAVE168: false, PENSION888: false, CS: false });
         setSudSI(0);
         setLife99SI(0);
         setUnjaiPlan(0);
@@ -1797,6 +1870,11 @@ function App() {
         setHs1810SI(0);
         setHs2515SI(0);
         setTaxsaver105SI(0);
+        setBlasave168SI(0);
+        setPension888SI(0);
+        setPensionGroupOpen(false);
+        setPensionScheduleOpen({});
+        setPensionYearModal(null);
         setSavingsScheduleOpen({});
         setSavingsMode({});
         setSavingsPremiumInput({});
@@ -1814,7 +1892,7 @@ function App() {
         if (age < SUD_MIN_AGE || age > SUD_MAX_AGE)
             return { ok: false, msg: `อายุรับประกัน ${SUD_MIN_AGE}-${SUD_MAX_AGE} ปี` };
         if (selected.LIFE99 || selected.UNJAI || selected.CANCERMAX || selected.PLUS2 || selected.PRESTIGE || selected.HAPPYPENSION || selected.HAPPYSAVING || selected.HAPPYWL || selected.HRP9920 || selected.HRPDIV || selected.HRP9901 || selected.HAPPYWL9901 || selected.HAPPYKID)
-            return { ok: false, msg: "เลือกได้เพียง 1 แบบ จาก 24 แบบทุนประกันหลัก (ไม่สามารถเลือกพร้อมกันได้)" };
+            return { ok: false, msg: "เลือกได้เพียง 1 แบบ จาก 26 แบบทุนประกันหลัก (ไม่สามารถเลือกพร้อมกันได้)" };
         if (occClass === 3)
             return { ok: false, msg: "ตลอดชีพ สุดคุ้ม รับประกันเฉพาะชั้นอาชีพ 1-2 เท่านั้น (ไม่รับชั้นอาชีพ 3)" };
         if (sudSI < 100000)
@@ -1837,7 +1915,7 @@ function App() {
         if (age < LIFE99_MIN_AGE || age > LIFE99_MAX_AGE)
             return { ok: false, msg: `อายุรับประกัน ${LIFE99_MIN_AGE}-${LIFE99_MAX_AGE} ปี` };
         if (selected.SUD || selected.UNJAI || selected.CANCERMAX || selected.PLUS2 || selected.PRESTIGE || selected.HAPPYPENSION || selected.HAPPYSAVING || selected.HAPPYWL || selected.HRP9920 || selected.HRPDIV || selected.HRP9901 || selected.HAPPYWL9901 || selected.HAPPYKID)
-            return { ok: false, msg: "เลือกได้เพียง 1 แบบ จาก 24 แบบทุนประกันหลัก (ไม่สามารถเลือกพร้อมกันได้)" };
+            return { ok: false, msg: "เลือกได้เพียง 1 แบบ จาก 26 แบบทุนประกันหลัก (ไม่สามารถเลือกพร้อมกันได้)" };
         if (life99SI < 50000)
             return { ok: false, msg: "จำนวนเงินเอาประกันภัยขั้นต่ำ 50,000 บาท" };
         const rate = (gender === "female" ? LIFE99_FEMALE : LIFE99_MALE)[age];
@@ -1854,7 +1932,7 @@ function App() {
         if (age < UNJAI_MIN_AGE || age > UNJAI_MAX_AGE)
             return { ok: false, msg: `อายุรับประกัน ${UNJAI_MIN_AGE}-${UNJAI_MAX_AGE} ปี` };
         if (selected.SUD || selected.LIFE99 || selected.CANCERMAX || selected.PLUS2 || selected.PRESTIGE || selected.HAPPYPENSION || selected.HAPPYSAVING || selected.HAPPYWL || selected.HRP9920 || selected.HRPDIV || selected.HRP9901 || selected.HAPPYWL9901 || selected.HAPPYKID)
-            return { ok: false, msg: "เลือกได้เพียง 1 แบบ จาก 24 แบบทุนประกันหลัก (ไม่สามารถเลือกพร้อมกันได้)" };
+            return { ok: false, msg: "เลือกได้เพียง 1 แบบ จาก 26 แบบทุนประกันหลัก (ไม่สามารถเลือกพร้อมกันได้)" };
         const pi = UNJAI_PLANS.indexOf(unjaiPlan);
         if (pi < 0)
             return { ok: false, msg: "กรุณาเลือกแผนความคุ้มครอง" };
@@ -1875,7 +1953,7 @@ function App() {
         if (age < CANCERMAX_MIN_AGE || age > CANCERMAX_MAX_AGE)
             return { ok: false, msg: `อายุรับประกัน ${CANCERMAX_MIN_AGE}-${CANCERMAX_MAX_AGE} ปี` };
         if (selected.SUD || selected.LIFE99 || selected.UNJAI || selected.PLUS2 || selected.PRESTIGE || selected.HAPPYPENSION || selected.HAPPYSAVING || selected.HAPPYWL || selected.HRP9920 || selected.HRPDIV || selected.HRP9901 || selected.HAPPYWL9901 || selected.HAPPYKID)
-            return { ok: false, msg: "เลือกได้เพียง 1 แบบ จาก 24 แบบทุนประกันหลัก (ไม่สามารถเลือกพร้อมกันได้)" };
+            return { ok: false, msg: "เลือกได้เพียง 1 แบบ จาก 26 แบบทุนประกันหลัก (ไม่สามารถเลือกพร้อมกันได้)" };
         const plan = CANCERMAX_PLANS.find((p) => p.key === cancermaxPlan);
         if (!plan)
             return { ok: false, msg: "กรุณาเลือกแผนความคุ้มครอง" };
@@ -1909,7 +1987,7 @@ function App() {
         if (age < PLUS2_MIN_AGE || age > maxAge)
             return { ok: false, msg: `อายุรับประกันสำหรับระยะ ${plus2Term} ปี คือ ${PLUS2_MIN_AGE}-${maxAge} ปี` };
         if (selected.SUD || selected.LIFE99 || selected.UNJAI || selected.CANCERMAX || selected.PRESTIGE || selected.HAPPYPENSION || selected.HAPPYSAVING || selected.HAPPYWL || selected.HRP9920 || selected.HRPDIV || selected.HRP9901 || selected.HAPPYWL9901 || selected.HAPPYKID)
-            return { ok: false, msg: "เลือกได้เพียง 1 แบบ จาก 24 แบบทุนประกันหลัก (ไม่สามารถเลือกพร้อมกันได้)" };
+            return { ok: false, msg: "เลือกได้เพียง 1 แบบ จาก 26 แบบทุนประกันหลัก (ไม่สามารถเลือกพร้อมกันได้)" };
         if (occClass === 3)
             return { ok: false, msg: "คุ้มครอง 2 พลัส รับประกันเฉพาะชั้นอาชีพ 1-2 เท่านั้น (ไม่รับชั้นอาชีพ 3)" };
         if (plus2SI < PLUS2_MIN_SI)
@@ -1938,7 +2016,7 @@ function App() {
         if (age < PRESTIGE_MIN_AGE || age > maxAge)
             return { ok: false, msg: `อายุรับประกันสำหรับระยะ ${prestigeTerm} ปี คือ ${PRESTIGE_MIN_AGE}-${maxAge} ปี` };
         if (selected.SUD || selected.LIFE99 || selected.UNJAI || selected.CANCERMAX || selected.PLUS2 || selected.HAPPYPENSION || selected.HAPPYSAVING || selected.HAPPYWL || selected.HRP9920 || selected.HRPDIV || selected.HRP9901 || selected.HAPPYWL9901 || selected.HAPPYKID)
-            return { ok: false, msg: "เลือกได้เพียง 1 แบบ จาก 24 แบบทุนประกันหลัก (ไม่สามารถเลือกพร้อมกันได้)" };
+            return { ok: false, msg: "เลือกได้เพียง 1 แบบ จาก 26 แบบทุนประกันหลัก (ไม่สามารถเลือกพร้อมกันได้)" };
         if (occClass === 3)
             return { ok: false, msg: "เพรสทีจ ไลฟ์ รับประกันเฉพาะชั้นอาชีพ 1-2 เท่านั้น (ไม่รับชั้นอาชีพ 3)" };
         if (prestigeSI < PRESTIGE_MIN_SI)
@@ -2327,7 +2405,7 @@ function App() {
     }
     function calcHAPPYPENSION() {
         if (selected.SUD || selected.LIFE99 || selected.UNJAI || selected.CANCERMAX || selected.PLUS2 || selected.PRESTIGE || selected.HAPPYSAVING || selected.HAPPYWL || selected.HRP9920 || selected.HRPDIV || selected.HRP9901 || selected.HAPPYWL9901 || selected.HAPPYKID)
-            return { ok: false, msg: "เลือกได้เพียง 1 แบบ จาก 24 แบบทุนประกันหลัก (ไม่สามารถเลือกพร้อมกันได้)" };
+            return { ok: false, msg: "เลือกได้เพียง 1 แบบ จาก 26 แบบทุนประกันหลัก (ไม่สามารถเลือกพร้อมกันได้)" };
         if (!happypensionTerm)
             return { ok: false, msg: "กรุณาเลือกงวดชำระเบี้ยที่จะใช้คำนวณรวม (ครั้งเดียว / 5 ปี / 10 ปี / ถึงอายุ 60 ปี)" };
         const row = happypensionRow(happypensionTerm);
@@ -2345,7 +2423,7 @@ function App() {
     }
     function calcHAPPYSAVING() {
         if (otherMainSelected("HAPPYSAVING"))
-            return { ok: false, msg: "เลือกได้เพียง 1 แบบ จาก 24 แบบทุนประกันหลัก (ไม่สามารถเลือกพร้อมกันได้)" };
+            return { ok: false, msg: "เลือกได้เพียง 1 แบบ จาก 26 แบบทุนประกันหลัก (ไม่สามารถเลือกพร้อมกันได้)" };
         if (age < HAPPYSAVING_MIN_AGE || age > HAPPYSAVING_MAX_AGE)
             return { ok: false, msg: `อายุรับประกัน ${HAPPYSAVING_MIN_AGE}-${HAPPYSAVING_MAX_AGE} ปี` };
         if (!happysavingTerm)
@@ -2370,7 +2448,7 @@ function App() {
     }
     function calcHAPPYWL() {
         if (otherMainSelected("HAPPYWL"))
-            return { ok: false, msg: "เลือกได้เพียง 1 แบบ จาก 24 แบบทุนประกันหลัก (ไม่สามารถเลือกพร้อมกันได้)" };
+            return { ok: false, msg: "เลือกได้เพียง 1 แบบ จาก 26 แบบทุนประกันหลัก (ไม่สามารถเลือกพร้อมกันได้)" };
         if (age < HAPPYWL_MIN_AGE || age > HAPPYWL_MAX_AGE)
             return { ok: false, msg: `อายุรับประกัน ${HAPPYWL_MIN_AGE}-${HAPPYWL_MAX_AGE} ปี` };
         if (occClass === 3)
@@ -2393,7 +2471,7 @@ function App() {
     }
     function calcHRP9920() {
         if (otherMainSelected("HRP9920"))
-            return { ok: false, msg: "เลือกได้เพียง 1 แบบ จาก 24 แบบทุนประกันหลัก (ไม่สามารถเลือกพร้อมกันได้)" };
+            return { ok: false, msg: "เลือกได้เพียง 1 แบบ จาก 26 แบบทุนประกันหลัก (ไม่สามารถเลือกพร้อมกันได้)" };
         if (age < HRP9920_MIN_AGE || age > HRP9920_MAX_AGE)
             return { ok: false, msg: `อายุรับประกัน ${HRP9920_MIN_AGE}-${HRP9920_MAX_AGE} ปี` };
         if (hrp9920SI < HRP9920_MIN_SI)
@@ -2409,7 +2487,7 @@ function App() {
     }
     function calcHRPDIV() {
         if (otherMainSelected("HRPDIV"))
-            return { ok: false, msg: "เลือกได้เพียง 1 แบบ จาก 24 แบบทุนประกันหลัก (ไม่สามารถเลือกพร้อมกันได้)" };
+            return { ok: false, msg: "เลือกได้เพียง 1 แบบ จาก 26 แบบทุนประกันหลัก (ไม่สามารถเลือกพร้อมกันได้)" };
         if (age < HRPDIV_MIN_AGE || age > HRPDIV_MAX_AGE)
             return { ok: false, msg: `อายุรับประกัน ${HRPDIV_MIN_AGE}-${HRPDIV_MAX_AGE} ปี` };
         if (!hrpdivTerm)
@@ -2429,7 +2507,7 @@ function App() {
     }
     function calcHRP9901() {
         if (otherMainSelected("HRP9901"))
-            return { ok: false, msg: "เลือกได้เพียง 1 แบบ จาก 24 แบบทุนประกันหลัก (ไม่สามารถเลือกพร้อมกันได้)" };
+            return { ok: false, msg: "เลือกได้เพียง 1 แบบ จาก 26 แบบทุนประกันหลัก (ไม่สามารถเลือกพร้อมกันได้)" };
         if (age < HRP9901_MIN_AGE || age > HRP9901_MAX_AGE)
             return { ok: false, msg: `อายุรับประกัน ${HRP9901_MIN_AGE}-${HRP9901_MAX_AGE} ปี` };
         if (hrp9901SI < HRP9901_MIN_SI)
@@ -2446,7 +2524,7 @@ function App() {
     }
     function calcHAPPYWL9901() {
         if (otherMainSelected("HAPPYWL9901"))
-            return { ok: false, msg: "เลือกได้เพียง 1 แบบ จาก 24 แบบทุนประกันหลัก (ไม่สามารถเลือกพร้อมกันได้)" };
+            return { ok: false, msg: "เลือกได้เพียง 1 แบบ จาก 26 แบบทุนประกันหลัก (ไม่สามารถเลือกพร้อมกันได้)" };
         if (age < HAPPYWL9901_MIN_AGE || age > HAPPYWL9901_MAX_AGE)
             return { ok: false, msg: `อายุรับประกัน ${HAPPYWL9901_MIN_AGE}-${HAPPYWL9901_MAX_AGE} ปี` };
         if (occClass === 3)
@@ -2466,7 +2544,7 @@ function App() {
     }
     function calcHAPPYKID() {
         if (otherMainSelected("HAPPYKID"))
-            return { ok: false, msg: "เลือกได้เพียง 1 แบบ จาก 24 แบบทุนประกันหลัก (ไม่สามารถเลือกพร้อมกันได้)" };
+            return { ok: false, msg: "เลือกได้เพียง 1 แบบ จาก 26 แบบทุนประกันหลัก (ไม่สามารถเลือกพร้อมกันได้)" };
         if (age < HAPPYKID_MIN_AGE || age > HAPPYKID_MAX_AGE)
             return { ok: false, msg: `อายุรับประกัน ${HAPPYKID_MIN_AGE}-${HAPPYKID_MAX_AGE} ปี (สำหรับผู้เยาว์เท่านั้น)` };
         if (happykidSI < HAPPYKID_MIN_SI || happykidSI > HAPPYKID_MAX_SI)
@@ -2604,7 +2682,7 @@ function App() {
     }
     function calcPSAVE104() {
         if (otherMainSelected("PSAVE104"))
-            return { ok: false, msg: "เลือกได้เพียง 1 แบบ จาก 24 แบบทุนประกันหลัก (ไม่สามารถเลือกพร้อมกันได้)" };
+            return { ok: false, msg: "เลือกได้เพียง 1 แบบ จาก 26 แบบทุนประกันหลัก (ไม่สามารถเลือกพร้อมกันได้)" };
         if (age < PSAVE104_MIN_AGE || age > PSAVE104_MAX_AGE)
             return { ok: false, msg: `อายุรับประกัน ${PSAVE104_MIN_AGE}-${PSAVE104_MAX_AGE} ปี` };
         const si = getEffectiveSI("PSAVE104");
@@ -2627,7 +2705,7 @@ function App() {
     }
     function calcPSAVE126() {
         if (otherMainSelected("PSAVE126"))
-            return { ok: false, msg: "เลือกได้เพียง 1 แบบ จาก 24 แบบทุนประกันหลัก (ไม่สามารถเลือกพร้อมกันได้)" };
+            return { ok: false, msg: "เลือกได้เพียง 1 แบบ จาก 26 แบบทุนประกันหลัก (ไม่สามารถเลือกพร้อมกันได้)" };
         if (age < PSAVE126_MIN_AGE || age > PSAVE126_MAX_AGE)
             return { ok: false, msg: `อายุรับประกัน ${PSAVE126_MIN_AGE}-${PSAVE126_MAX_AGE} ปี` };
         const si = getEffectiveSI("PSAVE126");
@@ -2660,6 +2738,7 @@ function App() {
         HS1810: { minAge: HS1810_MIN_AGE, maxAge: HS1810_MAX_AGE, minSI: HS1810_MIN_SI, payYears: HS1810_PAY_YEARS, schedule: HS1810_SCHEDULE, rate: (a, g) => (g === "female" ? HS1810_FEMALE : HS1810_MALE)[a], discount: (si) => hs1810Discount(si), name: "บีแอลเอ แฮปปี้เซฟวิ่ง 18/10 (มีเงินปันผล)" },
         HS2515: { minAge: HS2515_MIN_AGE, maxAge: HS2515_MAX_AGE, minSI: HS2515_MIN_SI, payYears: HS2515_PAY_YEARS, schedule: HS2515_SCHEDULE, rate: () => HS2515_RATE, discount: () => 0, name: "บีแอลเอ แฮปปี้เซฟวิ่ง 2515 (มีเงินปันผล)" },
         TAXSAVER105: { minAge: TAXSAVER105_MIN_AGE, maxAge: TAXSAVER105_MAX_AGE, minSI: TAXSAVER105_MIN_SI, payYears: TAXSAVER105_PAY_YEARS, schedule: TAXSAVER105_SCHEDULE, rate: (a) => taxsaver105Rate(a), discount: (si, a) => taxsaver105Discount(si, a), name: "แท็กซ์ เซฟเวอร์ 10/5 (มีเงินปันผล)" },
+        BLASAVE168: { minAge: BLASAVE168_MIN_AGE, maxAge: BLASAVE168_MAX_AGE, minSI: BLASAVE168_MIN_SI, payYears: BLASAVE168_PAY_YEARS, schedule: BLASAVE168_SCHEDULE, rate: () => BLASAVE168_RATE, discount: (si, a) => blasave168Discount(si, a), name: "บีแอลเอ เซฟวิ่ง 168" },
     };
     // แปลงตาราง schedule ([deathPct,cashPct] ต่อปี) เป็นรายการ benefits แบบสรุปช่วงปีอัตโนมัติ ลดการพิมพ์ซ้ำ/พิมพ์ผิด
     function savingsBenefitLines(def, si) {
@@ -2682,7 +2761,7 @@ function App() {
     function calcGenericSavings(id) {
         const def = SAVINGS_DEFS[id];
         if (otherMainSelected(id))
-            return { ok: false, msg: "เลือกได้เพียง 1 แบบ จาก 24 แบบทุนประกันหลัก (ไม่สามารถเลือกพร้อมกันได้)" };
+            return { ok: false, msg: "เลือกได้เพียง 1 แบบ จาก 26 แบบทุนประกันหลัก (ไม่สามารถเลือกพร้อมกันได้)" };
         if (age < def.minAge || age > def.maxAge)
             return { ok: false, msg: `อายุรับประกัน ${def.minAge}-${def.maxAge} ปี` };
         const si = getEffectiveSI(id);
@@ -2704,6 +2783,32 @@ function App() {
     function calcHS1810() { return calcGenericSavings("HS1810"); }
     function calcHS2515() { return calcGenericSavings("HS2515"); }
     function calcTAXSAVER105() { return calcGenericSavings("TAXSAVER105"); }
+    function calcBLASAVE168() { return calcGenericSavings("BLASAVE168"); }
+    function calcPENSION888() {
+        if (otherMainSelected("PENSION888"))
+            return { ok: false, msg: "เลือกได้เพียง 1 แบบ จาก 26 แบบทุนประกันหลัก (ไม่สามารถเลือกพร้อมกันได้)" };
+        if (age < PENSION888_MIN_AGE || age > PENSION888_MAX_AGE)
+            return { ok: false, msg: `อายุรับประกัน ${PENSION888_MIN_AGE}-${PENSION888_MAX_AGE} ปี` };
+        const si = getEffectiveSI("PENSION888");
+        if (si < PENSION888_MIN_SI)
+            return { ok: false, msg: (savingsMode.PENSION888 === "premium" ? `เบี้ยที่กรอกต่ำเกินไป (ทุนที่คำนวณได้ต้องไม่ต่ำกว่า ${baht(PENSION888_MIN_SI)})` : `ทุนประกันขั้นต่ำ ${baht(PENSION888_MIN_SI)} บาท`) };
+        const rate = (gender === "female" ? PENSION888_FEMALE : PENSION888_MALE)[age - PENSION888_MIN_AGE];
+        const discount = pension888Discount(si);
+        const premium = getDisplayPremium("PENSION888", rate * (1 - discount) * si / 1000);
+        const firstPension = Math.round(si * PENSION888_FIRST_PENSION_PCT);
+        const annualPension = Math.round(si * PENSION888_ANNUAL_PENSION_PCT);
+        const numAnnualPayments = PENSION888_PENSION_END_AGE - PENSION888_PENSION_START_AGE; // อายุ 61-88 = 28 งวด
+        const totalPension = firstPension + annualPension * numAnnualPayments;
+        return { ok: true, premium, benefits: [
+                ["ทุนประกันภัย", baht(si)],
+                ["ส่วนลดอัตราเบี้ย", discount > 0 ? (discount * 100) + "%" : "ไม่มี"],
+                ["บำนาญงวดแรก (อายุครบ 60 ปี)", baht(firstPension) + " (30% ของทุนประกันภัย)"],
+                ["บำนาญงวดถัดไป (อายุครบ 61-88 ปี)", baht(annualPension) + " ต่อปี (8% ของทุนประกันภัย)"],
+                ["รวมบำนาญที่จะได้รับตลอดโครงการ (29 งวด)", baht(totalPension)],
+                ["หากเสียชีวิตก่อนอายุ 60 ปี", "รับ 105% ของเบี้ยที่ชำระสะสม หรือมูลค่าเวนคืนกรมธรรม์ แล้วแต่จำนวนใดมากกว่า"],
+                ["หากเสียชีวิตระหว่างรับบำนาญ (อายุ 60-88 ปี)", "รับเบี้ยที่ชำระสะสมจริง หักด้วยบำนาญที่ได้รับไปแล้ว (ถ้าบำนาญที่ได้รับมากกว่าเบี้ยสะสม จะไม่มีเงินคืนเพิ่ม)"],
+            ] };
+    }
     // สร้างตารางอัตราเบี้ยที่จะปรับในอนาคต (รายปีหรือรายช่วงอายุ) ของแบบที่ไม่ใช่เบี้ยคงที่ ตามแผน/ทุนประกันที่เลือกไว้ปัจจุบัน ไปจนถึงอายุสูงสุดที่ต่ออายุได้
     function buildPremiumSchedule(id) {
         const rows = [];
@@ -3009,7 +3114,70 @@ function App() {
         });
         return results.sort((a, b) => { var _a, _b; return ((_a = b.irr) !== null && _a !== void 0 ? _a : -Infinity) - ((_b = a.irr) !== null && _b !== void 0 ? _b : -Infinity); });
     }
-    const CALC = { SUD: calcSUD, LIFE99: calcLIFE99, UNJAI: calcUNJAI, CANCERMAX: calcCANCERMAX, PLUS2: calcPLUS2, PRESTIGE: calcPRESTIGE, ACC: calcACC, ACC3: calcACC3, TPD: calcTPD, SUPER: calcSUPER, VH: calcVH, VHKIDS: calcVHKIDS, RPPR: calcRPPR, HHP: calcHHP, OPD: calcOPD, HAPPYCI: calcHAPPYCI, LLC: calcLLC, SS: calcSS, HAPPYPENSION: calcHAPPYPENSION, HAPPYSAVING: calcHAPPYSAVING, HAPPYWL: calcHAPPYWL, HRP9920: calcHRP9920, HRPDIV: calcHRPDIV, HRP9901: calcHRP9901, HAPPYWL9901: calcHAPPYWL9901, HAPPYKID: calcHAPPYKID, CHAK: calcCHAK, CHAP: calcCHAP, PH: calcPH, PSAVE104: calcPSAVE104, PSAVE126: calcPSAVE126, HS208: calcHS208, HS126: calcHS126, HS157: calcHS157, HS147: calcHS147, HS168: calcHS168, HS1810: calcHS1810, HS2515: calcHS2515, TAXSAVER105: calcTAXSAVER105, CS: calcCS };
+    // สร้างตารางการจ่ายบำนาญรายปี + หาอายุจุดคุ้มทุน (ปีที่บำนาญสะสม >= เบี้ยสะสม) — ใช้ร่วมกันทุกแบบบำนาญ
+    function buildPensionSchedule(id) {
+        if (id === "PENSION888") {
+            const si = getEffectiveSI("PENSION888");
+            if (si < PENSION888_MIN_SI)
+                return { rows: [], breakEvenAge: null };
+            const rate = (gender === "female" ? PENSION888_FEMALE : PENSION888_MALE)[age - PENSION888_MIN_AGE];
+            const discount = pension888Discount(si);
+            const yearlyPremium = Math.round(getDisplayPremium("PENSION888", rate * (1 - discount) * si / 1000));
+            const rows = [];
+            let cumPremium = 0, cumPension = 0, breakEvenAge = null;
+            for (let a = age; a <= PENSION888_PENSION_END_AGE; a++) {
+                const premium = a < age + PENSION888_PAY_YEARS ? yearlyPremium : 0;
+                cumPremium += premium;
+                let pension = 0;
+                if (a === PENSION888_PENSION_START_AGE)
+                    pension = Math.round(si * PENSION888_FIRST_PENSION_PCT);
+                else if (a > PENSION888_PENSION_START_AGE)
+                    pension = Math.round(si * PENSION888_ANNUAL_PENSION_PCT);
+                cumPension += pension;
+                if (breakEvenAge === null && cumPremium > 0 && cumPension >= cumPremium)
+                    breakEvenAge = a;
+                rows.push({ age: a, premium, pension, cumPremium, cumPension, note: a === PENSION888_PENSION_START_AGE ? "เริ่มรับบำนาญ (งวดแรก 30%)" : "" });
+            }
+            return { rows, breakEvenAge };
+        }
+        if (id === "HAPPYPENSION") {
+            const row = happypensionRow(happypensionTerm);
+            if (!row.ok)
+                return { rows: [], breakEvenAge: null };
+            const payYears = happypensionTerm === "once" ? 1 : happypensionTerm === "5y" ? 5 : happypensionTerm === "10y" ? 10 : (60 - age);
+            const rows = [];
+            let cumPremium = 0, cumPension = 0, breakEvenAge = null;
+            for (let a = age; a <= 98; a++) {
+                const premium = a < age + payYears ? Math.round(row.premium) : 0;
+                cumPremium += premium;
+                const pension = a >= 60 ? Math.round(row.pension) : 0;
+                cumPension += pension;
+                if (breakEvenAge === null && cumPremium > 0 && cumPension >= cumPremium)
+                    breakEvenAge = a;
+                rows.push({ age: a, premium, pension, cumPremium, cumPension, note: a === 60 ? "เริ่มรับบำนาญ" : "" });
+            }
+            return { rows, breakEvenAge };
+        }
+        return { rows: [], breakEvenAge: null };
+    }
+    // คำนวณ IRR ของแบบบำนาญ โดยตัดกระแสเงินสดที่อายุที่เลือกเป็นจุดสิ้นสุด (TVM: เบี้ยจ่ายต้นปี บำนาญรับปลายปี)
+    function computePensionIRRUpToAge(id, targetAge) {
+        const { rows } = buildPensionSchedule(id);
+        const relevant = rows.filter((r) => r.age <= targetAge);
+        if (relevant.length === 0)
+            return null;
+        const startAge = relevant[0].age;
+        const totalYears = targetAge - startAge + 1;
+        const cf = new Array(totalYears + 1).fill(0);
+        relevant.forEach((r) => {
+            const t = r.age - startAge;
+            if (r.premium > 0)
+                cf[t] -= r.premium;
+            cf[t + 1] = (cf[t + 1] || 0) + r.pension;
+        });
+        return calcIRR(cf);
+    }
+    const CALC = { SUD: calcSUD, LIFE99: calcLIFE99, UNJAI: calcUNJAI, CANCERMAX: calcCANCERMAX, PLUS2: calcPLUS2, PRESTIGE: calcPRESTIGE, ACC: calcACC, ACC3: calcACC3, TPD: calcTPD, SUPER: calcSUPER, VH: calcVH, VHKIDS: calcVHKIDS, RPPR: calcRPPR, HHP: calcHHP, OPD: calcOPD, HAPPYCI: calcHAPPYCI, LLC: calcLLC, SS: calcSS, HAPPYPENSION: calcHAPPYPENSION, HAPPYSAVING: calcHAPPYSAVING, HAPPYWL: calcHAPPYWL, HRP9920: calcHRP9920, HRPDIV: calcHRPDIV, HRP9901: calcHRP9901, HAPPYWL9901: calcHAPPYWL9901, HAPPYKID: calcHAPPYKID, CHAK: calcCHAK, CHAP: calcCHAP, PH: calcPH, PSAVE104: calcPSAVE104, PSAVE126: calcPSAVE126, HS208: calcHS208, HS126: calcHS126, HS157: calcHS157, HS147: calcHS147, HS168: calcHS168, HS1810: calcHS1810, HS2515: calcHS2515, TAXSAVER105: calcTAXSAVER105, BLASAVE168: calcBLASAVE168, PENSION888: calcPENSION888, CS: calcCS };
     function grandTotal() {
         let sum = 0;
         for (const p of PRODUCTS) {
@@ -3124,7 +3292,7 @@ function App() {
             default: return [];
         }
     }
-    const CATEGORY = { SUD: "life", LIFE99: "life", UNJAI: "life", CANCERMAX: "life", PLUS2: "life", PRESTIGE: "life", ACC: "life", ACC3: "life", TPD: "life", SUPER: "life", VH: "ipd", VHKIDS: "ipd", HHP: "ipd", OPD: "opd", HAPPYCI: "life", LLC: "life", SS: "life", HAPPYPENSION: "life", HAPPYSAVING: "life", HAPPYWL: "life", HRP9920: "life", HRPDIV: "life", HRP9901: "life", HAPPYWL9901: "life", HAPPYKID: "life", CHAK: "life", CHAP: "life", PH: "ipd", PSAVE104: "life", PSAVE126: "life", HS208: "life", HS126: "life", HS157: "life", HS147: "life", HS168: "life", HS1810: "life", HS2515: "life", TAXSAVER105: "life", RPPR: "opd", CS: "opd" };
+    const CATEGORY = { SUD: "life", LIFE99: "life", UNJAI: "life", CANCERMAX: "life", PLUS2: "life", PRESTIGE: "life", ACC: "life", ACC3: "life", TPD: "life", SUPER: "life", VH: "ipd", VHKIDS: "ipd", HHP: "ipd", OPD: "opd", HAPPYCI: "life", LLC: "life", SS: "life", HAPPYPENSION: "life", HAPPYSAVING: "life", HAPPYWL: "life", HRP9920: "life", HRPDIV: "life", HRP9901: "life", HAPPYWL9901: "life", HAPPYKID: "life", CHAK: "life", CHAP: "life", PH: "ipd", PSAVE104: "life", PSAVE126: "life", HS208: "life", HS126: "life", HS157: "life", HS147: "life", HS168: "life", HS1810: "life", HS2515: "life", TAXSAVER105: "life", BLASAVE168: "life", PENSION888: "life", RPPR: "opd", CS: "opd" };
     // live per-card premium preview (updates as you type, before pressing calculate)
     const liveResults = {};
     PRODUCTS.forEach((p) => { if (selected[p.id])
@@ -3136,7 +3304,7 @@ function App() {
         VH: vhPlan === 0, VHKIDS: vhkidsPlan === 0, RPPR: rpprDaily === 0, HHP: hhpPlan === 0, OPD: opdPlan === 0, HAPPYCI: happyciTerm === 0 || happyciSI === 0, LLC: llcVariant === "" || llcSI === 0, SS: ssSI === 0, HAPPYPENSION: happypensionTerm === "" || (happypensionMode === "premium" ? happypensionPremiumInput === 0 : happypensionTargetPension === 0),
         HAPPYSAVING: happysavingTerm === 0 || happysavingSI === 0, HAPPYWL: happywlTerm === 0 || happywlSI === 0, HRP9920: hrp9920SI === 0, HRPDIV: hrpdivTerm === 0 || hrpdivSI === 0, HRP9901: hrp9901SI === 0, HAPPYWL9901: happywl9901SI === 0, HAPPYKID: happykidSI === 0,
         CHAK: chakTerm === 0 || chakSI === 0, CHAP: chapTerm === 0 || chapSI === 0 || chapPayorAge === 0, PH: phPlan === 0 || phDeduct === null, PSAVE104: psave104SI === 0, PSAVE126: psave126SI === 0,
-        HS208: hs208SI === 0, HS126: hs126SI === 0, HS157: hs157SI === 0, HS147: hs147SI === 0, HS168: hs168SI === 0, HS1810: hs1810SI === 0, HS2515: hs2515SI === 0, TAXSAVER105: taxsaver105SI === 0, CS: csPayorAge === 0,
+        HS208: hs208SI === 0, HS126: hs126SI === 0, HS157: hs157SI === 0, HS147: hs147SI === 0, HS168: hs168SI === 0, HS1810: hs1810SI === 0, HS2515: hs2515SI === 0, TAXSAVER105: taxsaver105SI === 0, BLASAVE168: blasave168SI === 0, PENSION888: pension888SI === 0, CS: csPayorAge === 0,
     };
     function handleCalculate() {
         const errs = [];
@@ -3222,6 +3390,9 @@ function App() {
                     React.createElement("button", { onClick: () => setSavingsGroupOpen((o) => !o), className: "flex items-center gap-1.5 text-[21px] font-medium px-3.5 py-2.5 rounded-full border", style: { borderColor: savingsGroupOpen ? BRAND.green : "#D7E8F0", background: savingsGroupOpen ? "#F0FAE6" : "#fff", color: savingsGroupOpen ? BRAND.greenDeep : BRAND.navy } },
                         React.createElement("span", null, "\uD83D\uDCB0"),
                         " \u0E1B\u0E23\u0E30\u0E01\u0E31\u0E19\u0E2A\u0E30\u0E2A\u0E21\u0E17\u0E23\u0E31\u0E1E\u0E22\u0E4C"),
+                    React.createElement("button", { onClick: () => setPensionGroupOpen((o) => !o), className: "flex items-center gap-1.5 text-[21px] font-medium px-3.5 py-2.5 rounded-full border", style: { borderColor: pensionGroupOpen ? BRAND.green : "#D7E8F0", background: pensionGroupOpen ? "#F0FAE6" : "#fff", color: pensionGroupOpen ? BRAND.greenDeep : BRAND.navy } },
+                        React.createElement("span", null, "\uD83C\uDFD6\uFE0F"),
+                        " \u0E1B\u0E23\u0E30\u0E01\u0E31\u0E19\u0E1A\u0E33\u0E19\u0E32\u0E0D"),
                     selectedConcerns.length > 0 && (React.createElement("button", { onClick: () => { setSelectedConcerns([]); setPickedRecommendations([]); }, className: "flex items-center gap-1.5 text-[21px] font-medium px-3.5 py-2.5 rounded-full", style: { background: "#FDEAEA", color: BRAND.danger } }, "\u2715 \u0E25\u0E49\u0E32\u0E07\u0E01\u0E32\u0E23\u0E40\u0E25\u0E37\u0E2D\u0E01")))),
             savingsGroupOpen && (React.createElement("section", { id: "savings-group-section", className: "rounded-2xl p-4", style: { background: "#FFF9EE", boxShadow: "0 6px 24px rgba(11,42,85,0.07)", border: "1.5px solid #F3D98B" } },
                 React.createElement("div", { className: "flex items-center justify-between mb-1" },
@@ -3266,6 +3437,23 @@ function App() {
                     React.createElement("button", { onClick: confirmPickedRecommendations, className: "text-[24px] font-bold px-6 py-3 rounded-full", style: { background: BRAND.navy, color: "#fff" } },
                         "\u2705 \u0E40\u0E25\u0E37\u0E2D\u0E01 (",
                         pickedRecommendations.filter((id) => SAVINGS_IDS.includes(id)).length,
+                        ")"))))),
+            pensionGroupOpen && (React.createElement("section", { id: "pension-group-section", className: "rounded-2xl p-4", style: { background: "#EFF7FB", boxShadow: "0 6px 24px rgba(11,42,85,0.07)", border: "1.5px solid #BFE0F0" } },
+                React.createElement("div", { className: "flex items-center justify-between mb-1" },
+                    React.createElement("h2", { className: "text-[24px] font-bold px-1", style: { color: BRAND.mainBlue } }, "\uD83C\uDFD6\uFE0F \u0E1B\u0E23\u0E30\u0E01\u0E31\u0E19\u0E1A\u0E33\u0E19\u0E32\u0E0D"),
+                    React.createElement("button", { onClick: () => setPensionGroupOpen(false), className: "text-[19px] font-medium px-2 py-1", style: { color: BRAND.sub } }, "\u2715 \u0E1B\u0E34\u0E14")),
+                React.createElement("p", { className: "text-[16px] mb-3 px-1", style: { color: BRAND.sub } }, "\u0E15\u0E34\u0E4A\u0E01\u0E40\u0E25\u0E37\u0E2D\u0E01\u0E44\u0E14\u0E49\u0E2B\u0E25\u0E32\u0E22\u0E2D\u0E31\u0E19\u0E41\u0E25\u0E49\u0E27\u0E01\u0E14\u0E1B\u0E38\u0E48\u0E21 \"\u0E40\u0E25\u0E37\u0E2D\u0E01\" \u0E14\u0E49\u0E32\u0E19\u0E25\u0E48\u0E32\u0E07\u0E40\u0E1E\u0E37\u0E48\u0E2D\u0E44\u0E1B\u0E01\u0E23\u0E2D\u0E01\u0E02\u0E49\u0E2D\u0E21\u0E39\u0E25 \u00B7 \u0E40\u0E25\u0E37\u0E2D\u0E01\u0E44\u0E14\u0E49\u0E40\u0E1E\u0E35\u0E22\u0E07 1 \u0E41\u0E1A\u0E1A (\u0E17\u0E38\u0E19\u0E1B\u0E23\u0E30\u0E01\u0E31\u0E19\u0E2B\u0E25\u0E31\u0E01\u0E40\u0E25\u0E37\u0E2D\u0E01\u0E44\u0E14\u0E49 1 \u0E41\u0E1A\u0E1A\u0E40\u0E17\u0E48\u0E32\u0E19\u0E31\u0E49\u0E19)"),
+                React.createElement("div", { className: "grid grid-cols-2 sm:grid-cols-3 gap-1.5 sm:gap-2" }, sortByRecommended(PRODUCTS.filter((p) => PENSION_IDS.includes(p.id))).map((p) => (React.createElement(CompactChip, { key: p.id, product: p, checked: !!selected[p.id], picked: pickedRecommendations.includes(p.id), disabled: productDisabled(p), recommended: false, onCheckboxClick: () => { if (selected[p.id])
+                        toggle(p.id);
+                    else
+                        togglePicked(p.id); }, onNameClick: () => { if (selected[p.id])
+                        openEditor(p.id);
+                    else
+                        togglePicked(p.id); } })))),
+                pickedRecommendations.some((id) => PENSION_IDS.includes(id)) && (React.createElement("div", { className: "flex justify-end mt-3 pt-3", style: { borderTop: "1px dashed #BFE0F0" } },
+                    React.createElement("button", { onClick: confirmPickedRecommendations, className: "text-[24px] font-bold px-6 py-3 rounded-full", style: { background: BRAND.navy, color: "#fff" } },
+                        "\u2705 \u0E40\u0E25\u0E37\u0E2D\u0E01 (",
+                        pickedRecommendations.filter((id) => PENSION_IDS.includes(id)).length,
                         ")"))))),
             React.createElement("section", { className: "rounded-2xl p-4", style: { background: BRAND.card, boxShadow: "0 6px 24px rgba(11,42,85,0.07)" } },
                 React.createElement("h2", { className: "text-[24px] font-bold mb-1 px-1", style: { color: BRAND.mainBlue } }, "\u0E20\u0E32\u0E1E\u0E23\u0E27\u0E21\u0E41\u0E1A\u0E1A\u0E1B\u0E23\u0E30\u0E01\u0E31\u0E19\u0E17\u0E31\u0E49\u0E07\u0E2B\u0E21\u0E14"),
@@ -3359,6 +3547,23 @@ function App() {
                 React.createElement("button", { onClick: () => setScheduleModal(null), className: "w-full mt-4 rounded-xl py-3 text-[24px] font-medium text-white flex items-center justify-center gap-1 shrink-0", style: { background: BRAND.navy } },
                     React.createElement("span", { style: { fontSize: 18 } }, "✕"),
                     " \u0E1B\u0E34\u0E14")))),
+        pensionYearModal && (React.createElement("div", { className: "fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4", style: { background: "rgba(8,30,62,0.55)" }, onClick: () => setPensionYearModal(null) },
+            React.createElement("div", { className: "w-full max-w-sm rounded-2xl p-5", style: { background: BRAND.card }, onClick: (e) => e.stopPropagation() },
+                React.createElement("div", { className: "flex items-center gap-2 mb-2" },
+                    React.createElement("div", { className: "w-10 h-10 rounded-xl flex items-center justify-center shrink-0", style: { background: BRAND.bg } },
+                        React.createElement("span", { style: { fontSize: 20 } }, "\uD83D\uDCCA")),
+                    React.createElement("h3", { className: "text-[24px] font-semibold", style: { color: BRAND.navy } },
+                        "IRR \u0E13 \u0E2D\u0E32\u0E22\u0E38 ",
+                        pensionYearModal.age,
+                        " \u0E1B\u0E35")),
+                React.createElement("p", { className: "text-[19px] mb-3", style: { color: BRAND.sub } },
+                    pensionYearModal.name,
+                    " \u2014 \u0E2D\u0E31\u0E15\u0E23\u0E32\u0E1C\u0E25\u0E15\u0E2D\u0E1A\u0E41\u0E17\u0E19\u0E2B\u0E32\u0E01\u0E04\u0E34\u0E14\u0E01\u0E23\u0E30\u0E41\u0E2A\u0E40\u0E07\u0E34\u0E19\u0E2A\u0E14\u0E2A\u0E30\u0E2A\u0E21\u0E17\u0E31\u0E49\u0E07\u0E2B\u0E21\u0E14\u0E08\u0E19\u0E16\u0E36\u0E07\u0E2D\u0E32\u0E22\u0E38\u0E19\u0E35\u0E49\u0E40\u0E1B\u0E47\u0E19\u0E08\u0E38\u0E14\u0E2A\u0E34\u0E49\u0E19\u0E2A\u0E38\u0E14"),
+                React.createElement("div", { className: "rounded-xl p-4 text-center", style: { background: BRAND.bg } },
+                    React.createElement("span", { className: "text-[36px] font-bold", style: { color: BRAND.greenDeep } }, pensionYearModal.irr !== null && pensionYearModal.irr !== undefined ? (pensionYearModal.irr * 100).toFixed(2) + "%" : "คำนวณไม่ได้ (ยังไม่มีบำนาญเข้าในช่วงนี้)")),
+                React.createElement("button", { onClick: () => setPensionYearModal(null), className: "w-full mt-4 rounded-xl py-3 text-[24px] font-medium text-white flex items-center justify-center gap-1", style: { background: BRAND.navy } },
+                    React.createElement("span", { style: { fontSize: 18 } }, "✕"),
+                    " \u0E1B\u0E34\u0E14")))),
         React.createElement("footer", { className: "text-center text-[21px] py-6", style: { color: BRAND.sub } }, "\u0E40\u0E1E\u0E37\u0E48\u0E2D\u0E01\u0E32\u0E23\u0E19\u0E33\u0E40\u0E2A\u0E19\u0E2D\u0E40\u0E1A\u0E37\u0E49\u0E2D\u0E07\u0E15\u0E49\u0E19\u0E40\u0E17\u0E48\u0E32\u0E19\u0E31\u0E49\u0E19 \u0E44\u0E21\u0E48\u0E43\u0E0A\u0E48\u0E40\u0E2D\u0E01\u0E2A\u0E32\u0E23\u0E40\u0E2A\u0E19\u0E2D\u0E02\u0E32\u0E22\u0E2D\u0E22\u0E48\u0E32\u0E07\u0E40\u0E1B\u0E47\u0E19\u0E17\u0E32\u0E07\u0E01\u0E32\u0E23")));
 }
 /* ============================== BENEFIT BOARD (compact dashboard style) ============================== */
@@ -3441,6 +3646,33 @@ function PlanRow({ label, children }) {
 }
 // การ์ดกะทัดรัดในภาพรวม 4 คอลัมน์ — โชว์แค่ชื่อ+เครื่องหมายถูก แตะเพื่อเลือก/เปิดพื้นที่กรอกข้อมูลด้านล่าง
 // ตารางกระแสเงินคืนรายปี (การันตี) + ความคุ้มครองตลอดสัญญา สำหรับแบบสะสมทรัพย์ — แสดงเต็มพื้นที่ในหน้าเดียวกัน ไม่ใช่ป็อปอัพ
+// ตารางการจ่ายบำนาญรายปี — ไฮไลต์อายุจุดคุ้มทุน กดแถวเพื่อดู IRR ณ อายุนั้นในป็อปอัพ
+function PensionScheduleTable({ rows, breakEvenAge, onRowClick }) {
+    if (!rows || rows.length === 0)
+        return null;
+    return (React.createElement("div", { className: "mt-2 rounded-xl border overflow-x-auto", style: { borderColor: "#D7E8F0" } },
+        React.createElement("table", { className: "w-full text-[18px]", style: { minWidth: 600 } },
+            React.createElement("thead", { style: { background: BRAND.bg } },
+                React.createElement("tr", null,
+                    React.createElement("th", { className: "text-center px-2 py-2", style: { color: BRAND.navy } }, "\u0E2D\u0E32\u0E22\u0E38"),
+                    React.createElement("th", { className: "text-right px-2 py-2", style: { color: BRAND.navy } }, "\u0E40\u0E1A\u0E35\u0E49\u0E22\u0E15\u0E48\u0E2D\u0E1B\u0E35"),
+                    React.createElement("th", { className: "text-right px-2 py-2", style: { color: BRAND.navy } }, "\u0E1A\u0E33\u0E19\u0E32\u0E0D\u0E15\u0E48\u0E2D\u0E1B\u0E35"),
+                    React.createElement("th", { className: "text-right px-2 py-2", style: { color: BRAND.navy } }, "\u0E40\u0E1A\u0E35\u0E49\u0E22\u0E2A\u0E30\u0E2A\u0E21"),
+                    React.createElement("th", { className: "text-right px-2 py-2", style: { color: BRAND.navy } }, "\u0E1A\u0E33\u0E19\u0E32\u0E0D\u0E2A\u0E30\u0E2A\u0E21"),
+                    React.createElement("th", { className: "text-left px-2 py-2", style: { color: BRAND.navy } }, "\u0E2B\u0E21\u0E32\u0E22\u0E40\u0E2B\u0E15\u0E38"))),
+            React.createElement("tbody", null, rows.map((r) => {
+                const isBreakEven = r.age === breakEvenAge;
+                return (React.createElement("tr", { key: r.age, onClick: () => onRowClick(r.age), style: { borderTop: "1px solid #EEF3F7", background: isBreakEven ? "#F3FBEF" : "transparent", cursor: "pointer" } },
+                    React.createElement("td", { className: "text-center px-2 py-2 font-medium", style: { color: isBreakEven ? BRAND.greenDeep : BRAND.dataBlack } }, r.age),
+                    React.createElement("td", { className: "text-right px-2 py-2", style: { color: BRAND.dataBlack } }, r.premium > 0 ? fmt(r.premium) : "-"),
+                    React.createElement("td", { className: "text-right px-2 py-2 font-semibold", style: { color: r.pension > 0 ? BRAND.greenDeep : BRAND.dataBlack } }, r.pension > 0 ? fmt(r.pension) : "-"),
+                    React.createElement("td", { className: "text-right px-2 py-2", style: { color: BRAND.dataBlack } }, fmt(r.cumPremium)),
+                    React.createElement("td", { className: "text-right px-2 py-2", style: { color: BRAND.dataBlack } }, fmt(r.cumPension)),
+                    React.createElement("td", { className: "text-left px-2 py-2", style: { color: BRAND.warn } },
+                        isBreakEven ? "จุดคุ้มทุน · " : "",
+                        r.note)));
+            })))));
+}
 function SavingsScheduleTable({ rows, irr }) {
     if (!rows || rows.length === 0)
         return null;
