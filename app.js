@@ -1068,7 +1068,10 @@ function App() {
     const [hs2515SI, setHs2515SI] = useState(0);
     const [taxsaver105SI, setTaxsaver105SI] = useState(0);
     const [blasave168SI, setBlasave168SI] = useState(0);
-    const [pension888SI, setPension888SI] = useState(0);
+    const [pension888SI, setPension888SI] = useState(0); // เก็บไว้เผื่ออ้างอิงเดิม ไม่ได้ใช้ในโหมดใหม่แล้ว
+    const [pension888Mode, setPension888Mode] = useState("premium"); // "premium" | "pension"
+    const [pension888PremiumInput, setPension888PremiumInput] = useState(0);
+    const [pension888TargetPension, setPension888TargetPension] = useState(0); // บำนาญที่ต้องการรับต่อปี (งวดปกติ 8%)
     const [pensionGroupOpen, setPensionGroupOpen] = useState(false);
     const [pensionScheduleOpen, setPensionScheduleOpen] = useState({});
     const [pensionYearModal, setPensionYearModal] = useState(null); // { name, age, irr }
@@ -1208,6 +1211,12 @@ function App() {
                         setBlasave168SI(s.blasave168SI);
                     if (s.pension888SI !== undefined)
                         setPension888SI(s.pension888SI);
+                    if (s.pension888Mode)
+                        setPension888Mode(s.pension888Mode);
+                    if (s.pension888PremiumInput !== undefined)
+                        setPension888PremiumInput(s.pension888PremiumInput);
+                    if (s.pension888TargetPension !== undefined)
+                        setPension888TargetPension(s.pension888TargetPension);
                     if (s.selectedConcerns)
                         setSelectedConcerns(s.selectedConcerns);
                     if (s.opdPlan !== undefined)
@@ -1240,9 +1249,9 @@ function App() {
     useEffect(() => {
         if (!loadedFromStorage)
             return;
-        const snapshot = { gender, age, occClass, payMode, sudSI, life99SI, unjaiPlan, cancermaxPlan, plus2SI, plus2Term, prestigeSI, prestigeTerm, selected, accPlan, acc3Plan, tpdSI, supSI, vhPlan, vhkidsPlan, rpprDaily, hhpPlan, hhpDeduct, opdPlan, happyciSI, happyciTerm, llcSI, llcVariant, ssSI, happypensionPremiumInput, happypensionTerm, happypensionMode, happypensionTargetPension, happysavingSI, happysavingTerm, happywlSI, happywlTerm, hrp9920SI, hrpdivSI, hrpdivTerm, hrp9901SI, happywl9901SI, happykidSI, chakSI, chakTerm, chapSI, chapTerm, chapPayorAge, chapPayorGender, phPlan, phDeduct, phArea, psave104SI, psave126SI, hs208SI, hs126SI, hs157SI, hs147SI, hs168SI, hs1810SI, hs2515SI, taxsaver105SI, blasave168SI, pension888SI, csPayorAge, csPayorGender, selectedConcerns };
+        const snapshot = { gender, age, occClass, payMode, sudSI, life99SI, unjaiPlan, cancermaxPlan, plus2SI, plus2Term, prestigeSI, prestigeTerm, selected, accPlan, acc3Plan, tpdSI, supSI, vhPlan, vhkidsPlan, rpprDaily, hhpPlan, hhpDeduct, opdPlan, happyciSI, happyciTerm, llcSI, llcVariant, ssSI, happypensionPremiumInput, happypensionTerm, happypensionMode, happypensionTargetPension, happysavingSI, happysavingTerm, happywlSI, happywlTerm, hrp9920SI, hrpdivSI, hrpdivTerm, hrp9901SI, happywl9901SI, happykidSI, chakSI, chakTerm, chapSI, chapTerm, chapPayorAge, chapPayorGender, phPlan, phDeduct, phArea, psave104SI, psave126SI, hs208SI, hs126SI, hs157SI, hs147SI, hs168SI, hs1810SI, hs2515SI, taxsaver105SI, blasave168SI, pension888SI, pension888Mode, pension888PremiumInput, pension888TargetPension, csPayorAge, csPayorGender, selectedConcerns };
         storageAdapter.set(STORAGE_KEY, JSON.stringify(snapshot));
-    }, [loadedFromStorage, gender, age, occClass, payMode, sudSI, life99SI, unjaiPlan, cancermaxPlan, plus2SI, plus2Term, prestigeSI, prestigeTerm, selected, accPlan, acc3Plan, tpdSI, supSI, vhPlan, vhkidsPlan, rpprDaily, hhpPlan, hhpDeduct, opdPlan, happyciSI, happyciTerm, llcSI, llcVariant, ssSI, happypensionPremiumInput, happypensionTerm, happypensionMode, happypensionTargetPension, happysavingSI, happysavingTerm, happywlSI, happywlTerm, hrp9920SI, hrpdivSI, hrpdivTerm, hrp9901SI, happywl9901SI, happykidSI, chakSI, chakTerm, chapSI, chapTerm, chapPayorAge, chapPayorGender, phPlan, phDeduct, phArea, psave104SI, psave126SI, hs208SI, hs126SI, hs157SI, hs147SI, hs168SI, hs1810SI, hs2515SI, taxsaver105SI, blasave168SI, pension888SI, csPayorAge, csPayorGender, selectedConcerns]);
+    }, [loadedFromStorage, gender, age, occClass, payMode, sudSI, life99SI, unjaiPlan, cancermaxPlan, plus2SI, plus2Term, prestigeSI, prestigeTerm, selected, accPlan, acc3Plan, tpdSI, supSI, vhPlan, vhkidsPlan, rpprDaily, hhpPlan, hhpDeduct, opdPlan, happyciSI, happyciTerm, llcSI, llcVariant, ssSI, happypensionPremiumInput, happypensionTerm, happypensionMode, happypensionTargetPension, happysavingSI, happysavingTerm, happywlSI, happywlTerm, hrp9920SI, hrpdivSI, hrpdivTerm, hrp9901SI, happywl9901SI, happykidSI, chakSI, chakTerm, chapSI, chapTerm, chapPayorAge, chapPayorGender, phPlan, phDeduct, phArea, psave104SI, psave126SI, hs208SI, hs126SI, hs157SI, hs147SI, hs168SI, hs1810SI, hs2515SI, taxsaver105SI, blasave168SI, pension888SI, pension888Mode, pension888PremiumInput, pension888TargetPension, csPayorAge, csPayorGender, selectedConcerns]);
     const toggle = (id) => setSelected((s) => {
         const next = Object.assign(Object.assign({}, s), { [id]: !s[id] });
         if (next[id])
@@ -1690,16 +1699,18 @@ function App() {
                     savingsScheduleOpen[id] && (() => { const s = buildSavingsSchedule(id); return React.createElement(SavingsScheduleTable, { rows: s.rows, irr: s.irr }); })()));
             }
             case "PENSION888": return selected.PENSION888 && (React.createElement(React.Fragment, null,
-                React.createElement(PlanRow, { label: "\u0E23\u0E30\u0E1A\u0E38\u0E02\u0E49\u0E2D\u0E21\u0E39\u0E25\u0E08\u0E32\u0E01" },
-                    React.createElement(SegButton, { options: [{ k: "si", l: "ทุนประกัน" }, { k: "premium", l: "เบี้ยประกัน" }], value: savingsMode.PENSION888 || "si", onChange: (v) => setSavingsMode((m) => (Object.assign(Object.assign({}, m), { PENSION888: v }))) })),
-                (savingsMode.PENSION888 || "si") === "si" ? (React.createElement(PlanRow, { label: "\u0E17\u0E38\u0E19\u0E1B\u0E23\u0E30\u0E01\u0E31\u0E19\u0E20\u0E31\u0E22 (\u0E1A\u0E32\u0E17)" },
-                    React.createElement(NumInput, { value: pension888SI, onChange: setPension888SI, min: 0, step: 10000 }))) : (React.createElement(React.Fragment, null,
-                    React.createElement(PlanRow, { label: "\u0E40\u0E1A\u0E35\u0E49\u0E22\u0E1B\u0E23\u0E30\u0E01\u0E31\u0E19\u0E20\u0E31\u0E22\u0E17\u0E35\u0E48\u0E15\u0E49\u0E2D\u0E07\u0E01\u0E32\u0E23\u0E08\u0E48\u0E32\u0E22/\u0E1B\u0E35 (\u0E1A\u0E32\u0E17)" },
-                        React.createElement(NumInput, { value: savingsPremiumInput.PENSION888 || 0, onChange: (v) => setSavingsPremiumInput((pr) => (Object.assign(Object.assign({}, pr), { PENSION888: v }))), min: 0, step: 5000 })),
-                    React.createElement("p", { className: "text-[19px] px-1", style: { color: BRAND.sub } },
+                React.createElement(PlanRow, { label: "\u0E27\u0E34\u0E18\u0E35\u0E01\u0E23\u0E2D\u0E01\u0E02\u0E49\u0E2D\u0E21\u0E39\u0E25" },
+                    React.createElement(SegButton, { options: [{ k: "premium", l: "กรอกเบี้ยประกัน" }, { k: "pension", l: "กรอกบำนาญที่ต้องการ" }], value: pension888Mode, onChange: setPension888Mode })),
+                pension888Mode === "premium" ? (React.createElement(PlanRow, { label: "\u0E40\u0E1A\u0E35\u0E49\u0E22\u0E1B\u0E23\u0E30\u0E01\u0E31\u0E19\u0E17\u0E35\u0E48\u0E15\u0E49\u0E2D\u0E07\u0E01\u0E32\u0E23\u0E08\u0E48\u0E32\u0E22/\u0E1B\u0E35 (\u0E1A\u0E32\u0E17)" },
+                    React.createElement(NumInput, { value: pension888PremiumInput, onChange: setPension888PremiumInput, min: 0, step: 10000 }))) : (React.createElement(PlanRow, { label: "\u0E1A\u0E33\u0E19\u0E32\u0E0D\u0E17\u0E35\u0E48\u0E15\u0E49\u0E2D\u0E07\u0E01\u0E32\u0E23\u0E23\u0E31\u0E1A\u0E15\u0E48\u0E2D\u0E1B\u0E35 (\u0E1A\u0E32\u0E17) \u2014 \u0E07\u0E27\u0E14\u0E1B\u0E01\u0E15\u0E34 (\u0E2D\u0E32\u0E22\u0E38 61-88 \u0E1B\u0E35)" },
+                    React.createElement(NumInput, { value: pension888TargetPension, onChange: setPension888TargetPension, min: 0, step: 10000 }))),
+                (() => {
+                    const row = pension888Row();
+                    return row.ok && (React.createElement("p", { className: "text-[19px] px-1", style: { color: BRAND.sub } },
                         "\u0E17\u0E38\u0E19\u0E1B\u0E23\u0E30\u0E01\u0E31\u0E19\u0E20\u0E31\u0E22\u0E17\u0E35\u0E48\u0E04\u0E33\u0E19\u0E27\u0E13\u0E44\u0E14\u0E49: ",
-                        baht(getEffectiveSI("PENSION888"))))),
-                getEffectiveSI("PENSION888") >= PENSION888_MIN_SI && (React.createElement("button", { onClick: () => setPensionScheduleOpen((o) => (Object.assign(Object.assign({}, o), { PENSION888: !o.PENSION888 }))), className: "w-full text-[21px] font-semibold px-4 py-2.5 rounded-xl mt-1", style: { background: BRAND.bg, color: BRAND.navy, border: "1px solid #D7E8F0" } }, pensionScheduleOpen.PENSION888 ? "▴ ซ่อนตารางบำนาญ" : "▾ ดูตารางการจ่ายบำนาญ + จุดคุ้มทุน")),
+                        baht(Math.round(row.effectiveSI))));
+                })(),
+                pension888Row().ok && (React.createElement("button", { onClick: () => setPensionScheduleOpen((o) => (Object.assign(Object.assign({}, o), { PENSION888: !o.PENSION888 }))), className: "w-full text-[21px] font-semibold px-4 py-2.5 rounded-xl mt-1", style: { background: BRAND.bg, color: BRAND.navy, border: "1px solid #D7E8F0" } }, pensionScheduleOpen.PENSION888 ? "▴ ซ่อนตารางบำนาญ" : "▾ ดูตารางการจ่ายบำนาญ + จุดคุ้มทุน")),
                 pensionScheduleOpen.PENSION888 && (() => {
                     const s = buildPensionSchedule("PENSION888");
                     return React.createElement(PensionScheduleTable, { rows: s.rows, breakEvenAge: s.breakEvenAge, onRowClick: (a) => setPensionYearModal({ name: "บีแอลเอ เพนชั่น 888", age: a, irr: computePensionIRRUpToAge("PENSION888", a) }) });
@@ -1872,6 +1883,9 @@ function App() {
         setTaxsaver105SI(0);
         setBlasave168SI(0);
         setPension888SI(0);
+        setPension888Mode("premium");
+        setPension888PremiumInput(0);
+        setPension888TargetPension(0);
         setPensionGroupOpen(false);
         setPensionScheduleOpen({});
         setPensionYearModal(null);
@@ -2784,27 +2798,62 @@ function App() {
     function calcHS2515() { return calcGenericSavings("HS2515"); }
     function calcTAXSAVER105() { return calcGenericSavings("TAXSAVER105"); }
     function calcBLASAVE168() { return calcGenericSavings("BLASAVE168"); }
+    function pension888Row() {
+        let ok = true, msg = "";
+        if (age < PENSION888_MIN_AGE || age > PENSION888_MAX_AGE) {
+            ok = false;
+            msg = `อายุรับประกัน ${PENSION888_MIN_AGE}-${PENSION888_MAX_AGE} ปี`;
+        }
+        let effectiveSI = 0, premium = 0, discount = 0;
+        if (ok) {
+            const rate = (gender === "female" ? PENSION888_FEMALE : PENSION888_MALE)[age - PENSION888_MIN_AGE];
+            if (pension888Mode === "pension") {
+                effectiveSI = pension888TargetPension > 0 ? pension888TargetPension / PENSION888_ANNUAL_PENSION_PCT : 0;
+                discount = pension888Discount(effectiveSI);
+                premium = (rate * effectiveSI / 1000) * (1 - discount);
+            }
+            else {
+                const budget = pension888PremiumInput;
+                if (budget <= 0) {
+                    effectiveSI = 0;
+                }
+                else {
+                    let si = (budget * 1000) / rate;
+                    const d = pension888Discount(si);
+                    if (d > 0)
+                        si = (budget * 1000) / (rate * (1 - d));
+                    effectiveSI = si;
+                    discount = pension888Discount(effectiveSI);
+                }
+                premium = budget;
+            }
+            if (effectiveSI <= 0) {
+                ok = false;
+                msg = "กรุณากรอกจำนวนเงิน";
+            }
+            else if (effectiveSI < PENSION888_MIN_SI) {
+                ok = false;
+                msg = `ทุนที่คำนวณได้ต่ำกว่าขั้นต่ำ ${baht(PENSION888_MIN_SI)} บาท`;
+            }
+        }
+        const firstPension = ok ? effectiveSI * PENSION888_FIRST_PENSION_PCT : 0;
+        const annualPension = ok ? effectiveSI * PENSION888_ANNUAL_PENSION_PCT : 0;
+        const numAnnualPayments = PENSION888_PENSION_END_AGE - PENSION888_PENSION_START_AGE; // อายุ 61-88 = 28 งวด
+        const totalPensionPaid = firstPension + annualPension * numAnnualPayments;
+        return { effectiveSI, premium, discount, firstPension, annualPension, totalPensionPaid, ok, msg };
+    }
     function calcPENSION888() {
         if (otherMainSelected("PENSION888"))
             return { ok: false, msg: "เลือกได้เพียง 1 แบบ จาก 26 แบบทุนประกันหลัก (ไม่สามารถเลือกพร้อมกันได้)" };
-        if (age < PENSION888_MIN_AGE || age > PENSION888_MAX_AGE)
-            return { ok: false, msg: `อายุรับประกัน ${PENSION888_MIN_AGE}-${PENSION888_MAX_AGE} ปี` };
-        const si = getEffectiveSI("PENSION888");
-        if (si < PENSION888_MIN_SI)
-            return { ok: false, msg: (savingsMode.PENSION888 === "premium" ? `เบี้ยที่กรอกต่ำเกินไป (ทุนที่คำนวณได้ต้องไม่ต่ำกว่า ${baht(PENSION888_MIN_SI)})` : `ทุนประกันขั้นต่ำ ${baht(PENSION888_MIN_SI)} บาท`) };
-        const rate = (gender === "female" ? PENSION888_FEMALE : PENSION888_MALE)[age - PENSION888_MIN_AGE];
-        const discount = pension888Discount(si);
-        const premium = getDisplayPremium("PENSION888", rate * (1 - discount) * si / 1000);
-        const firstPension = Math.round(si * PENSION888_FIRST_PENSION_PCT);
-        const annualPension = Math.round(si * PENSION888_ANNUAL_PENSION_PCT);
-        const numAnnualPayments = PENSION888_PENSION_END_AGE - PENSION888_PENSION_START_AGE; // อายุ 61-88 = 28 งวด
-        const totalPension = firstPension + annualPension * numAnnualPayments;
-        return { ok: true, premium, benefits: [
-                ["ทุนประกันภัย", baht(si)],
-                ["ส่วนลดอัตราเบี้ย", discount > 0 ? (discount * 100) + "%" : "ไม่มี"],
-                ["บำนาญงวดแรก (อายุครบ 60 ปี)", baht(firstPension) + " (30% ของทุนประกันภัย)"],
-                ["บำนาญงวดถัดไป (อายุครบ 61-88 ปี)", baht(annualPension) + " ต่อปี (8% ของทุนประกันภัย)"],
-                ["รวมบำนาญที่จะได้รับตลอดโครงการ (29 งวด)", baht(totalPension)],
+        const row = pension888Row();
+        if (!row.ok)
+            return { ok: false, msg: row.msg };
+        return { ok: true, premium: row.premium, benefits: [
+                ["ทุนประกันภัย", baht(Math.round(row.effectiveSI))],
+                ["ส่วนลดอัตราเบี้ย", row.discount > 0 ? (row.discount * 100) + "%" : "ไม่มี"],
+                ["บำนาญงวดแรก (อายุครบ 60 ปี)", baht(Math.round(row.firstPension)) + " (30% ของทุนประกันภัย)"],
+                ["บำนาญงวดถัดไป (อายุครบ 61-88 ปี)", baht(Math.round(row.annualPension)) + " ต่อปี (8% ของทุนประกันภัย)"],
+                ["รวมบำนาญที่จะได้รับตลอดโครงการ (29 งวด)", baht(Math.round(row.totalPensionPaid))],
                 ["หากเสียชีวิตก่อนอายุ 60 ปี", "รับ 105% ของเบี้ยที่ชำระสะสม หรือมูลค่าเวนคืนกรมธรรม์ แล้วแต่จำนวนใดมากกว่า"],
                 ["หากเสียชีวิตระหว่างรับบำนาญ (อายุ 60-88 ปี)", "รับเบี้ยที่ชำระสะสมจริง หักด้วยบำนาญที่ได้รับไปแล้ว (ถ้าบำนาญที่ได้รับมากกว่าเบี้ยสะสม จะไม่มีเงินคืนเพิ่ม)"],
             ] };
@@ -3117,12 +3166,11 @@ function App() {
     // สร้างตารางการจ่ายบำนาญรายปี + หาอายุจุดคุ้มทุน (ปีที่บำนาญสะสม >= เบี้ยสะสม) — ใช้ร่วมกันทุกแบบบำนาญ
     function buildPensionSchedule(id) {
         if (id === "PENSION888") {
-            const si = getEffectiveSI("PENSION888");
-            if (si < PENSION888_MIN_SI)
+            const row = pension888Row();
+            if (!row.ok)
                 return { rows: [], breakEvenAge: null };
-            const rate = (gender === "female" ? PENSION888_FEMALE : PENSION888_MALE)[age - PENSION888_MIN_AGE];
-            const discount = pension888Discount(si);
-            const yearlyPremium = Math.round(getDisplayPremium("PENSION888", rate * (1 - discount) * si / 1000));
+            const si = row.effectiveSI;
+            const yearlyPremium = Math.round(row.premium);
             const rows = [];
             let cumPremium = 0, cumPension = 0, breakEvenAge = null;
             for (let a = age; a <= PENSION888_PENSION_END_AGE; a++) {
@@ -3136,7 +3184,9 @@ function App() {
                 cumPension += pension;
                 if (breakEvenAge === null && cumPremium > 0 && cumPension >= cumPremium)
                     breakEvenAge = a;
-                rows.push({ age: a, premium, pension, cumPremium, cumPension, note: a === PENSION888_PENSION_START_AGE ? "เริ่มรับบำนาญ (งวดแรก 30%)" : "" });
+                // กรณีเสียชีวิต: ก่อนอายุ 60 = 105% ของเบี้ยสะสม (หรือมูลค่าเวนคืน ซึ่งอาจสูงกว่า ไม่รวมในตัวเลขนี้); ระหว่างรับบำนาญ = เบี้ยสะสม - บำนาญที่ได้รับไปแล้ว (ต่ำสุด 0)
+                const deathBenefit = a < PENSION888_PENSION_START_AGE ? Math.round(cumPremium * 1.05) : Math.max(0, cumPremium - cumPension);
+                rows.push({ age: a, premium, pension, cumPremium, cumPension, deathBenefit, note: a === PENSION888_PENSION_START_AGE ? "เริ่มรับบำนาญ (งวดแรก 30%)" : "" });
             }
             return { rows, breakEvenAge };
         }
@@ -3154,7 +3204,9 @@ function App() {
                 cumPension += pension;
                 if (breakEvenAge === null && cumPremium > 0 && cumPension >= cumPremium)
                     breakEvenAge = a;
-                rows.push({ age: a, premium, pension, cumPremium, cumPension, note: a === 60 ? "เริ่มรับบำนาญ" : "" });
+                // กรณีเสียชีวิต: ก่อนอายุ 60 = 110% ของเบี้ยสะสม (หรือมูลค่าเวนคืน ซึ่งอาจสูงกว่า ไม่รวมในตัวเลขนี้); ตั้งแต่อายุ 60 = เบี้ยสะสม - บำนาญที่ได้รับไปแล้ว (ต่ำสุด 0)
+                const deathBenefit = a < 60 ? Math.round(cumPremium * 1.10) : Math.max(0, cumPremium - cumPension);
+                rows.push({ age: a, premium, pension, cumPremium, cumPension, deathBenefit, note: a === 60 ? "เริ่มรับบำนาญ" : "" });
             }
             return { rows, breakEvenAge };
         }
@@ -3304,7 +3356,7 @@ function App() {
         VH: vhPlan === 0, VHKIDS: vhkidsPlan === 0, RPPR: rpprDaily === 0, HHP: hhpPlan === 0, OPD: opdPlan === 0, HAPPYCI: happyciTerm === 0 || happyciSI === 0, LLC: llcVariant === "" || llcSI === 0, SS: ssSI === 0, HAPPYPENSION: happypensionTerm === "" || (happypensionMode === "premium" ? happypensionPremiumInput === 0 : happypensionTargetPension === 0),
         HAPPYSAVING: happysavingTerm === 0 || happysavingSI === 0, HAPPYWL: happywlTerm === 0 || happywlSI === 0, HRP9920: hrp9920SI === 0, HRPDIV: hrpdivTerm === 0 || hrpdivSI === 0, HRP9901: hrp9901SI === 0, HAPPYWL9901: happywl9901SI === 0, HAPPYKID: happykidSI === 0,
         CHAK: chakTerm === 0 || chakSI === 0, CHAP: chapTerm === 0 || chapSI === 0 || chapPayorAge === 0, PH: phPlan === 0 || phDeduct === null, PSAVE104: psave104SI === 0, PSAVE126: psave126SI === 0,
-        HS208: hs208SI === 0, HS126: hs126SI === 0, HS157: hs157SI === 0, HS147: hs147SI === 0, HS168: hs168SI === 0, HS1810: hs1810SI === 0, HS2515: hs2515SI === 0, TAXSAVER105: taxsaver105SI === 0, BLASAVE168: blasave168SI === 0, PENSION888: pension888SI === 0, CS: csPayorAge === 0,
+        HS208: hs208SI === 0, HS126: hs126SI === 0, HS157: hs157SI === 0, HS147: hs147SI === 0, HS168: hs168SI === 0, HS1810: hs1810SI === 0, HS2515: hs2515SI === 0, TAXSAVER105: taxsaver105SI === 0, BLASAVE168: blasave168SI === 0, PENSION888: (pension888Mode === "premium" ? pension888PremiumInput === 0 : pension888TargetPension === 0), CS: csPayorAge === 0,
     };
     function handleCalculate() {
         const errs = [];
@@ -3651,7 +3703,7 @@ function PensionScheduleTable({ rows, breakEvenAge, onRowClick }) {
     if (!rows || rows.length === 0)
         return null;
     return (React.createElement("div", { className: "mt-2 rounded-xl border overflow-x-auto", style: { borderColor: "#D7E8F0" } },
-        React.createElement("table", { className: "w-full text-[18px]", style: { minWidth: 600 } },
+        React.createElement("table", { className: "w-full text-[18px]", style: { minWidth: 680 } },
             React.createElement("thead", { style: { background: BRAND.bg } },
                 React.createElement("tr", null,
                     React.createElement("th", { className: "text-center px-2 py-2", style: { color: BRAND.navy } }, "\u0E2D\u0E32\u0E22\u0E38"),
@@ -3659,6 +3711,7 @@ function PensionScheduleTable({ rows, breakEvenAge, onRowClick }) {
                     React.createElement("th", { className: "text-right px-2 py-2", style: { color: BRAND.navy } }, "\u0E1A\u0E33\u0E19\u0E32\u0E0D\u0E15\u0E48\u0E2D\u0E1B\u0E35"),
                     React.createElement("th", { className: "text-right px-2 py-2", style: { color: BRAND.navy } }, "\u0E40\u0E1A\u0E35\u0E49\u0E22\u0E2A\u0E30\u0E2A\u0E21"),
                     React.createElement("th", { className: "text-right px-2 py-2", style: { color: BRAND.navy } }, "\u0E1A\u0E33\u0E19\u0E32\u0E0D\u0E2A\u0E30\u0E2A\u0E21"),
+                    React.createElement("th", { className: "text-right px-2 py-2", style: { color: BRAND.navy } }, "\u0E01\u0E23\u0E13\u0E35\u0E40\u0E2A\u0E35\u0E22\u0E0A\u0E35\u0E27\u0E34\u0E15"),
                     React.createElement("th", { className: "text-left px-2 py-2", style: { color: BRAND.navy } }, "\u0E2B\u0E21\u0E32\u0E22\u0E40\u0E2B\u0E15\u0E38"))),
             React.createElement("tbody", null, rows.map((r) => {
                 const isBreakEven = r.age === breakEvenAge;
@@ -3668,6 +3721,7 @@ function PensionScheduleTable({ rows, breakEvenAge, onRowClick }) {
                     React.createElement("td", { className: "text-right px-2 py-2 font-semibold", style: { color: r.pension > 0 ? BRAND.greenDeep : BRAND.dataBlack } }, r.pension > 0 ? fmt(r.pension) : "-"),
                     React.createElement("td", { className: "text-right px-2 py-2", style: { color: BRAND.dataBlack } }, fmt(r.cumPremium)),
                     React.createElement("td", { className: "text-right px-2 py-2", style: { color: BRAND.dataBlack } }, fmt(r.cumPension)),
+                    React.createElement("td", { className: "text-right px-2 py-2", style: { color: BRAND.danger } }, fmt(r.deathBenefit)),
                     React.createElement("td", { className: "text-left px-2 py-2", style: { color: BRAND.warn } },
                         isBreakEven ? "จุดคุ้มทุน · " : "",
                         r.note)));
