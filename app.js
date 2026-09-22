@@ -3467,10 +3467,12 @@ function App() {
                                 " ",
                                 c.label));
                         }),
-                        React.createElement("button", { onClick: () => setSavingsGroupOpen((o) => !o), className: "flex items-center gap-1.5 text-[21px] font-medium px-3.5 py-2.5 rounded-full border", style: { borderColor: savingsGroupOpen ? BRAND.green : "#D7E8F0", background: savingsGroupOpen ? "#F0FAE6" : "#fff", color: savingsGroupOpen ? BRAND.greenDeep : BRAND.navy } },
+                        React.createElement("button", { onClick: () => setSavingsGroupOpen((o) => { const next = !o; if (next)
+                                setPensionGroupOpen(false); return next; }), className: "flex items-center gap-1.5 text-[21px] font-medium px-3.5 py-2.5 rounded-full border", style: { borderColor: savingsGroupOpen ? BRAND.green : "#D7E8F0", background: savingsGroupOpen ? "#F0FAE6" : "#fff", color: savingsGroupOpen ? BRAND.greenDeep : BRAND.navy } },
                             React.createElement("span", null, "\uD83D\uDCB0"),
                             " \u0E1B\u0E23\u0E30\u0E01\u0E31\u0E19\u0E2A\u0E30\u0E2A\u0E21\u0E17\u0E23\u0E31\u0E1E\u0E22\u0E4C"),
-                        React.createElement("button", { onClick: () => setPensionGroupOpen((o) => !o), className: "flex items-center gap-1.5 text-[21px] font-medium px-3.5 py-2.5 rounded-full border", style: { borderColor: pensionGroupOpen ? BRAND.green : "#D7E8F0", background: pensionGroupOpen ? "#F0FAE6" : "#fff", color: pensionGroupOpen ? BRAND.greenDeep : BRAND.navy } },
+                        React.createElement("button", { onClick: () => setPensionGroupOpen((o) => { const next = !o; if (next)
+                                setSavingsGroupOpen(false); return next; }), className: "flex items-center gap-1.5 text-[21px] font-medium px-3.5 py-2.5 rounded-full border", style: { borderColor: pensionGroupOpen ? BRAND.green : "#D7E8F0", background: pensionGroupOpen ? "#F0FAE6" : "#fff", color: pensionGroupOpen ? BRAND.greenDeep : BRAND.navy } },
                             React.createElement("span", null, "\uD83C\uDFD6\uFE0F"),
                             " \u0E1B\u0E23\u0E30\u0E01\u0E31\u0E19\u0E1A\u0E33\u0E19\u0E32\u0E0D"),
                         selectedConcerns.length > 0 && (React.createElement("button", { onClick: () => { setSelectedConcerns([]); setPickedRecommendations([]); }, className: "flex items-center gap-1.5 text-[21px] font-medium px-3.5 py-2.5 rounded-full", style: { background: "#FDEAEA", color: BRAND.danger } }, "\u2715 \u0E25\u0E49\u0E32\u0E07\u0E01\u0E32\u0E23\u0E40\u0E25\u0E37\u0E2D\u0E01")))),
@@ -3478,14 +3480,8 @@ function App() {
                     React.createElement("div", { className: "flex items-center justify-between mb-1" },
                         React.createElement("h2", { className: "text-[24px] font-bold px-1", style: { color: BRAND.mainBlue } }, "\uD83D\uDCB0 \u0E1B\u0E23\u0E30\u0E01\u0E31\u0E19\u0E2A\u0E30\u0E2A\u0E21\u0E17\u0E23\u0E31\u0E1E\u0E22\u0E4C"),
                         React.createElement("button", { onClick: () => setSavingsGroupOpen(false), className: "text-[19px] font-medium px-2 py-1", style: { color: BRAND.sub } }, "\u2715 \u0E1B\u0E34\u0E14")),
-                    React.createElement("p", { className: "text-[16px] mb-3 px-1", style: { color: BRAND.sub } }, "\u0E15\u0E34\u0E4A\u0E01\u0E40\u0E25\u0E37\u0E2D\u0E01\u0E44\u0E14\u0E49\u0E2B\u0E25\u0E32\u0E22\u0E2D\u0E31\u0E19\u0E41\u0E25\u0E49\u0E27\u0E01\u0E14\u0E1B\u0E38\u0E48\u0E21 \"\u0E40\u0E25\u0E37\u0E2D\u0E01\" \u0E14\u0E49\u0E32\u0E19\u0E25\u0E48\u0E32\u0E07\u0E40\u0E1E\u0E37\u0E48\u0E2D\u0E44\u0E1B\u0E01\u0E23\u0E2D\u0E01\u0E02\u0E49\u0E2D\u0E21\u0E39\u0E25 \u00B7 \u0E40\u0E25\u0E37\u0E2D\u0E01\u0E44\u0E14\u0E49\u0E40\u0E1E\u0E35\u0E22\u0E07 1 \u0E41\u0E1A\u0E1A (\u0E17\u0E38\u0E19\u0E1B\u0E23\u0E30\u0E01\u0E31\u0E19\u0E2B\u0E25\u0E31\u0E01\u0E40\u0E25\u0E37\u0E2D\u0E01\u0E44\u0E14\u0E49 1 \u0E41\u0E1A\u0E1A\u0E40\u0E17\u0E48\u0E32\u0E19\u0E31\u0E49\u0E19)"),
-                    React.createElement("div", { className: "grid grid-cols-2 sm:grid-cols-3 gap-1.5 sm:gap-2" }, sortByRecommended(PRODUCTS.filter((p) => SAVINGS_IDS.includes(p.id))).map((p) => (React.createElement(CompactChip, { key: p.id, product: p, checked: !!selected[p.id], picked: pickedRecommendations.includes(p.id), disabled: productDisabled(p), recommended: false, onCheckboxClick: () => { if (selected[p.id])
-                            toggle(p.id);
-                        else
-                            togglePicked(p.id); }, onNameClick: () => { if (selected[p.id])
-                            openEditor(p.id);
-                        else
-                            togglePicked(p.id); } })))),
+                    React.createElement("p", { className: "text-[16px] mb-3 px-1", style: { color: BRAND.sub } }, "\u0E41\u0E15\u0E30\u0E40\u0E25\u0E37\u0E2D\u0E01\u0E44\u0E14\u0E49\u0E17\u0E31\u0E19\u0E17\u0E35 1 \u0E41\u0E1A\u0E1A \u2014 \u0E01\u0E14\u0E15\u0E31\u0E27\u0E43\u0E2B\u0E21\u0E48\u0E08\u0E30\u0E2A\u0E25\u0E31\u0E1A\u0E41\u0E17\u0E19\u0E15\u0E31\u0E27\u0E40\u0E14\u0E34\u0E21\u0E43\u0E2B\u0E49\u0E2D\u0E31\u0E15\u0E42\u0E19\u0E21\u0E31\u0E15\u0E34 (\u0E17\u0E38\u0E19\u0E1B\u0E23\u0E30\u0E01\u0E31\u0E19\u0E2B\u0E25\u0E31\u0E01\u0E40\u0E25\u0E37\u0E2D\u0E01\u0E44\u0E14\u0E49 1 \u0E41\u0E1A\u0E1A\u0E40\u0E17\u0E48\u0E32\u0E19\u0E31\u0E49\u0E19)"),
+                    React.createElement("div", { className: "grid grid-cols-2 sm:grid-cols-3 gap-1.5 sm:gap-2" }, sortByRecommended(PRODUCTS.filter((p) => SAVINGS_IDS.includes(p.id))).map((p) => (React.createElement(CompactChip, { key: p.id, product: p, checked: !!selected[p.id], picked: false, disabled: productDisabled(p), recommended: false, onCheckboxClick: () => toggle(p.id), onNameClick: () => openEditor(p.id) })))),
                     React.createElement("button", { onClick: () => setCompareOpen((o) => !o), className: "w-full text-[21px] font-semibold px-4 py-2.5 rounded-xl mt-3", style: { background: "#fff", color: BRAND.warn, border: `1.5px solid ${BRAND.warn}` } }, compareOpen ? "▴ ซ่อนตารางเทียบทุกแบบ" : "▾ เทียบทุกแบบ (IRR)"),
                     compareOpen && (React.createElement("div", { className: "mt-2" },
                         React.createElement(PlanRow, { label: "\u0E17\u0E38\u0E19\u0E1B\u0E23\u0E30\u0E01\u0E31\u0E19\u0E17\u0E35\u0E48\u0E43\u0E0A\u0E49\u0E40\u0E1B\u0E23\u0E35\u0E22\u0E1A\u0E40\u0E17\u0E35\u0E22\u0E1A (\u0E1A\u0E32\u0E17)" },
@@ -3512,29 +3508,13 @@ function App() {
                                             "/",
                                             r.totalYears),
                                         React.createElement("td", { className: "text-right px-2 py-2 font-bold", style: { color: i === 0 ? BRAND.greenDeep : BRAND.dataBlack } }, r.irr !== null && r.irr !== undefined ? (r.irr * 100).toFixed(2) + "%" : "-"))));
-                                })()))))),
-                    pickedRecommendations.some((id) => SAVINGS_IDS.includes(id)) && (React.createElement("div", { className: "flex justify-end mt-3 pt-3", style: { borderTop: "1px dashed #F3D98B" } },
-                        React.createElement("button", { onClick: confirmPickedRecommendations, className: "text-[24px] font-bold px-6 py-3 rounded-full", style: { background: BRAND.navy, color: "#fff" } },
-                            "\u2705 \u0E40\u0E25\u0E37\u0E2D\u0E01 (",
-                            pickedRecommendations.filter((id) => SAVINGS_IDS.includes(id)).length,
-                            ")"))))),
+                                })()))))))),
                 pensionGroupOpen && (React.createElement("section", { id: "pension-group-section", className: "rounded-2xl p-4", style: { background: "#EFF7FB", boxShadow: "0 6px 24px rgba(11,42,85,0.07)", border: "1.5px solid #BFE0F0" } },
                     React.createElement("div", { className: "flex items-center justify-between mb-1" },
                         React.createElement("h2", { className: "text-[24px] font-bold px-1", style: { color: BRAND.mainBlue } }, "\uD83C\uDFD6\uFE0F \u0E1B\u0E23\u0E30\u0E01\u0E31\u0E19\u0E1A\u0E33\u0E19\u0E32\u0E0D"),
                         React.createElement("button", { onClick: () => setPensionGroupOpen(false), className: "text-[19px] font-medium px-2 py-1", style: { color: BRAND.sub } }, "\u2715 \u0E1B\u0E34\u0E14")),
-                    React.createElement("p", { className: "text-[16px] mb-3 px-1", style: { color: BRAND.sub } }, "\u0E15\u0E34\u0E4A\u0E01\u0E40\u0E25\u0E37\u0E2D\u0E01\u0E44\u0E14\u0E49\u0E2B\u0E25\u0E32\u0E22\u0E2D\u0E31\u0E19\u0E41\u0E25\u0E49\u0E27\u0E01\u0E14\u0E1B\u0E38\u0E48\u0E21 \"\u0E40\u0E25\u0E37\u0E2D\u0E01\" \u0E14\u0E49\u0E32\u0E19\u0E25\u0E48\u0E32\u0E07\u0E40\u0E1E\u0E37\u0E48\u0E2D\u0E44\u0E1B\u0E01\u0E23\u0E2D\u0E01\u0E02\u0E49\u0E2D\u0E21\u0E39\u0E25 \u00B7 \u0E40\u0E25\u0E37\u0E2D\u0E01\u0E44\u0E14\u0E49\u0E40\u0E1E\u0E35\u0E22\u0E07 1 \u0E41\u0E1A\u0E1A (\u0E17\u0E38\u0E19\u0E1B\u0E23\u0E30\u0E01\u0E31\u0E19\u0E2B\u0E25\u0E31\u0E01\u0E40\u0E25\u0E37\u0E2D\u0E01\u0E44\u0E14\u0E49 1 \u0E41\u0E1A\u0E1A\u0E40\u0E17\u0E48\u0E32\u0E19\u0E31\u0E49\u0E19)"),
-                    React.createElement("div", { className: "grid grid-cols-2 sm:grid-cols-3 gap-1.5 sm:gap-2" }, sortByRecommended(PRODUCTS.filter((p) => PENSION_IDS.includes(p.id))).map((p) => (React.createElement(CompactChip, { key: p.id, product: p, checked: !!selected[p.id], picked: pickedRecommendations.includes(p.id), disabled: productDisabled(p), recommended: false, onCheckboxClick: () => { if (selected[p.id])
-                            toggle(p.id);
-                        else
-                            togglePicked(p.id); }, onNameClick: () => { if (selected[p.id])
-                            openEditor(p.id);
-                        else
-                            togglePicked(p.id); } })))),
-                    pickedRecommendations.some((id) => PENSION_IDS.includes(id)) && (React.createElement("div", { className: "flex justify-end mt-3 pt-3", style: { borderTop: "1px dashed #BFE0F0" } },
-                        React.createElement("button", { onClick: confirmPickedRecommendations, className: "text-[24px] font-bold px-6 py-3 rounded-full", style: { background: BRAND.navy, color: "#fff" } },
-                            "\u2705 \u0E40\u0E25\u0E37\u0E2D\u0E01 (",
-                            pickedRecommendations.filter((id) => PENSION_IDS.includes(id)).length,
-                            ")"))))),
+                    React.createElement("p", { className: "text-[16px] mb-3 px-1", style: { color: BRAND.sub } }, "\u0E41\u0E15\u0E30\u0E40\u0E25\u0E37\u0E2D\u0E01\u0E44\u0E14\u0E49\u0E17\u0E31\u0E19\u0E17\u0E35 1 \u0E41\u0E1A\u0E1A \u2014 \u0E01\u0E14\u0E15\u0E31\u0E27\u0E43\u0E2B\u0E21\u0E48\u0E08\u0E30\u0E2A\u0E25\u0E31\u0E1A\u0E41\u0E17\u0E19\u0E15\u0E31\u0E27\u0E40\u0E14\u0E34\u0E21\u0E43\u0E2B\u0E49\u0E2D\u0E31\u0E15\u0E42\u0E19\u0E21\u0E31\u0E15\u0E34 (\u0E17\u0E38\u0E19\u0E1B\u0E23\u0E30\u0E01\u0E31\u0E19\u0E2B\u0E25\u0E31\u0E01\u0E40\u0E25\u0E37\u0E2D\u0E01\u0E44\u0E14\u0E49 1 \u0E41\u0E1A\u0E1A\u0E40\u0E17\u0E48\u0E32\u0E19\u0E31\u0E49\u0E19)"),
+                    React.createElement("div", { className: "grid grid-cols-2 sm:grid-cols-3 gap-1.5 sm:gap-2" }, sortByRecommended(PRODUCTS.filter((p) => PENSION_IDS.includes(p.id))).map((p) => (React.createElement(CompactChip, { key: p.id, product: p, checked: !!selected[p.id], picked: false, disabled: productDisabled(p), recommended: false, onCheckboxClick: () => toggle(p.id), onNameClick: () => openEditor(p.id) })))))),
                 React.createElement("section", { className: "rounded-2xl p-4", style: { background: BRAND.card, boxShadow: "0 6px 24px rgba(11,42,85,0.07)" } },
                     React.createElement("h2", { className: "text-[24px] font-bold mb-1 px-1", style: { color: BRAND.mainBlue } }, "\u0E20\u0E32\u0E1E\u0E23\u0E27\u0E21\u0E41\u0E1A\u0E1A\u0E1B\u0E23\u0E30\u0E01\u0E31\u0E19\u0E17\u0E31\u0E49\u0E07\u0E2B\u0E21\u0E14"),
                     React.createElement("p", { className: "text-[16px] mb-3 px-1", style: { color: BRAND.sub } }, "\u0E15\u0E34\u0E4A\u0E01\u0E40\u0E25\u0E37\u0E2D\u0E01\u0E44\u0E14\u0E49\u0E2B\u0E25\u0E32\u0E22\u0E2D\u0E31\u0E19\u0E1E\u0E23\u0E49\u0E2D\u0E21\u0E01\u0E31\u0E19 \u0E41\u0E25\u0E49\u0E27\u0E01\u0E14\u0E1B\u0E38\u0E48\u0E21 \"\u0E40\u0E25\u0E37\u0E2D\u0E01\" \u0E14\u0E49\u0E32\u0E19\u0E25\u0E48\u0E32\u0E07\u0E40\u0E1E\u0E37\u0E48\u0E2D\u0E44\u0E1B\u0E01\u0E23\u0E2D\u0E01\u0E02\u0E49\u0E2D\u0E21\u0E39\u0E25 \u00B7 \u0E17\u0E38\u0E19\u0E2B\u0E25\u0E31\u0E01\u0E40\u0E25\u0E37\u0E2D\u0E01\u0E44\u0E14\u0E49 1 \u0E41\u0E1A\u0E1A"),
