@@ -1255,7 +1255,14 @@ function App() {
         storageAdapter.set(STORAGE_KEY, JSON.stringify(snapshot));
     }, [loadedFromStorage, gender, age, occClass, payMode, sudSI, life99SI, unjaiPlan, cancermaxPlan, plus2SI, plus2Term, prestigeSI, prestigeTerm, selected, accPlan, acc3Plan, tpdSI, supSI, vhPlan, vhkidsPlan, rpprDaily, hhpPlan, hhpDeduct, opdPlan, happyciSI, happyciTerm, llcSI, llcVariant, ssSI, happypensionPremiumInput, happypensionTerm, happypensionMode, happypensionTargetPension, happysavingSI, happysavingTerm, happywlSI, happywlTerm, hrp9920SI, hrpdivSI, hrpdivTerm, hrp9901SI, happywl9901SI, happykidSI, chakSI, chakTerm, chapSI, chapTerm, chapPayorAge, chapPayorGender, phPlan, phDeduct, phArea, psave104SI, psave126SI, hs208SI, hs126SI, hs157SI, hs147SI, hs168SI, hs1810SI, hs2515SI, taxsaver105SI, blasave168SI, pension888SI, pension888Mode, pension888PremiumInput, pension888TargetPension, csPayorAge, csPayorGender, selectedConcerns]);
     const toggle = (id) => setSelected((s) => {
-        const next = Object.assign(Object.assign({}, s), { [id]: !s[id] });
+        const turningOn = !s[id];
+        const p = PRODUCTS.find((x) => x.id === id);
+        let next = Object.assign(Object.assign({}, s), { [id]: !s[id] });
+        if (turningOn && p && p.isMain) {
+            // แบบประกันหลักเลือกได้ทีละ 1 แบบเท่านั้น — เลือกตัวใหม่แล้วยกเลิกตัวเดิมให้อัตโนมัติ ไม่ต้องยกเลิกเองก่อน
+            MAIN_IDS.forEach((m) => { if (m !== id)
+                next[m] = false; });
+        }
         if (next[id])
             setOpenProductCards((o) => (Object.assign(Object.assign({}, o), { [id]: true }))); // เลือกแล้วเปิดรายละเอียดให้อัตโนมัติ ไม่ต้องกดซ้ำ
         return next;
@@ -1282,8 +1289,7 @@ function App() {
     // เช็คว่าแบบทุนประกันหลักแต่ละตัวเลือกได้จริงหรือไม่ ตามอายุปัจจุบัน (ใช้ช่วงอายุกว้างสุดของแต่ละแบบเป็นตัวกรองเบื้องต้น)
     // และล็อกไม่ให้เลือกซ้อนกับทุนหลักตัวอื่นที่เลือกไว้แล้ว
     function mainDisabled(p) {
-        if (otherMainSelected(p.id))
-            return true;
+        // ไม่บล็อกจากการมีทุนหลักตัวอื่นเลือกอยู่แล้ว — เลือกตัวใหม่จะสลับให้อัตโนมัติ (ดู toggle/confirmPickedRecommendations)
         if (age < p.ageMin || age > p.ageMax)
             return true;
         return false;
@@ -1434,7 +1440,16 @@ function App() {
         return computedPremium;
     }
     function togglePicked(id) {
-        setPickedRecommendations((prev) => prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]);
+        setPickedRecommendations((prev) => {
+            if (prev.includes(id))
+                return prev.filter((x) => x !== id);
+            const p = PRODUCTS.find((x) => x.id === id);
+            if (p && p.isMain) {
+                // แบบประกันหลักติ๊กพร้อมกันได้แค่ 1 แบบ — ติ๊กตัวใหม่แล้วเอาตัวหลักตัวอื่นที่ติ๊กค้างไว้ออกให้อัตโนมัติ
+                return [...prev.filter((x) => { const px = PRODUCTS.find((y) => y.id === x); return !(px && px.isMain); }), id];
+            }
+            return [...prev, id];
+        });
     }
     // ตั้งข้อมูลตารางที่จะพิมพ์ แล้วเรียก window.print() หลังจากให้ React วาดส่วนพิมพ์เสร็จก่อน
     function handlePrintTable(data) {
@@ -1448,6 +1463,9 @@ function App() {
             return;
         setSelected((s) => {
             const next = Object.assign({}, s);
+            const newMain = ids.map((id) => PRODUCTS.find((p) => p.id === id)).find((p) => p && p.isMain);
+            if (newMain)
+                MAIN_IDS.forEach((m) => { next[m] = false; }); // เลือกทุนหลักใหม่ ยกเลิกทุนหลักเดิมทั้งหมดก่อนเสมอ
             ids.forEach((id) => { next[id] = true; });
             return next;
         });
@@ -3394,249 +3412,250 @@ function App() {
     const font = `@import url('https://fonts.googleapis.com/css2?family=Prompt:wght@400;500;600;700&family=IBM+Plex+Sans+Thai:wght@400;500;600;700&display=swap');`;
     return (React.createElement("div", { style: { minHeight: "100vh", background: `linear-gradient(180deg, ${BRAND.bg} 0%, #FFFFFF 320px)`, fontFamily: "'IBM Plex Sans Thai','Prompt',sans-serif", color: BRAND.ink, fontSize: "17px", fontWeight: 500, WebkitFontSmoothing: "antialiased", textRendering: "optimizeLegibility" } },
         React.createElement("style", null, font),
-        React.createElement("header", { style: { background: `linear-gradient(120deg, ${BRAND.navy}, ${BRAND.navyDeep})` }, className: "text-white" },
-            React.createElement("div", { className: "max-w-5xl mx-auto px-5 py-4 flex items-center gap-4 relative" },
-                React.createElement("span", { className: "absolute top-2 right-2 text-[14px] px-2 py-0.5 rounded-full", style: { background: "rgba(255,255,255,0.15)", color: "#BFE3F5" } }, APP_VERSION),
-                React.createElement("div", { style: { background: "#fff" }, className: "w-24 h-24 sm:w-28 sm:h-28 rounded-3xl flex items-center justify-center shrink-0 overflow-hidden shadow-lg" },
-                    React.createElement("img", { src: LOGO_DATA_URI, alt: "\u0E04\u0E33\u0E19\u0E27\u0E13\u0E40\u0E1A\u0E35\u0E49\u0E22\u0E2D\u0E22\u0E48\u0E32\u0E07\u0E07\u0E48\u0E32\u0E22", className: "w-full h-full object-cover" })),
-                React.createElement("div", null,
-                    React.createElement("h1", { className: "text-[36px] sm:text-[45px] font-semibold leading-tight" }, "\u0E04\u0E33\u0E19\u0E27\u0E13\u0E40\u0E1A\u0E35\u0E49\u0E22\u0E2D\u0E22\u0E48\u0E32\u0E07\u0E07\u0E48\u0E32\u0E22"),
-                    React.createElement("p", { className: "text-[24px] sm:text-[27px]", style: { color: "#BFE3F5" } }, "\u0E1B\u0E49\u0E32\u0E40\u0E1B\u0E47\u0E14 CFP\u00AE \u00B7 \u0E01\u0E23\u0E38\u0E07\u0E40\u0E17\u0E1E\u0E1B\u0E23\u0E30\u0E01\u0E31\u0E19\u0E0A\u0E35\u0E27\u0E34\u0E15 \u0E2A\u0E32\u0E02\u0E32\u0E40\u0E0A\u0E35\u0E22\u0E07\u0E43\u0E2B\u0E21\u0E48")),
-                React.createElement("div", { className: "ml-auto hidden sm:flex items-center gap-1 text-[24px] px-3 py-1.5 rounded-full", style: { background: "rgba(143,209,79,0.2)", color: BRAND.green } },
-                    React.createElement("span", { style: { fontSize: 18 } }, "✨"),
-                    " \u0E40\u0E25\u0E37\u0E2D\u0E01\u0E44\u0E14\u0E49\u0E2B\u0E25\u0E32\u0E22\u0E41\u0E1A\u0E1A\u0E1E\u0E23\u0E49\u0E2D\u0E21\u0E01\u0E31\u0E19"))),
-        React.createElement("main", { className: "max-w-5xl mx-auto px-5 py-6 space-y-6" },
-            React.createElement("div", { className: "flex items-start gap-2 text-[24px] rounded-xl p-4", style: { background: "#FFF6E5", color: "#5C4310", border: "1px solid #F3D98B" } },
-                React.createElement("span", { style: { fontSize: 22 }, className: "mt-0.5 shrink-0" }, "ℹ️"),
-                React.createElement("span", null, "\u0E2D\u0E31\u0E15\u0E23\u0E32\u0E40\u0E1A\u0E35\u0E49\u0E22\u0E04\u0E33\u0E19\u0E27\u0E13\u0E08\u0E32\u0E01\u0E40\u0E2D\u0E01\u0E2A\u0E32\u0E23\u0E1B\u0E23\u0E30\u0E01\u0E2D\u0E1A\u0E01\u0E32\u0E23\u0E02\u0E32\u0E22\u0E17\u0E35\u0E48\u0E41\u0E19\u0E1A\u0E21\u0E32 \u0E01\u0E23\u0E38\u0E13\u0E32\u0E15\u0E23\u0E27\u0E08\u0E2A\u0E2D\u0E1A\u0E04\u0E27\u0E32\u0E21\u0E16\u0E39\u0E01\u0E15\u0E49\u0E2D\u0E07\u0E01\u0E31\u0E1A\u0E15\u0E32\u0E23\u0E32\u0E07\u0E2D\u0E31\u0E15\u0E23\u0E32\u0E40\u0E1A\u0E35\u0E49\u0E22\u0E09\u0E1A\u0E31\u0E1A\u0E17\u0E32\u0E07\u0E01\u0E32\u0E23\u0E01\u0E48\u0E2D\u0E19\u0E19\u0E33\u0E40\u0E2A\u0E19\u0E2D\u0E25\u0E39\u0E01\u0E04\u0E49\u0E32\u0E40\u0E2A\u0E21\u0E2D")),
-            React.createElement("section", { className: "rounded-2xl p-5", style: { background: BRAND.card, boxShadow: "0 6px 24px rgba(11,42,85,0.07)" } },
-                React.createElement("div", { className: "flex items-center justify-between mb-4" },
-                    React.createElement("h2", { className: "text-[27px] font-semibold flex items-center gap-2", style: { color: BRAND.navy } },
-                        React.createElement("span", { style: { fontSize: 20 } }, "👥"),
-                        " \u0E02\u0E49\u0E2D\u0E21\u0E39\u0E25\u0E1C\u0E39\u0E49\u0E40\u0E2D\u0E32\u0E1B\u0E23\u0E30\u0E01\u0E31\u0E19\u0E20\u0E31\u0E22"),
-                    React.createElement("button", { onClick: clearAll, className: "flex items-center gap-1.5 text-[21px] font-medium px-3 py-2 rounded-xl", style: { background: "#FDEAEA", color: BRAND.danger } },
-                        React.createElement("span", { style: { fontSize: 16 } }, "🧹"),
-                        " \u0E40\u0E04\u0E25\u0E35\u0E22\u0E23\u0E4C\u0E02\u0E49\u0E2D\u0E21\u0E39\u0E25\u0E17\u0E31\u0E49\u0E07\u0E2B\u0E21\u0E14")),
-                React.createElement("p", { className: "text-[21px] mb-3", style: { color: BRAND.sub } }, "\u0E02\u0E49\u0E2D\u0E21\u0E39\u0E25\u0E17\u0E35\u0E48\u0E04\u0E35\u0E22\u0E4C\u0E08\u0E30\u0E16\u0E39\u0E01\u0E1A\u0E31\u0E19\u0E17\u0E36\u0E01\u0E44\u0E27\u0E49\u0E2D\u0E31\u0E15\u0E42\u0E19\u0E21\u0E31\u0E15\u0E34\u0E43\u0E19\u0E40\u0E04\u0E23\u0E37\u0E48\u0E2D\u0E07\u0E19\u0E35\u0E49 \u0E41\u0E21\u0E49\u0E1B\u0E34\u0E14\u0E41\u0E2D\u0E1B\u0E41\u0E25\u0E49\u0E27\u0E40\u0E1B\u0E34\u0E14\u0E43\u0E2B\u0E21\u0E48\u0E01\u0E47\u0E22\u0E31\u0E07\u0E2D\u0E22\u0E39\u0E48 \u0E08\u0E19\u0E01\u0E27\u0E48\u0E32\u0E08\u0E30\u0E01\u0E14 \"\u0E40\u0E04\u0E25\u0E35\u0E22\u0E23\u0E4C\u0E02\u0E49\u0E2D\u0E21\u0E39\u0E25\u0E17\u0E31\u0E49\u0E07\u0E2B\u0E21\u0E14\""),
-                React.createElement("div", { className: "grid grid-cols-2 sm:grid-cols-4 gap-4" },
-                    React.createElement(Field, { label: "\u0E40\u0E1E\u0E28" },
-                        React.createElement(SegButton, { options: [{ k: "female", l: "หญิง" }, { k: "male", l: "ชาย" }], value: gender, onChange: setGender })),
-                    React.createElement(Field, { label: "\u0E2D\u0E32\u0E22\u0E38 (\u0E1B\u0E35)" },
-                        React.createElement(NumInput, { value: age, onChange: setAge, min: 0, max: 99 })),
-                    React.createElement(Field, { label: "\u0E0A\u0E31\u0E49\u0E19\u0E2D\u0E32\u0E0A\u0E35\u0E1E" },
-                        React.createElement(SegButton, { options: [{ k: 1, l: "1" }, { k: 2, l: "2" }, { k: 3, l: "3" }], value: occClass, onChange: setOccClass })),
-                    React.createElement(Field, { label: "\u0E07\u0E27\u0E14\u0E0A\u0E33\u0E23\u0E30\u0E40\u0E1A\u0E35\u0E49\u0E22" },
-                        React.createElement("select", { value: payMode, onChange: (e) => setPayMode(e.target.value), className: "w-full rounded-xl border px-3 py-2.5 text-[24px]", style: { borderColor: "#D7E8F0" } }, PAY_MODE.map((m) => React.createElement("option", { key: m.key, value: m.key }, m.label)))))),
-            age >= 0 && age <= 14 && (() => {
-                const csProduct = PRODUCTS.find((p) => p.id === "CS");
-                const csMandatory = selected.CANCERMAX && !csDisabled;
-                return (React.createElement("section", { className: "rounded-2xl p-5", style: { background: "#FFF9EE", boxShadow: "0 6px 24px rgba(11,42,85,0.07)", border: "1.5px solid #F3D98B" } },
-                    React.createElement("h2", { className: "text-[27px] font-bold mb-1", style: { color: BRAND.mainBlue } }, "\uD83D\uDEE1\uFE0F \u0E04\u0E38\u0E49\u0E21\u0E04\u0E23\u0E2D\u0E07\u0E01\u0E32\u0E23\u0E0A\u0E33\u0E23\u0E30\u0E40\u0E1A\u0E35\u0E49\u0E22 (\u0E04\u0E0A.)"),
-                    React.createElement("p", { className: "text-[21px] mb-3", style: { color: BRAND.sub } }, csMandatory
-                        ? "จำเป็นต้องซื้อคู่กับแคนเซอร์ แม็กซ์ สำหรับผู้เยาว์อายุ 0-14 ปี ระบบติ๊กเลือกให้อัตโนมัติแล้ว"
-                        : "ลูกค้าอายุ 0-14 ปี เข้าเงื่อนไขสัญญานี้ — คุ้มครองผู้ปกครองที่ชำระเบี้ย หากเสียชีวิตหรือทุพพลภาพถาวรสิ้นเชิง บริษัทจะชำระเบี้ยแทนให้จนครบกำหนด แนะนำให้พิจารณาทุกครั้ง"),
-                    React.createElement(ProductRow, { product: csProduct, checked: selected.CS, onToggle: () => toggle("CS"), age: age, live: liveResults.CS, pending: PRIMARY_FIELD_ZERO.CS, disabled: csDisabled || selected.UNJAI || selected.PRESTIGE, recommended: false, expanded: !!openProductCards.CS, onToggleExpand: () => toggleProductCard("CS") }, renderProductChildren(csProduct))));
-            })(),
-            React.createElement("section", { className: "rounded-2xl p-5", style: { background: BRAND.card, boxShadow: "0 6px 24px rgba(11,42,85,0.07)" } },
-                React.createElement("h2", { className: "text-[27px] font-semibold mb-1", style: { color: BRAND.navy } }, "\u0E25\u0E39\u0E01\u0E04\u0E49\u0E32\u0E01\u0E31\u0E07\u0E27\u0E25\u0E40\u0E23\u0E37\u0E48\u0E2D\u0E07\u0E2D\u0E30\u0E44\u0E23\u0E40\u0E1B\u0E47\u0E19\u0E1E\u0E34\u0E40\u0E28\u0E29?"),
-                React.createElement("p", { className: "text-[21px] mb-3", style: { color: BRAND.sub } }, "\u0E40\u0E25\u0E37\u0E2D\u0E01\u0E44\u0E14\u0E49\u0E21\u0E32\u0E01\u0E01\u0E27\u0E48\u0E32 1 \u0E02\u0E49\u0E2D \u0E23\u0E30\u0E1A\u0E1A\u0E08\u0E30\u0E02\u0E36\u0E49\u0E19\u0E1B\u0E49\u0E32\u0E22 \"\u2B50 \u0E41\u0E19\u0E30\u0E19\u0E33\" \u0E44\u0E27\u0E49\u0E17\u0E35\u0E48\u0E41\u0E1A\u0E1A\u0E1B\u0E23\u0E30\u0E01\u0E31\u0E19\u0E17\u0E35\u0E48\u0E40\u0E01\u0E35\u0E48\u0E22\u0E27\u0E02\u0E49\u0E2D\u0E07\u0E14\u0E49\u0E32\u0E19\u0E25\u0E48\u0E32\u0E07\u0E41\u0E25\u0E30\u0E40\u0E25\u0E37\u0E48\u0E2D\u0E19\u0E02\u0E36\u0E49\u0E19\u0E21\u0E32\u0E1A\u0E19\u0E2A\u0E38\u0E14 \u2014 \u0E16\u0E49\u0E32\u0E2D\u0E19\u0E38\u0E2A\u0E31\u0E0D\u0E0D\u0E32\u0E17\u0E35\u0E48\u0E41\u0E19\u0E30\u0E19\u0E33\u0E15\u0E49\u0E2D\u0E07\u0E0B\u0E37\u0E49\u0E2D\u0E04\u0E39\u0E48\u0E01\u0E31\u0E1A\u0E17\u0E38\u0E19\u0E1B\u0E23\u0E30\u0E01\u0E31\u0E19\u0E2B\u0E25\u0E31\u0E01 \u0E23\u0E30\u0E1A\u0E1A\u0E08\u0E30\u0E41\u0E19\u0E30\u0E19\u0E33\u0E17\u0E38\u0E19\u0E2B\u0E25\u0E31\u0E01\u0E17\u0E35\u0E48\u0E40\u0E1A\u0E35\u0E49\u0E22\u0E16\u0E39\u0E01\u0E17\u0E35\u0E48\u0E2A\u0E38\u0E14\u0E2A\u0E33\u0E2B\u0E23\u0E31\u0E1A\u0E2D\u0E32\u0E22\u0E38\u0E19\u0E35\u0E49\u0E21\u0E32\u0E04\u0E39\u0E48\u0E01\u0E31\u0E19\u0E43\u0E2B\u0E49\u0E14\u0E49\u0E27\u0E22 (\u0E40\u0E17\u0E35\u0E22\u0E1A\u0E40\u0E09\u0E1E\u0E32\u0E30\u0E2A\u0E38\u0E14\u0E04\u0E38\u0E49\u0E21/99-99 \u0E40\u0E1E\u0E23\u0E32\u0E30\u0E17\u0E38\u0E19\u0E02\u0E31\u0E49\u0E19\u0E15\u0E48\u0E33\u0E19\u0E49\u0E2D\u0E22\u0E2A\u0E38\u0E14) \u0E2B\u0E23\u0E37\u0E2D\u0E02\u0E49\u0E32\u0E21\u0E02\u0E31\u0E49\u0E19\u0E15\u0E2D\u0E19\u0E19\u0E35\u0E49\u0E41\u0E25\u0E49\u0E27\u0E40\u0E25\u0E37\u0E2D\u0E01\u0E41\u0E1A\u0E1A\u0E1B\u0E23\u0E30\u0E01\u0E31\u0E19\u0E40\u0E2D\u0E07\u0E44\u0E14\u0E49\u0E40\u0E25\u0E22"),
-                React.createElement("div", { className: "flex flex-wrap gap-2" },
-                    CONCERNS.map((c) => {
-                        const active = selectedConcerns.includes(c.id);
-                        return (React.createElement("button", { key: c.id, onClick: () => toggleConcern(c.id), className: "flex items-center gap-1.5 text-[21px] font-medium px-3.5 py-2.5 rounded-full border", style: { borderColor: active ? BRAND.green : "#D7E8F0", background: active ? "#F0FAE6" : "#fff", color: active ? BRAND.greenDeep : BRAND.navy } },
-                            React.createElement("span", null, c.icon),
-                            " ",
-                            c.label));
-                    }),
-                    React.createElement("button", { onClick: () => setSavingsGroupOpen((o) => !o), className: "flex items-center gap-1.5 text-[21px] font-medium px-3.5 py-2.5 rounded-full border", style: { borderColor: savingsGroupOpen ? BRAND.green : "#D7E8F0", background: savingsGroupOpen ? "#F0FAE6" : "#fff", color: savingsGroupOpen ? BRAND.greenDeep : BRAND.navy } },
-                        React.createElement("span", null, "\uD83D\uDCB0"),
-                        " \u0E1B\u0E23\u0E30\u0E01\u0E31\u0E19\u0E2A\u0E30\u0E2A\u0E21\u0E17\u0E23\u0E31\u0E1E\u0E22\u0E4C"),
-                    React.createElement("button", { onClick: () => setPensionGroupOpen((o) => !o), className: "flex items-center gap-1.5 text-[21px] font-medium px-3.5 py-2.5 rounded-full border", style: { borderColor: pensionGroupOpen ? BRAND.green : "#D7E8F0", background: pensionGroupOpen ? "#F0FAE6" : "#fff", color: pensionGroupOpen ? BRAND.greenDeep : BRAND.navy } },
-                        React.createElement("span", null, "\uD83C\uDFD6\uFE0F"),
-                        " \u0E1B\u0E23\u0E30\u0E01\u0E31\u0E19\u0E1A\u0E33\u0E19\u0E32\u0E0D"),
-                    selectedConcerns.length > 0 && (React.createElement("button", { onClick: () => { setSelectedConcerns([]); setPickedRecommendations([]); }, className: "flex items-center gap-1.5 text-[21px] font-medium px-3.5 py-2.5 rounded-full", style: { background: "#FDEAEA", color: BRAND.danger } }, "\u2715 \u0E25\u0E49\u0E32\u0E07\u0E01\u0E32\u0E23\u0E40\u0E25\u0E37\u0E2D\u0E01")))),
-            savingsGroupOpen && (React.createElement("section", { id: "savings-group-section", className: "rounded-2xl p-4", style: { background: "#FFF9EE", boxShadow: "0 6px 24px rgba(11,42,85,0.07)", border: "1.5px solid #F3D98B" } },
-                React.createElement("div", { className: "flex items-center justify-between mb-1" },
-                    React.createElement("h2", { className: "text-[24px] font-bold px-1", style: { color: BRAND.mainBlue } }, "\uD83D\uDCB0 \u0E1B\u0E23\u0E30\u0E01\u0E31\u0E19\u0E2A\u0E30\u0E2A\u0E21\u0E17\u0E23\u0E31\u0E1E\u0E22\u0E4C"),
-                    React.createElement("button", { onClick: () => setSavingsGroupOpen(false), className: "text-[19px] font-medium px-2 py-1", style: { color: BRAND.sub } }, "\u2715 \u0E1B\u0E34\u0E14")),
-                React.createElement("p", { className: "text-[16px] mb-3 px-1", style: { color: BRAND.sub } }, "\u0E15\u0E34\u0E4A\u0E01\u0E40\u0E25\u0E37\u0E2D\u0E01\u0E44\u0E14\u0E49\u0E2B\u0E25\u0E32\u0E22\u0E2D\u0E31\u0E19\u0E41\u0E25\u0E49\u0E27\u0E01\u0E14\u0E1B\u0E38\u0E48\u0E21 \"\u0E40\u0E25\u0E37\u0E2D\u0E01\" \u0E14\u0E49\u0E32\u0E19\u0E25\u0E48\u0E32\u0E07\u0E40\u0E1E\u0E37\u0E48\u0E2D\u0E44\u0E1B\u0E01\u0E23\u0E2D\u0E01\u0E02\u0E49\u0E2D\u0E21\u0E39\u0E25 \u00B7 \u0E40\u0E25\u0E37\u0E2D\u0E01\u0E44\u0E14\u0E49\u0E40\u0E1E\u0E35\u0E22\u0E07 1 \u0E41\u0E1A\u0E1A (\u0E17\u0E38\u0E19\u0E1B\u0E23\u0E30\u0E01\u0E31\u0E19\u0E2B\u0E25\u0E31\u0E01\u0E40\u0E25\u0E37\u0E2D\u0E01\u0E44\u0E14\u0E49 1 \u0E41\u0E1A\u0E1A\u0E40\u0E17\u0E48\u0E32\u0E19\u0E31\u0E49\u0E19)"),
-                React.createElement("div", { className: "grid grid-cols-2 sm:grid-cols-3 gap-1.5 sm:gap-2" }, sortByRecommended(PRODUCTS.filter((p) => SAVINGS_IDS.includes(p.id))).map((p) => (React.createElement(CompactChip, { key: p.id, product: p, checked: !!selected[p.id], picked: pickedRecommendations.includes(p.id), disabled: productDisabled(p), recommended: false, onCheckboxClick: () => { if (selected[p.id])
-                        toggle(p.id);
-                    else
-                        togglePicked(p.id); }, onNameClick: () => { if (selected[p.id])
-                        openEditor(p.id);
-                    else
-                        togglePicked(p.id); } })))),
-                React.createElement("button", { onClick: () => setCompareOpen((o) => !o), className: "w-full text-[21px] font-semibold px-4 py-2.5 rounded-xl mt-3", style: { background: "#fff", color: BRAND.warn, border: `1.5px solid ${BRAND.warn}` } }, compareOpen ? "▴ ซ่อนตารางเทียบทุกแบบ" : "▾ เทียบทุกแบบ (IRR)"),
-                compareOpen && (React.createElement("div", { className: "mt-2" },
-                    React.createElement(PlanRow, { label: "\u0E17\u0E38\u0E19\u0E1B\u0E23\u0E30\u0E01\u0E31\u0E19\u0E17\u0E35\u0E48\u0E43\u0E0A\u0E49\u0E40\u0E1B\u0E23\u0E35\u0E22\u0E1A\u0E40\u0E17\u0E35\u0E22\u0E1A (\u0E1A\u0E32\u0E17)" },
-                        React.createElement(NumInput, { value: compareSI, onChange: setCompareSI, min: 0, step: 100000 })),
-                    React.createElement("p", { className: "text-[16px] mb-2 px-1", style: { color: BRAND.sub } }, "\u0E43\u0E0A\u0E49\u0E2D\u0E32\u0E22\u0E38/\u0E40\u0E1E\u0E28\u0E1B\u0E31\u0E08\u0E08\u0E38\u0E1A\u0E31\u0E19\u0E02\u0E2D\u0E07\u0E25\u0E39\u0E01\u0E04\u0E49\u0E32\u0E17\u0E35\u0E48\u0E01\u0E23\u0E2D\u0E01\u0E44\u0E27\u0E49\u0E14\u0E49\u0E32\u0E19\u0E1A\u0E19 \u00B7 \u0E41\u0E2E\u0E1B\u0E1B\u0E35\u0E49\u0E40\u0E0B\u0E1F\u0E27\u0E34\u0E48\u0E07\u0E43\u0E0A\u0E49\u0E40\u0E1A\u0E35\u0E49\u0E22 5 \u0E1B\u0E35 (\u0E2A\u0E31\u0E49\u0E19\u0E2A\u0E38\u0E14) \u0E40\u0E1B\u0E47\u0E19\u0E04\u0E48\u0E32\u0E40\u0E23\u0E34\u0E48\u0E21\u0E15\u0E49\u0E19 \u00B7 \u0E40\u0E23\u0E35\u0E22\u0E07\u0E08\u0E32\u0E01 IRR \u0E2A\u0E39\u0E07\u0E44\u0E1B\u0E15\u0E48\u0E33"),
-                    React.createElement("div", { className: "rounded-xl border overflow-x-auto", style: { borderColor: "#D7E8F0" } },
-                        React.createElement("table", { className: "w-full text-[18px]", style: { minWidth: 560 } },
-                            React.createElement("thead", { style: { background: BRAND.bg } },
-                                React.createElement("tr", null,
-                                    React.createElement("th", { className: "text-left px-2 py-2", style: { color: BRAND.navy } }, "\u0E2D\u0E31\u0E19\u0E14\u0E31\u0E1A"),
-                                    React.createElement("th", { className: "text-left px-2 py-2", style: { color: BRAND.navy } }, "\u0E41\u0E1A\u0E1A\u0E1B\u0E23\u0E30\u0E01\u0E31\u0E19"),
-                                    React.createElement("th", { className: "text-right px-2 py-2", style: { color: BRAND.navy } }, "\u0E40\u0E1A\u0E35\u0E49\u0E22/\u0E1B\u0E35"),
-                                    React.createElement("th", { className: "text-center px-2 py-2", style: { color: BRAND.navy } }, "\u0E1B\u0E35\u0E0A\u0E33\u0E23\u0E30/\u0E04\u0E38\u0E49\u0E21\u0E04\u0E23\u0E2D\u0E07"),
-                                    React.createElement("th", { className: "text-right px-2 py-2", style: { color: BRAND.navy } }, "IRR"))),
-                            React.createElement("tbody", null, (() => {
-                                const cmp = buildComparisonRows(compareSI);
-                                return cmp.length === 0 ? (React.createElement("tr", null,
-                                    React.createElement("td", { colSpan: 5, className: "text-center px-2 py-4", style: { color: BRAND.sub } }, "\u0E44\u0E21\u0E48\u0E21\u0E35\u0E41\u0E1A\u0E1A\u0E43\u0E14\u0E23\u0E2D\u0E07\u0E23\u0E31\u0E1A\u0E17\u0E38\u0E19\u0E1B\u0E23\u0E30\u0E01\u0E31\u0E19/\u0E2D\u0E32\u0E22\u0E38\u0E19\u0E35\u0E49"))) : cmp.map((r, i) => (React.createElement("tr", { key: r.id, style: { borderTop: "1px solid #EEF3F7", background: i === 0 ? "#F3FBEF" : "transparent" } },
-                                    React.createElement("td", { className: "px-2 py-2", style: { color: BRAND.dataBlack } }, i + 1),
-                                    React.createElement("td", { className: "px-2 py-2", style: { color: BRAND.dataBlack } }, r.name),
-                                    React.createElement("td", { className: "text-right px-2 py-2", style: { color: BRAND.dataBlack } }, fmt(r.premium)),
-                                    React.createElement("td", { className: "text-center px-2 py-2", style: { color: BRAND.dataBlack } },
-                                        r.payYears,
-                                        "/",
-                                        r.totalYears),
-                                    React.createElement("td", { className: "text-right px-2 py-2 font-bold", style: { color: i === 0 ? BRAND.greenDeep : BRAND.dataBlack } }, r.irr !== null && r.irr !== undefined ? (r.irr * 100).toFixed(2) + "%" : "-"))));
-                            })()))))),
-                pickedRecommendations.some((id) => SAVINGS_IDS.includes(id)) && (React.createElement("div", { className: "flex justify-end mt-3 pt-3", style: { borderTop: "1px dashed #F3D98B" } },
-                    React.createElement("button", { onClick: confirmPickedRecommendations, className: "text-[24px] font-bold px-6 py-3 rounded-full", style: { background: BRAND.navy, color: "#fff" } },
-                        "\u2705 \u0E40\u0E25\u0E37\u0E2D\u0E01 (",
-                        pickedRecommendations.filter((id) => SAVINGS_IDS.includes(id)).length,
-                        ")"))))),
-            pensionGroupOpen && (React.createElement("section", { id: "pension-group-section", className: "rounded-2xl p-4", style: { background: "#EFF7FB", boxShadow: "0 6px 24px rgba(11,42,85,0.07)", border: "1.5px solid #BFE0F0" } },
-                React.createElement("div", { className: "flex items-center justify-between mb-1" },
-                    React.createElement("h2", { className: "text-[24px] font-bold px-1", style: { color: BRAND.mainBlue } }, "\uD83C\uDFD6\uFE0F \u0E1B\u0E23\u0E30\u0E01\u0E31\u0E19\u0E1A\u0E33\u0E19\u0E32\u0E0D"),
-                    React.createElement("button", { onClick: () => setPensionGroupOpen(false), className: "text-[19px] font-medium px-2 py-1", style: { color: BRAND.sub } }, "\u2715 \u0E1B\u0E34\u0E14")),
-                React.createElement("p", { className: "text-[16px] mb-3 px-1", style: { color: BRAND.sub } }, "\u0E15\u0E34\u0E4A\u0E01\u0E40\u0E25\u0E37\u0E2D\u0E01\u0E44\u0E14\u0E49\u0E2B\u0E25\u0E32\u0E22\u0E2D\u0E31\u0E19\u0E41\u0E25\u0E49\u0E27\u0E01\u0E14\u0E1B\u0E38\u0E48\u0E21 \"\u0E40\u0E25\u0E37\u0E2D\u0E01\" \u0E14\u0E49\u0E32\u0E19\u0E25\u0E48\u0E32\u0E07\u0E40\u0E1E\u0E37\u0E48\u0E2D\u0E44\u0E1B\u0E01\u0E23\u0E2D\u0E01\u0E02\u0E49\u0E2D\u0E21\u0E39\u0E25 \u00B7 \u0E40\u0E25\u0E37\u0E2D\u0E01\u0E44\u0E14\u0E49\u0E40\u0E1E\u0E35\u0E22\u0E07 1 \u0E41\u0E1A\u0E1A (\u0E17\u0E38\u0E19\u0E1B\u0E23\u0E30\u0E01\u0E31\u0E19\u0E2B\u0E25\u0E31\u0E01\u0E40\u0E25\u0E37\u0E2D\u0E01\u0E44\u0E14\u0E49 1 \u0E41\u0E1A\u0E1A\u0E40\u0E17\u0E48\u0E32\u0E19\u0E31\u0E49\u0E19)"),
-                React.createElement("div", { className: "grid grid-cols-2 sm:grid-cols-3 gap-1.5 sm:gap-2" }, sortByRecommended(PRODUCTS.filter((p) => PENSION_IDS.includes(p.id))).map((p) => (React.createElement(CompactChip, { key: p.id, product: p, checked: !!selected[p.id], picked: pickedRecommendations.includes(p.id), disabled: productDisabled(p), recommended: false, onCheckboxClick: () => { if (selected[p.id])
-                        toggle(p.id);
-                    else
-                        togglePicked(p.id); }, onNameClick: () => { if (selected[p.id])
-                        openEditor(p.id);
-                    else
-                        togglePicked(p.id); } })))),
-                pickedRecommendations.some((id) => PENSION_IDS.includes(id)) && (React.createElement("div", { className: "flex justify-end mt-3 pt-3", style: { borderTop: "1px dashed #BFE0F0" } },
-                    React.createElement("button", { onClick: confirmPickedRecommendations, className: "text-[24px] font-bold px-6 py-3 rounded-full", style: { background: BRAND.navy, color: "#fff" } },
-                        "\u2705 \u0E40\u0E25\u0E37\u0E2D\u0E01 (",
-                        pickedRecommendations.filter((id) => PENSION_IDS.includes(id)).length,
-                        ")"))))),
-            React.createElement("section", { className: "rounded-2xl p-4", style: { background: BRAND.card, boxShadow: "0 6px 24px rgba(11,42,85,0.07)" } },
-                React.createElement("h2", { className: "text-[24px] font-bold mb-1 px-1", style: { color: BRAND.mainBlue } }, "\u0E20\u0E32\u0E1E\u0E23\u0E27\u0E21\u0E41\u0E1A\u0E1A\u0E1B\u0E23\u0E30\u0E01\u0E31\u0E19\u0E17\u0E31\u0E49\u0E07\u0E2B\u0E21\u0E14"),
-                React.createElement("p", { className: "text-[16px] mb-3 px-1", style: { color: BRAND.sub } }, "\u0E15\u0E34\u0E4A\u0E01\u0E40\u0E25\u0E37\u0E2D\u0E01\u0E44\u0E14\u0E49\u0E2B\u0E25\u0E32\u0E22\u0E2D\u0E31\u0E19\u0E1E\u0E23\u0E49\u0E2D\u0E21\u0E01\u0E31\u0E19 \u0E41\u0E25\u0E49\u0E27\u0E01\u0E14\u0E1B\u0E38\u0E48\u0E21 \"\u0E40\u0E25\u0E37\u0E2D\u0E01\" \u0E14\u0E49\u0E32\u0E19\u0E25\u0E48\u0E32\u0E07\u0E40\u0E1E\u0E37\u0E48\u0E2D\u0E44\u0E1B\u0E01\u0E23\u0E2D\u0E01\u0E02\u0E49\u0E2D\u0E21\u0E39\u0E25 \u00B7 \u0E17\u0E38\u0E19\u0E2B\u0E25\u0E31\u0E01\u0E40\u0E25\u0E37\u0E2D\u0E01\u0E44\u0E14\u0E49 1 \u0E41\u0E1A\u0E1A"),
-                (selected.UNJAI || selected.CANCERMAX) && (React.createElement("p", { className: "text-[16px] mb-2 px-1 font-medium", style: { color: BRAND.warn } },
-                    "\u26A0 ",
-                    selected.UNJAI ? "อุ่นใจ โรคร้าย" : "แคนเซอร์ แม็กซ์",
-                    " \u0E40\u0E1B\u0E47\u0E19\u0E41\u0E1E\u0E47\u0E01\u0E40\u0E01\u0E08\u0E1B\u0E34\u0E14 \u0E44\u0E21\u0E48\u0E2A\u0E32\u0E21\u0E32\u0E23\u0E16\u0E0B\u0E37\u0E49\u0E2D\u0E2A\u0E31\u0E0D\u0E0D\u0E32\u0E40\u0E1E\u0E34\u0E48\u0E21\u0E40\u0E15\u0E34\u0E21\u0E2D\u0E37\u0E48\u0E19\u0E40\u0E1E\u0E34\u0E48\u0E21\u0E44\u0E14\u0E49",
-                    selected.CANCERMAX ? " ยกเว้น คช. ซึ่งผู้เยาว์อายุ 0-14 ปี ต้องซื้อเพิ่มด้วย" : "")),
-                React.createElement("div", { className: "grid grid-cols-4 gap-1.5 sm:gap-2" }, CATEGORY_GROUPS.map((group) => (React.createElement("div", { key: group.id, className: "space-y-1" },
-                    React.createElement("p", { className: "text-[13px] sm:text-[14px] font-bold text-center leading-tight px-0.5 py-1.5 rounded-lg", style: { background: BRAND.bg, color: BRAND.navy } }, group.label),
-                    sortByRecommended(PRODUCTS.filter((p) => group.ids.includes(p.id))).map((p) => (React.createElement(CompactChip, { key: p.id, product: p, checked: !!selected[p.id], picked: pickedRecommendations.includes(p.id), disabled: productDisabled(p), recommended: recommendedProductIds.has(p.id), tag: COMPACT_TAG[p.id], onCheckboxClick: () => { if (selected[p.id])
+        React.createElement("div", { id: "app-root-content" },
+            React.createElement("header", { style: { background: `linear-gradient(120deg, ${BRAND.navy}, ${BRAND.navyDeep})` }, className: "text-white" },
+                React.createElement("div", { className: "max-w-5xl mx-auto px-5 py-4 flex items-center gap-4 relative" },
+                    React.createElement("span", { className: "absolute top-2 right-2 text-[14px] px-2 py-0.5 rounded-full", style: { background: "rgba(255,255,255,0.15)", color: "#BFE3F5" } }, APP_VERSION),
+                    React.createElement("div", { style: { background: "#fff" }, className: "w-24 h-24 sm:w-28 sm:h-28 rounded-3xl flex items-center justify-center shrink-0 overflow-hidden shadow-lg" },
+                        React.createElement("img", { src: LOGO_DATA_URI, alt: "\u0E04\u0E33\u0E19\u0E27\u0E13\u0E40\u0E1A\u0E35\u0E49\u0E22\u0E2D\u0E22\u0E48\u0E32\u0E07\u0E07\u0E48\u0E32\u0E22", className: "w-full h-full object-cover" })),
+                    React.createElement("div", null,
+                        React.createElement("h1", { className: "text-[36px] sm:text-[45px] font-semibold leading-tight" }, "\u0E04\u0E33\u0E19\u0E27\u0E13\u0E40\u0E1A\u0E35\u0E49\u0E22\u0E2D\u0E22\u0E48\u0E32\u0E07\u0E07\u0E48\u0E32\u0E22"),
+                        React.createElement("p", { className: "text-[24px] sm:text-[27px]", style: { color: "#BFE3F5" } }, "\u0E1B\u0E49\u0E32\u0E40\u0E1B\u0E47\u0E14 CFP\u00AE \u00B7 \u0E01\u0E23\u0E38\u0E07\u0E40\u0E17\u0E1E\u0E1B\u0E23\u0E30\u0E01\u0E31\u0E19\u0E0A\u0E35\u0E27\u0E34\u0E15 \u0E2A\u0E32\u0E02\u0E32\u0E40\u0E0A\u0E35\u0E22\u0E07\u0E43\u0E2B\u0E21\u0E48")),
+                    React.createElement("div", { className: "ml-auto hidden sm:flex items-center gap-1 text-[24px] px-3 py-1.5 rounded-full", style: { background: "rgba(143,209,79,0.2)", color: BRAND.green } },
+                        React.createElement("span", { style: { fontSize: 18 } }, "✨"),
+                        " \u0E40\u0E25\u0E37\u0E2D\u0E01\u0E44\u0E14\u0E49\u0E2B\u0E25\u0E32\u0E22\u0E41\u0E1A\u0E1A\u0E1E\u0E23\u0E49\u0E2D\u0E21\u0E01\u0E31\u0E19"))),
+            React.createElement("main", { className: "max-w-5xl mx-auto px-5 py-6 space-y-6" },
+                React.createElement("div", { className: "flex items-start gap-2 text-[24px] rounded-xl p-4", style: { background: "#FFF6E5", color: "#5C4310", border: "1px solid #F3D98B" } },
+                    React.createElement("span", { style: { fontSize: 22 }, className: "mt-0.5 shrink-0" }, "ℹ️"),
+                    React.createElement("span", null, "\u0E2D\u0E31\u0E15\u0E23\u0E32\u0E40\u0E1A\u0E35\u0E49\u0E22\u0E04\u0E33\u0E19\u0E27\u0E13\u0E08\u0E32\u0E01\u0E40\u0E2D\u0E01\u0E2A\u0E32\u0E23\u0E1B\u0E23\u0E30\u0E01\u0E2D\u0E1A\u0E01\u0E32\u0E23\u0E02\u0E32\u0E22\u0E17\u0E35\u0E48\u0E41\u0E19\u0E1A\u0E21\u0E32 \u0E01\u0E23\u0E38\u0E13\u0E32\u0E15\u0E23\u0E27\u0E08\u0E2A\u0E2D\u0E1A\u0E04\u0E27\u0E32\u0E21\u0E16\u0E39\u0E01\u0E15\u0E49\u0E2D\u0E07\u0E01\u0E31\u0E1A\u0E15\u0E32\u0E23\u0E32\u0E07\u0E2D\u0E31\u0E15\u0E23\u0E32\u0E40\u0E1A\u0E35\u0E49\u0E22\u0E09\u0E1A\u0E31\u0E1A\u0E17\u0E32\u0E07\u0E01\u0E32\u0E23\u0E01\u0E48\u0E2D\u0E19\u0E19\u0E33\u0E40\u0E2A\u0E19\u0E2D\u0E25\u0E39\u0E01\u0E04\u0E49\u0E32\u0E40\u0E2A\u0E21\u0E2D")),
+                React.createElement("section", { className: "rounded-2xl p-5", style: { background: BRAND.card, boxShadow: "0 6px 24px rgba(11,42,85,0.07)" } },
+                    React.createElement("div", { className: "flex items-center justify-between mb-4" },
+                        React.createElement("h2", { className: "text-[27px] font-semibold flex items-center gap-2", style: { color: BRAND.navy } },
+                            React.createElement("span", { style: { fontSize: 20 } }, "👥"),
+                            " \u0E02\u0E49\u0E2D\u0E21\u0E39\u0E25\u0E1C\u0E39\u0E49\u0E40\u0E2D\u0E32\u0E1B\u0E23\u0E30\u0E01\u0E31\u0E19\u0E20\u0E31\u0E22"),
+                        React.createElement("button", { onClick: clearAll, className: "flex items-center gap-1.5 text-[21px] font-medium px-3 py-2 rounded-xl", style: { background: "#FDEAEA", color: BRAND.danger } },
+                            React.createElement("span", { style: { fontSize: 16 } }, "🧹"),
+                            " \u0E40\u0E04\u0E25\u0E35\u0E22\u0E23\u0E4C\u0E02\u0E49\u0E2D\u0E21\u0E39\u0E25\u0E17\u0E31\u0E49\u0E07\u0E2B\u0E21\u0E14")),
+                    React.createElement("p", { className: "text-[21px] mb-3", style: { color: BRAND.sub } }, "\u0E02\u0E49\u0E2D\u0E21\u0E39\u0E25\u0E17\u0E35\u0E48\u0E04\u0E35\u0E22\u0E4C\u0E08\u0E30\u0E16\u0E39\u0E01\u0E1A\u0E31\u0E19\u0E17\u0E36\u0E01\u0E44\u0E27\u0E49\u0E2D\u0E31\u0E15\u0E42\u0E19\u0E21\u0E31\u0E15\u0E34\u0E43\u0E19\u0E40\u0E04\u0E23\u0E37\u0E48\u0E2D\u0E07\u0E19\u0E35\u0E49 \u0E41\u0E21\u0E49\u0E1B\u0E34\u0E14\u0E41\u0E2D\u0E1B\u0E41\u0E25\u0E49\u0E27\u0E40\u0E1B\u0E34\u0E14\u0E43\u0E2B\u0E21\u0E48\u0E01\u0E47\u0E22\u0E31\u0E07\u0E2D\u0E22\u0E39\u0E48 \u0E08\u0E19\u0E01\u0E27\u0E48\u0E32\u0E08\u0E30\u0E01\u0E14 \"\u0E40\u0E04\u0E25\u0E35\u0E22\u0E23\u0E4C\u0E02\u0E49\u0E2D\u0E21\u0E39\u0E25\u0E17\u0E31\u0E49\u0E07\u0E2B\u0E21\u0E14\""),
+                    React.createElement("div", { className: "grid grid-cols-2 sm:grid-cols-4 gap-4" },
+                        React.createElement(Field, { label: "\u0E40\u0E1E\u0E28" },
+                            React.createElement(SegButton, { options: [{ k: "female", l: "หญิง" }, { k: "male", l: "ชาย" }], value: gender, onChange: setGender })),
+                        React.createElement(Field, { label: "\u0E2D\u0E32\u0E22\u0E38 (\u0E1B\u0E35)" },
+                            React.createElement(NumInput, { value: age, onChange: setAge, min: 0, max: 99 })),
+                        React.createElement(Field, { label: "\u0E0A\u0E31\u0E49\u0E19\u0E2D\u0E32\u0E0A\u0E35\u0E1E" },
+                            React.createElement(SegButton, { options: [{ k: 1, l: "1" }, { k: 2, l: "2" }, { k: 3, l: "3" }], value: occClass, onChange: setOccClass })),
+                        React.createElement(Field, { label: "\u0E07\u0E27\u0E14\u0E0A\u0E33\u0E23\u0E30\u0E40\u0E1A\u0E35\u0E49\u0E22" },
+                            React.createElement("select", { value: payMode, onChange: (e) => setPayMode(e.target.value), className: "w-full rounded-xl border px-3 py-2.5 text-[24px]", style: { borderColor: "#D7E8F0" } }, PAY_MODE.map((m) => React.createElement("option", { key: m.key, value: m.key }, m.label)))))),
+                age >= 0 && age <= 14 && (() => {
+                    const csProduct = PRODUCTS.find((p) => p.id === "CS");
+                    const csMandatory = selected.CANCERMAX && !csDisabled;
+                    return (React.createElement("section", { className: "rounded-2xl p-5", style: { background: "#FFF9EE", boxShadow: "0 6px 24px rgba(11,42,85,0.07)", border: "1.5px solid #F3D98B" } },
+                        React.createElement("h2", { className: "text-[27px] font-bold mb-1", style: { color: BRAND.mainBlue } }, "\uD83D\uDEE1\uFE0F \u0E04\u0E38\u0E49\u0E21\u0E04\u0E23\u0E2D\u0E07\u0E01\u0E32\u0E23\u0E0A\u0E33\u0E23\u0E30\u0E40\u0E1A\u0E35\u0E49\u0E22 (\u0E04\u0E0A.)"),
+                        React.createElement("p", { className: "text-[21px] mb-3", style: { color: BRAND.sub } }, csMandatory
+                            ? "จำเป็นต้องซื้อคู่กับแคนเซอร์ แม็กซ์ สำหรับผู้เยาว์อายุ 0-14 ปี ระบบติ๊กเลือกให้อัตโนมัติแล้ว"
+                            : "ลูกค้าอายุ 0-14 ปี เข้าเงื่อนไขสัญญานี้ — คุ้มครองผู้ปกครองที่ชำระเบี้ย หากเสียชีวิตหรือทุพพลภาพถาวรสิ้นเชิง บริษัทจะชำระเบี้ยแทนให้จนครบกำหนด แนะนำให้พิจารณาทุกครั้ง"),
+                        React.createElement(ProductRow, { product: csProduct, checked: selected.CS, onToggle: () => toggle("CS"), age: age, live: liveResults.CS, pending: PRIMARY_FIELD_ZERO.CS, disabled: csDisabled || selected.UNJAI || selected.PRESTIGE, recommended: false, expanded: !!openProductCards.CS, onToggleExpand: () => toggleProductCard("CS") }, renderProductChildren(csProduct))));
+                })(),
+                React.createElement("section", { className: "rounded-2xl p-5", style: { background: BRAND.card, boxShadow: "0 6px 24px rgba(11,42,85,0.07)" } },
+                    React.createElement("h2", { className: "text-[27px] font-semibold mb-1", style: { color: BRAND.navy } }, "\u0E25\u0E39\u0E01\u0E04\u0E49\u0E32\u0E01\u0E31\u0E07\u0E27\u0E25\u0E40\u0E23\u0E37\u0E48\u0E2D\u0E07\u0E2D\u0E30\u0E44\u0E23\u0E40\u0E1B\u0E47\u0E19\u0E1E\u0E34\u0E40\u0E28\u0E29?"),
+                    React.createElement("p", { className: "text-[21px] mb-3", style: { color: BRAND.sub } }, "\u0E40\u0E25\u0E37\u0E2D\u0E01\u0E44\u0E14\u0E49\u0E21\u0E32\u0E01\u0E01\u0E27\u0E48\u0E32 1 \u0E02\u0E49\u0E2D \u0E23\u0E30\u0E1A\u0E1A\u0E08\u0E30\u0E02\u0E36\u0E49\u0E19\u0E1B\u0E49\u0E32\u0E22 \"\u2B50 \u0E41\u0E19\u0E30\u0E19\u0E33\" \u0E44\u0E27\u0E49\u0E17\u0E35\u0E48\u0E41\u0E1A\u0E1A\u0E1B\u0E23\u0E30\u0E01\u0E31\u0E19\u0E17\u0E35\u0E48\u0E40\u0E01\u0E35\u0E48\u0E22\u0E27\u0E02\u0E49\u0E2D\u0E07\u0E14\u0E49\u0E32\u0E19\u0E25\u0E48\u0E32\u0E07\u0E41\u0E25\u0E30\u0E40\u0E25\u0E37\u0E48\u0E2D\u0E19\u0E02\u0E36\u0E49\u0E19\u0E21\u0E32\u0E1A\u0E19\u0E2A\u0E38\u0E14 \u2014 \u0E16\u0E49\u0E32\u0E2D\u0E19\u0E38\u0E2A\u0E31\u0E0D\u0E0D\u0E32\u0E17\u0E35\u0E48\u0E41\u0E19\u0E30\u0E19\u0E33\u0E15\u0E49\u0E2D\u0E07\u0E0B\u0E37\u0E49\u0E2D\u0E04\u0E39\u0E48\u0E01\u0E31\u0E1A\u0E17\u0E38\u0E19\u0E1B\u0E23\u0E30\u0E01\u0E31\u0E19\u0E2B\u0E25\u0E31\u0E01 \u0E23\u0E30\u0E1A\u0E1A\u0E08\u0E30\u0E41\u0E19\u0E30\u0E19\u0E33\u0E17\u0E38\u0E19\u0E2B\u0E25\u0E31\u0E01\u0E17\u0E35\u0E48\u0E40\u0E1A\u0E35\u0E49\u0E22\u0E16\u0E39\u0E01\u0E17\u0E35\u0E48\u0E2A\u0E38\u0E14\u0E2A\u0E33\u0E2B\u0E23\u0E31\u0E1A\u0E2D\u0E32\u0E22\u0E38\u0E19\u0E35\u0E49\u0E21\u0E32\u0E04\u0E39\u0E48\u0E01\u0E31\u0E19\u0E43\u0E2B\u0E49\u0E14\u0E49\u0E27\u0E22 (\u0E40\u0E17\u0E35\u0E22\u0E1A\u0E40\u0E09\u0E1E\u0E32\u0E30\u0E2A\u0E38\u0E14\u0E04\u0E38\u0E49\u0E21/99-99 \u0E40\u0E1E\u0E23\u0E32\u0E30\u0E17\u0E38\u0E19\u0E02\u0E31\u0E49\u0E19\u0E15\u0E48\u0E33\u0E19\u0E49\u0E2D\u0E22\u0E2A\u0E38\u0E14) \u0E2B\u0E23\u0E37\u0E2D\u0E02\u0E49\u0E32\u0E21\u0E02\u0E31\u0E49\u0E19\u0E15\u0E2D\u0E19\u0E19\u0E35\u0E49\u0E41\u0E25\u0E49\u0E27\u0E40\u0E25\u0E37\u0E2D\u0E01\u0E41\u0E1A\u0E1A\u0E1B\u0E23\u0E30\u0E01\u0E31\u0E19\u0E40\u0E2D\u0E07\u0E44\u0E14\u0E49\u0E40\u0E25\u0E22"),
+                    React.createElement("div", { className: "flex flex-wrap gap-2" },
+                        CONCERNS.map((c) => {
+                            const active = selectedConcerns.includes(c.id);
+                            return (React.createElement("button", { key: c.id, onClick: () => toggleConcern(c.id), className: "flex items-center gap-1.5 text-[21px] font-medium px-3.5 py-2.5 rounded-full border", style: { borderColor: active ? BRAND.green : "#D7E8F0", background: active ? "#F0FAE6" : "#fff", color: active ? BRAND.greenDeep : BRAND.navy } },
+                                React.createElement("span", null, c.icon),
+                                " ",
+                                c.label));
+                        }),
+                        React.createElement("button", { onClick: () => setSavingsGroupOpen((o) => !o), className: "flex items-center gap-1.5 text-[21px] font-medium px-3.5 py-2.5 rounded-full border", style: { borderColor: savingsGroupOpen ? BRAND.green : "#D7E8F0", background: savingsGroupOpen ? "#F0FAE6" : "#fff", color: savingsGroupOpen ? BRAND.greenDeep : BRAND.navy } },
+                            React.createElement("span", null, "\uD83D\uDCB0"),
+                            " \u0E1B\u0E23\u0E30\u0E01\u0E31\u0E19\u0E2A\u0E30\u0E2A\u0E21\u0E17\u0E23\u0E31\u0E1E\u0E22\u0E4C"),
+                        React.createElement("button", { onClick: () => setPensionGroupOpen((o) => !o), className: "flex items-center gap-1.5 text-[21px] font-medium px-3.5 py-2.5 rounded-full border", style: { borderColor: pensionGroupOpen ? BRAND.green : "#D7E8F0", background: pensionGroupOpen ? "#F0FAE6" : "#fff", color: pensionGroupOpen ? BRAND.greenDeep : BRAND.navy } },
+                            React.createElement("span", null, "\uD83C\uDFD6\uFE0F"),
+                            " \u0E1B\u0E23\u0E30\u0E01\u0E31\u0E19\u0E1A\u0E33\u0E19\u0E32\u0E0D"),
+                        selectedConcerns.length > 0 && (React.createElement("button", { onClick: () => { setSelectedConcerns([]); setPickedRecommendations([]); }, className: "flex items-center gap-1.5 text-[21px] font-medium px-3.5 py-2.5 rounded-full", style: { background: "#FDEAEA", color: BRAND.danger } }, "\u2715 \u0E25\u0E49\u0E32\u0E07\u0E01\u0E32\u0E23\u0E40\u0E25\u0E37\u0E2D\u0E01")))),
+                savingsGroupOpen && (React.createElement("section", { id: "savings-group-section", className: "rounded-2xl p-4", style: { background: "#FFF9EE", boxShadow: "0 6px 24px rgba(11,42,85,0.07)", border: "1.5px solid #F3D98B" } },
+                    React.createElement("div", { className: "flex items-center justify-between mb-1" },
+                        React.createElement("h2", { className: "text-[24px] font-bold px-1", style: { color: BRAND.mainBlue } }, "\uD83D\uDCB0 \u0E1B\u0E23\u0E30\u0E01\u0E31\u0E19\u0E2A\u0E30\u0E2A\u0E21\u0E17\u0E23\u0E31\u0E1E\u0E22\u0E4C"),
+                        React.createElement("button", { onClick: () => setSavingsGroupOpen(false), className: "text-[19px] font-medium px-2 py-1", style: { color: BRAND.sub } }, "\u2715 \u0E1B\u0E34\u0E14")),
+                    React.createElement("p", { className: "text-[16px] mb-3 px-1", style: { color: BRAND.sub } }, "\u0E15\u0E34\u0E4A\u0E01\u0E40\u0E25\u0E37\u0E2D\u0E01\u0E44\u0E14\u0E49\u0E2B\u0E25\u0E32\u0E22\u0E2D\u0E31\u0E19\u0E41\u0E25\u0E49\u0E27\u0E01\u0E14\u0E1B\u0E38\u0E48\u0E21 \"\u0E40\u0E25\u0E37\u0E2D\u0E01\" \u0E14\u0E49\u0E32\u0E19\u0E25\u0E48\u0E32\u0E07\u0E40\u0E1E\u0E37\u0E48\u0E2D\u0E44\u0E1B\u0E01\u0E23\u0E2D\u0E01\u0E02\u0E49\u0E2D\u0E21\u0E39\u0E25 \u00B7 \u0E40\u0E25\u0E37\u0E2D\u0E01\u0E44\u0E14\u0E49\u0E40\u0E1E\u0E35\u0E22\u0E07 1 \u0E41\u0E1A\u0E1A (\u0E17\u0E38\u0E19\u0E1B\u0E23\u0E30\u0E01\u0E31\u0E19\u0E2B\u0E25\u0E31\u0E01\u0E40\u0E25\u0E37\u0E2D\u0E01\u0E44\u0E14\u0E49 1 \u0E41\u0E1A\u0E1A\u0E40\u0E17\u0E48\u0E32\u0E19\u0E31\u0E49\u0E19)"),
+                    React.createElement("div", { className: "grid grid-cols-2 sm:grid-cols-3 gap-1.5 sm:gap-2" }, sortByRecommended(PRODUCTS.filter((p) => SAVINGS_IDS.includes(p.id))).map((p) => (React.createElement(CompactChip, { key: p.id, product: p, checked: !!selected[p.id], picked: pickedRecommendations.includes(p.id), disabled: productDisabled(p), recommended: false, onCheckboxClick: () => { if (selected[p.id])
                             toggle(p.id);
                         else
                             togglePicked(p.id); }, onNameClick: () => { if (selected[p.id])
                             openEditor(p.id);
                         else
-                            togglePicked(p.id); } }))))))),
-                pickedRecommendations.length > 0 && (React.createElement("div", { className: "flex justify-end mt-3 pt-3", style: { borderTop: "1px dashed #D7E8F0" } },
-                    React.createElement("button", { onClick: confirmPickedRecommendations, className: "text-[24px] font-bold px-6 py-3 rounded-full", style: { background: BRAND.navy, color: "#fff" } },
-                        "\u2705 \u0E40\u0E25\u0E37\u0E2D\u0E01 (",
-                        pickedRecommendations.length,
-                        ")")))),
-            PRODUCTS.some((p) => selected[p.id] && openProductCards[p.id]) && (React.createElement("section", { className: "space-y-3" },
-                React.createElement("h2", { className: "text-[24px] font-bold px-1", style: { color: BRAND.mainBlue } }, "\uD83D\uDCDD \u0E01\u0E23\u0E2D\u0E01\u0E02\u0E49\u0E2D\u0E21\u0E39\u0E25\u0E41\u0E1A\u0E1A\u0E1B\u0E23\u0E30\u0E01\u0E31\u0E19\u0E17\u0E35\u0E48\u0E40\u0E25\u0E37\u0E2D\u0E01"),
-                PRODUCTS.filter((p) => selected[p.id] && openProductCards[p.id]).map((p) => (React.createElement(ProductRow, { key: p.id, product: p, checked: selected[p.id], onToggle: () => toggle(p.id), age: age, live: liveResults[p.id], pending: PRIMARY_FIELD_ZERO[p.id], disabled: productDisabled(p), recommended: recommendedProductIds.has(p.id), recommendedReason: autoMainReason[p.id] ? `companion-${autoMainReason[p.id]}` : undefined, expanded: true, onToggleExpand: () => toggleProductCard(p.id), onShowSchedule: () => setScheduleModal({ name: p.name, rows: buildPremiumSchedule(p.id) }) }, renderProductChildren(p)))))),
-            React.createElement("button", { onClick: handleCalculate, className: "w-full rounded-2xl py-4 font-semibold text-white text-[27px] flex items-center justify-center gap-2 transition active:scale-[0.99]", style: { background: `linear-gradient(120deg, ${BRAND.skyDeep}, ${BRAND.navy})`, boxShadow: "0 8px 20px rgba(11,42,85,0.25)" } },
-                React.createElement("span", { style: { fontSize: 22 } }, "🧮"),
-                " \u0E04\u0E33\u0E19\u0E27\u0E13\u0E40\u0E1A\u0E35\u0E49\u0E22\u0E1B\u0E23\u0E30\u0E01\u0E31\u0E19\u0E41\u0E25\u0E30\u0E04\u0E27\u0E32\u0E21\u0E04\u0E38\u0E49\u0E21\u0E04\u0E23\u0E2D\u0E07"),
-            result && (React.createElement("section", { className: "space-y-4" },
-                React.createElement("div", { className: "rounded-2xl p-5 text-white", style: { background: `linear-gradient(120deg, ${BRAND.green}, ${BRAND.greenDeep})` } },
-                    React.createElement("p", { className: "text-[24px] opacity-90" },
-                        "\u0E40\u0E1A\u0E35\u0E49\u0E22\u0E1B\u0E23\u0E30\u0E01\u0E31\u0E19\u0E20\u0E31\u0E22\u0E23\u0E27\u0E21 (",
-                        result.payLabel,
-                        ")"),
-                    React.createElement("p", { className: "text-[54px] font-bold mt-1" }, baht(result.totalPay)),
-                    result.factor !== 1 && React.createElement("p", { className: "text-[24px] mt-1 opacity-90" },
-                        "\u0E40\u0E17\u0E35\u0E22\u0E1A\u0E40\u0E17\u0E48\u0E32\u0E40\u0E1A\u0E35\u0E49\u0E22\u0E23\u0E32\u0E22\u0E1B\u0E35\u0E23\u0E27\u0E21 ",
-                        baht(result.totalYear))),
-                React.createElement(BenefitBoard, { cards: result.cards }),
-                React.createElement("div", { className: "grid sm:grid-cols-2 gap-4" }, result.cards.map((c) => (React.createElement("div", { key: c.id, className: "rounded-2xl overflow-hidden", style: { background: BRAND.card, boxShadow: "0 6px 20px rgba(11,42,85,0.08)", borderTop: `4px solid ${BRAND.sky}`, position: "relative" } },
-                    c.renewalNote && (React.createElement("span", { className: "absolute top-3 right-3 text-[15px] font-medium px-2 py-1 rounded-full z-10", style: { background: BRAND.bg, color: BRAND.sub, border: "1px solid #D7E8F0" } }, c.renewalNote)),
-                    React.createElement("div", { className: "p-5" },
-                        React.createElement("div", { className: "flex items-start justify-between gap-2 pr-16" },
-                            React.createElement("div", null,
-                                React.createElement("p", { className: "text-[21px]", style: { color: BRAND.sub } }, c.tag),
-                                React.createElement("p", { className: "text-[27px] font-bold", style: { color: BRAND.nameBlue } }, c.name)),
-                            React.createElement("button", { onClick: () => setOpenCards((o) => (Object.assign(Object.assign({}, o), { [c.id]: !o[c.id] }))), className: "p-2 rounded-lg", style: { background: BRAND.bg } }, openCards[c.id] ? "▴" : "▾")),
-                        React.createElement("p", { className: "text-[45px] font-bold mt-3", style: { color: BRAND.dataBlack } }, baht(c.premium * result.factor) + (result.factor === 1 ? " / ปี" : "")),
-                        c.isMain && mainPolicyPaymentYears(c.id) > 0 && (React.createElement("p", { className: "text-[18px] mt-1", style: { color: BRAND.sub } },
-                            "(\u0E40\u0E1A\u0E35\u0E49\u0E22\u0E23\u0E27\u0E21\u0E15\u0E25\u0E2D\u0E14\u0E42\u0E04\u0E23\u0E07\u0E01\u0E32\u0E23 ",
-                            mainPolicyPaymentYears(c.id),
-                            " \u0E1B\u0E35 \u2248 ",
-                            baht(Math.round(c.premium * mainPolicyPaymentYears(c.id))),
-                            ")")),
-                        openCards[c.id] && (React.createElement("div", { className: "mt-3 pt-2 rounded-xl overflow-hidden", style: { border: "1px solid #E7EEF3" } }, c.benefits.map(([k, v], i) => (React.createElement("div", { key: i, className: "px-3 py-3", style: { background: i % 2 === 0 ? "#FBFDFE" : "#FFFFFF", borderTop: i === 0 ? "none" : "1px solid #EEF3F7" } },
-                            React.createElement("p", { className: "text-[21px] font-medium leading-snug", style: { color: BRAND.label } }, k),
-                            React.createElement("p", { className: "text-[27px] font-bold leading-snug mt-0.5", style: { color: BRAND.dataBlack } }, v)))))))))))))),
-        modal && (React.createElement("div", { className: "fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4", style: { background: "rgba(8,30,62,0.55)" } },
-            React.createElement("div", { className: "w-full max-w-md rounded-2xl p-5", style: { background: BRAND.card } },
-                React.createElement("div", { className: "flex items-center gap-2 mb-3" },
-                    React.createElement("div", { className: "w-10 h-10 rounded-xl flex items-center justify-center", style: { background: "#FDEAEA" } },
-                        React.createElement("span", { style: { fontSize: 22 } }, "⚠️")),
-                    React.createElement("h3", { className: "text-[27px] font-semibold", style: { color: BRAND.navy } }, "\u0E02\u0E49\u0E2D\u0E21\u0E39\u0E25\u0E44\u0E21\u0E48\u0E15\u0E23\u0E07\u0E15\u0E32\u0E21\u0E40\u0E07\u0E37\u0E48\u0E2D\u0E19\u0E44\u0E02\u0E23\u0E31\u0E1A\u0E1B\u0E23\u0E30\u0E01\u0E31\u0E19")),
-                React.createElement("div", { className: "space-y-2 max-h-72 overflow-y-auto" }, modal.map((e, i) => (React.createElement("div", { key: i, className: "text-[24px] rounded-xl p-3", style: { background: "#FFF5F5" } },
-                    React.createElement("p", { className: "font-medium", style: { color: BRAND.danger } }, e.product),
-                    React.createElement("p", { style: { color: "#7A2E2E" } }, e.msg))))),
-                React.createElement("button", { onClick: () => setModal(null), className: "w-full mt-4 rounded-xl py-3 text-[27px] font-medium text-white flex items-center justify-center gap-1", style: { background: BRAND.navy } },
-                    React.createElement("span", { style: { fontSize: 18 } }, "✕"),
-                    " \u0E1B\u0E34\u0E14\u0E41\u0E25\u0E30\u0E41\u0E01\u0E49\u0E44\u0E02\u0E02\u0E49\u0E2D\u0E21\u0E39\u0E25")))),
-        scheduleModal && (React.createElement("div", { className: "fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4", style: { background: "rgba(8,30,62,0.55)" } },
-            React.createElement("div", { className: "w-full max-w-md rounded-2xl p-5", style: { background: BRAND.card, maxHeight: "85vh", display: "flex", flexDirection: "column" } },
-                React.createElement("div", { className: "flex items-center gap-2 mb-1" },
-                    React.createElement("div", { className: "w-10 h-10 rounded-xl flex items-center justify-center shrink-0", style: { background: BRAND.bg } },
-                        React.createElement("span", { style: { fontSize: 20 } }, "\uD83D\uDCC8")),
-                    React.createElement("h3", { className: "text-[24px] font-semibold", style: { color: BRAND.navy } }, "\u0E2D\u0E31\u0E15\u0E23\u0E32\u0E40\u0E1A\u0E35\u0E49\u0E22\u0E17\u0E35\u0E48\u0E08\u0E30\u0E1B\u0E23\u0E31\u0E1A\u0E43\u0E19\u0E2D\u0E19\u0E32\u0E04\u0E15")),
-                React.createElement("p", { className: "text-[19px] mb-3", style: { color: BRAND.sub } },
-                    scheduleModal.name,
-                    " \u2014 \u0E04\u0E33\u0E19\u0E27\u0E13\u0E08\u0E32\u0E01\u0E17\u0E38\u0E19\u0E1B\u0E23\u0E30\u0E01\u0E31\u0E19/\u0E41\u0E1C\u0E19\u0E17\u0E35\u0E48\u0E40\u0E25\u0E37\u0E2D\u0E01\u0E44\u0E27\u0E49\u0E1B\u0E31\u0E08\u0E08\u0E38\u0E1A\u0E31\u0E19 \u0E15\u0E31\u0E49\u0E07\u0E41\u0E15\u0E48\u0E2D\u0E32\u0E22\u0E38\u0E1B\u0E31\u0E08\u0E08\u0E38\u0E1A\u0E31\u0E19\u0E08\u0E19\u0E16\u0E36\u0E07\u0E1B\u0E35\u0E2A\u0E38\u0E14\u0E17\u0E49\u0E32\u0E22\u0E17\u0E35\u0E48\u0E15\u0E48\u0E2D\u0E2D\u0E32\u0E22\u0E38\u0E04\u0E27\u0E32\u0E21\u0E04\u0E38\u0E49\u0E21\u0E04\u0E23\u0E2D\u0E07\u0E44\u0E14\u0E49"),
-                scheduleModal.rows.length === 0 ? (React.createElement("p", { className: "text-[21px]", style: { color: BRAND.sub } }, "\u0E01\u0E23\u0E38\u0E13\u0E32\u0E01\u0E23\u0E2D\u0E01\u0E02\u0E49\u0E2D\u0E21\u0E39\u0E25 (\u0E17\u0E38\u0E19\u0E1B\u0E23\u0E30\u0E01\u0E31\u0E19/\u0E41\u0E1C\u0E19) \u0E43\u0E2B\u0E49\u0E04\u0E23\u0E1A\u0E01\u0E48\u0E2D\u0E19 \u0E08\u0E36\u0E07\u0E08\u0E30\u0E41\u0E2A\u0E14\u0E07\u0E15\u0E32\u0E23\u0E32\u0E07\u0E2D\u0E31\u0E15\u0E23\u0E32\u0E40\u0E1A\u0E35\u0E49\u0E22\u0E44\u0E14\u0E49")) : (React.createElement("div", { className: "overflow-y-auto rounded-xl border", style: { borderColor: "#D7E8F0", flex: 1 } },
-                    React.createElement("table", { className: "w-full text-[21px]" },
-                        React.createElement("thead", { style: { background: BRAND.bg, position: "sticky", top: 0 } },
-                            React.createElement("tr", null,
-                                React.createElement("th", { className: "text-left px-3 py-2", style: { color: BRAND.navy } }, "\u0E0A\u0E48\u0E27\u0E07\u0E17\u0E35\u0E48\u0E1B\u0E23\u0E31\u0E1A"),
-                                React.createElement("th", { className: "text-right px-3 py-2", style: { color: BRAND.navy } }, "\u0E40\u0E1A\u0E35\u0E49\u0E22\u0E23\u0E32\u0E22\u0E1B\u0E35"))),
-                        React.createElement("tbody", null, scheduleModal.rows.map((r, i) => (React.createElement("tr", { key: i, style: { borderTop: "1px solid #EEF3F7", background: i === 0 ? "#F3FBEF" : "transparent" } },
-                            React.createElement("td", { className: "px-3 py-2", style: { color: BRAND.dataBlack } },
-                                r.label,
-                                i === 0 ? " (ปัจจุบัน)" : ""),
-                            React.createElement("td", { className: "px-3 py-2 text-right font-medium", style: { color: i === 0 ? BRAND.greenDeep : BRAND.dataBlack } }, baht(Math.round(r.premium)))))))))),
-                React.createElement("button", { onClick: () => setScheduleModal(null), className: "w-full mt-4 rounded-xl py-3 text-[24px] font-medium text-white flex items-center justify-center gap-1 shrink-0", style: { background: BRAND.navy } },
-                    React.createElement("span", { style: { fontSize: 18 } }, "✕"),
-                    " \u0E1B\u0E34\u0E14")))),
-        pensionYearModal && (React.createElement("div", { className: "fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4", style: { background: "rgba(8,30,62,0.55)" }, onClick: () => setPensionYearModal(null) },
-            React.createElement("div", { className: "w-full max-w-sm rounded-2xl p-5", style: { background: BRAND.card }, onClick: (e) => e.stopPropagation() },
-                React.createElement("div", { className: "flex items-center gap-2 mb-2" },
-                    React.createElement("div", { className: "w-10 h-10 rounded-xl flex items-center justify-center shrink-0", style: { background: BRAND.bg } },
-                        React.createElement("span", { style: { fontSize: 20 } }, "\uD83D\uDCCA")),
-                    React.createElement("h3", { className: "text-[24px] font-semibold", style: { color: BRAND.navy } },
-                        "IRR \u0E13 \u0E2D\u0E32\u0E22\u0E38 ",
-                        pensionYearModal.age,
-                        " \u0E1B\u0E35")),
-                React.createElement("p", { className: "text-[19px] mb-3", style: { color: BRAND.sub } },
-                    pensionYearModal.name,
-                    " \u2014 \u0E2D\u0E31\u0E15\u0E23\u0E32\u0E1C\u0E25\u0E15\u0E2D\u0E1A\u0E41\u0E17\u0E19\u0E2B\u0E32\u0E01\u0E04\u0E34\u0E14\u0E01\u0E23\u0E30\u0E41\u0E2A\u0E40\u0E07\u0E34\u0E19\u0E2A\u0E14\u0E2A\u0E30\u0E2A\u0E21\u0E17\u0E31\u0E49\u0E07\u0E2B\u0E21\u0E14\u0E08\u0E19\u0E16\u0E36\u0E07\u0E2D\u0E32\u0E22\u0E38\u0E19\u0E35\u0E49\u0E40\u0E1B\u0E47\u0E19\u0E08\u0E38\u0E14\u0E2A\u0E34\u0E49\u0E19\u0E2A\u0E38\u0E14"),
-                React.createElement("div", { className: "rounded-xl p-4 text-center", style: { background: BRAND.bg } },
-                    React.createElement("span", { className: "text-[36px] font-bold", style: { color: BRAND.greenDeep } }, pensionYearModal.irr !== null && pensionYearModal.irr !== undefined ? (pensionYearModal.irr * 100).toFixed(2) + "%" : "คำนวณไม่ได้ (ยังไม่มีบำนาญเข้าในช่วงนี้)")),
-                React.createElement("button", { onClick: () => setPensionYearModal(null), className: "w-full mt-4 rounded-xl py-3 text-[24px] font-medium text-white flex items-center justify-center gap-1", style: { background: BRAND.navy } },
-                    React.createElement("span", { style: { fontSize: 18 } }, "✕"),
-                    " \u0E1B\u0E34\u0E14")))),
+                            togglePicked(p.id); } })))),
+                    React.createElement("button", { onClick: () => setCompareOpen((o) => !o), className: "w-full text-[21px] font-semibold px-4 py-2.5 rounded-xl mt-3", style: { background: "#fff", color: BRAND.warn, border: `1.5px solid ${BRAND.warn}` } }, compareOpen ? "▴ ซ่อนตารางเทียบทุกแบบ" : "▾ เทียบทุกแบบ (IRR)"),
+                    compareOpen && (React.createElement("div", { className: "mt-2" },
+                        React.createElement(PlanRow, { label: "\u0E17\u0E38\u0E19\u0E1B\u0E23\u0E30\u0E01\u0E31\u0E19\u0E17\u0E35\u0E48\u0E43\u0E0A\u0E49\u0E40\u0E1B\u0E23\u0E35\u0E22\u0E1A\u0E40\u0E17\u0E35\u0E22\u0E1A (\u0E1A\u0E32\u0E17)" },
+                            React.createElement(NumInput, { value: compareSI, onChange: setCompareSI, min: 0, step: 100000 })),
+                        React.createElement("p", { className: "text-[16px] mb-2 px-1", style: { color: BRAND.sub } }, "\u0E43\u0E0A\u0E49\u0E2D\u0E32\u0E22\u0E38/\u0E40\u0E1E\u0E28\u0E1B\u0E31\u0E08\u0E08\u0E38\u0E1A\u0E31\u0E19\u0E02\u0E2D\u0E07\u0E25\u0E39\u0E01\u0E04\u0E49\u0E32\u0E17\u0E35\u0E48\u0E01\u0E23\u0E2D\u0E01\u0E44\u0E27\u0E49\u0E14\u0E49\u0E32\u0E19\u0E1A\u0E19 \u00B7 \u0E41\u0E2E\u0E1B\u0E1B\u0E35\u0E49\u0E40\u0E0B\u0E1F\u0E27\u0E34\u0E48\u0E07\u0E43\u0E0A\u0E49\u0E40\u0E1A\u0E35\u0E49\u0E22 5 \u0E1B\u0E35 (\u0E2A\u0E31\u0E49\u0E19\u0E2A\u0E38\u0E14) \u0E40\u0E1B\u0E47\u0E19\u0E04\u0E48\u0E32\u0E40\u0E23\u0E34\u0E48\u0E21\u0E15\u0E49\u0E19 \u00B7 \u0E40\u0E23\u0E35\u0E22\u0E07\u0E08\u0E32\u0E01 IRR \u0E2A\u0E39\u0E07\u0E44\u0E1B\u0E15\u0E48\u0E33"),
+                        React.createElement("div", { className: "rounded-xl border overflow-x-auto", style: { borderColor: "#D7E8F0" } },
+                            React.createElement("table", { className: "w-full text-[18px]", style: { minWidth: 560 } },
+                                React.createElement("thead", { style: { background: BRAND.bg } },
+                                    React.createElement("tr", null,
+                                        React.createElement("th", { className: "text-left px-2 py-2", style: { color: BRAND.navy } }, "\u0E2D\u0E31\u0E19\u0E14\u0E31\u0E1A"),
+                                        React.createElement("th", { className: "text-left px-2 py-2", style: { color: BRAND.navy } }, "\u0E41\u0E1A\u0E1A\u0E1B\u0E23\u0E30\u0E01\u0E31\u0E19"),
+                                        React.createElement("th", { className: "text-right px-2 py-2", style: { color: BRAND.navy } }, "\u0E40\u0E1A\u0E35\u0E49\u0E22/\u0E1B\u0E35"),
+                                        React.createElement("th", { className: "text-center px-2 py-2", style: { color: BRAND.navy } }, "\u0E1B\u0E35\u0E0A\u0E33\u0E23\u0E30/\u0E04\u0E38\u0E49\u0E21\u0E04\u0E23\u0E2D\u0E07"),
+                                        React.createElement("th", { className: "text-right px-2 py-2", style: { color: BRAND.navy } }, "IRR"))),
+                                React.createElement("tbody", null, (() => {
+                                    const cmp = buildComparisonRows(compareSI);
+                                    return cmp.length === 0 ? (React.createElement("tr", null,
+                                        React.createElement("td", { colSpan: 5, className: "text-center px-2 py-4", style: { color: BRAND.sub } }, "\u0E44\u0E21\u0E48\u0E21\u0E35\u0E41\u0E1A\u0E1A\u0E43\u0E14\u0E23\u0E2D\u0E07\u0E23\u0E31\u0E1A\u0E17\u0E38\u0E19\u0E1B\u0E23\u0E30\u0E01\u0E31\u0E19/\u0E2D\u0E32\u0E22\u0E38\u0E19\u0E35\u0E49"))) : cmp.map((r, i) => (React.createElement("tr", { key: r.id, style: { borderTop: "1px solid #EEF3F7", background: i === 0 ? "#F3FBEF" : "transparent" } },
+                                        React.createElement("td", { className: "px-2 py-2", style: { color: BRAND.dataBlack } }, i + 1),
+                                        React.createElement("td", { className: "px-2 py-2", style: { color: BRAND.dataBlack } }, r.name),
+                                        React.createElement("td", { className: "text-right px-2 py-2", style: { color: BRAND.dataBlack } }, fmt(r.premium)),
+                                        React.createElement("td", { className: "text-center px-2 py-2", style: { color: BRAND.dataBlack } },
+                                            r.payYears,
+                                            "/",
+                                            r.totalYears),
+                                        React.createElement("td", { className: "text-right px-2 py-2 font-bold", style: { color: i === 0 ? BRAND.greenDeep : BRAND.dataBlack } }, r.irr !== null && r.irr !== undefined ? (r.irr * 100).toFixed(2) + "%" : "-"))));
+                                })()))))),
+                    pickedRecommendations.some((id) => SAVINGS_IDS.includes(id)) && (React.createElement("div", { className: "flex justify-end mt-3 pt-3", style: { borderTop: "1px dashed #F3D98B" } },
+                        React.createElement("button", { onClick: confirmPickedRecommendations, className: "text-[24px] font-bold px-6 py-3 rounded-full", style: { background: BRAND.navy, color: "#fff" } },
+                            "\u2705 \u0E40\u0E25\u0E37\u0E2D\u0E01 (",
+                            pickedRecommendations.filter((id) => SAVINGS_IDS.includes(id)).length,
+                            ")"))))),
+                pensionGroupOpen && (React.createElement("section", { id: "pension-group-section", className: "rounded-2xl p-4", style: { background: "#EFF7FB", boxShadow: "0 6px 24px rgba(11,42,85,0.07)", border: "1.5px solid #BFE0F0" } },
+                    React.createElement("div", { className: "flex items-center justify-between mb-1" },
+                        React.createElement("h2", { className: "text-[24px] font-bold px-1", style: { color: BRAND.mainBlue } }, "\uD83C\uDFD6\uFE0F \u0E1B\u0E23\u0E30\u0E01\u0E31\u0E19\u0E1A\u0E33\u0E19\u0E32\u0E0D"),
+                        React.createElement("button", { onClick: () => setPensionGroupOpen(false), className: "text-[19px] font-medium px-2 py-1", style: { color: BRAND.sub } }, "\u2715 \u0E1B\u0E34\u0E14")),
+                    React.createElement("p", { className: "text-[16px] mb-3 px-1", style: { color: BRAND.sub } }, "\u0E15\u0E34\u0E4A\u0E01\u0E40\u0E25\u0E37\u0E2D\u0E01\u0E44\u0E14\u0E49\u0E2B\u0E25\u0E32\u0E22\u0E2D\u0E31\u0E19\u0E41\u0E25\u0E49\u0E27\u0E01\u0E14\u0E1B\u0E38\u0E48\u0E21 \"\u0E40\u0E25\u0E37\u0E2D\u0E01\" \u0E14\u0E49\u0E32\u0E19\u0E25\u0E48\u0E32\u0E07\u0E40\u0E1E\u0E37\u0E48\u0E2D\u0E44\u0E1B\u0E01\u0E23\u0E2D\u0E01\u0E02\u0E49\u0E2D\u0E21\u0E39\u0E25 \u00B7 \u0E40\u0E25\u0E37\u0E2D\u0E01\u0E44\u0E14\u0E49\u0E40\u0E1E\u0E35\u0E22\u0E07 1 \u0E41\u0E1A\u0E1A (\u0E17\u0E38\u0E19\u0E1B\u0E23\u0E30\u0E01\u0E31\u0E19\u0E2B\u0E25\u0E31\u0E01\u0E40\u0E25\u0E37\u0E2D\u0E01\u0E44\u0E14\u0E49 1 \u0E41\u0E1A\u0E1A\u0E40\u0E17\u0E48\u0E32\u0E19\u0E31\u0E49\u0E19)"),
+                    React.createElement("div", { className: "grid grid-cols-2 sm:grid-cols-3 gap-1.5 sm:gap-2" }, sortByRecommended(PRODUCTS.filter((p) => PENSION_IDS.includes(p.id))).map((p) => (React.createElement(CompactChip, { key: p.id, product: p, checked: !!selected[p.id], picked: pickedRecommendations.includes(p.id), disabled: productDisabled(p), recommended: false, onCheckboxClick: () => { if (selected[p.id])
+                            toggle(p.id);
+                        else
+                            togglePicked(p.id); }, onNameClick: () => { if (selected[p.id])
+                            openEditor(p.id);
+                        else
+                            togglePicked(p.id); } })))),
+                    pickedRecommendations.some((id) => PENSION_IDS.includes(id)) && (React.createElement("div", { className: "flex justify-end mt-3 pt-3", style: { borderTop: "1px dashed #BFE0F0" } },
+                        React.createElement("button", { onClick: confirmPickedRecommendations, className: "text-[24px] font-bold px-6 py-3 rounded-full", style: { background: BRAND.navy, color: "#fff" } },
+                            "\u2705 \u0E40\u0E25\u0E37\u0E2D\u0E01 (",
+                            pickedRecommendations.filter((id) => PENSION_IDS.includes(id)).length,
+                            ")"))))),
+                React.createElement("section", { className: "rounded-2xl p-4", style: { background: BRAND.card, boxShadow: "0 6px 24px rgba(11,42,85,0.07)" } },
+                    React.createElement("h2", { className: "text-[24px] font-bold mb-1 px-1", style: { color: BRAND.mainBlue } }, "\u0E20\u0E32\u0E1E\u0E23\u0E27\u0E21\u0E41\u0E1A\u0E1A\u0E1B\u0E23\u0E30\u0E01\u0E31\u0E19\u0E17\u0E31\u0E49\u0E07\u0E2B\u0E21\u0E14"),
+                    React.createElement("p", { className: "text-[16px] mb-3 px-1", style: { color: BRAND.sub } }, "\u0E15\u0E34\u0E4A\u0E01\u0E40\u0E25\u0E37\u0E2D\u0E01\u0E44\u0E14\u0E49\u0E2B\u0E25\u0E32\u0E22\u0E2D\u0E31\u0E19\u0E1E\u0E23\u0E49\u0E2D\u0E21\u0E01\u0E31\u0E19 \u0E41\u0E25\u0E49\u0E27\u0E01\u0E14\u0E1B\u0E38\u0E48\u0E21 \"\u0E40\u0E25\u0E37\u0E2D\u0E01\" \u0E14\u0E49\u0E32\u0E19\u0E25\u0E48\u0E32\u0E07\u0E40\u0E1E\u0E37\u0E48\u0E2D\u0E44\u0E1B\u0E01\u0E23\u0E2D\u0E01\u0E02\u0E49\u0E2D\u0E21\u0E39\u0E25 \u00B7 \u0E17\u0E38\u0E19\u0E2B\u0E25\u0E31\u0E01\u0E40\u0E25\u0E37\u0E2D\u0E01\u0E44\u0E14\u0E49 1 \u0E41\u0E1A\u0E1A"),
+                    (selected.UNJAI || selected.CANCERMAX) && (React.createElement("p", { className: "text-[16px] mb-2 px-1 font-medium", style: { color: BRAND.warn } },
+                        "\u26A0 ",
+                        selected.UNJAI ? "อุ่นใจ โรคร้าย" : "แคนเซอร์ แม็กซ์",
+                        " \u0E40\u0E1B\u0E47\u0E19\u0E41\u0E1E\u0E47\u0E01\u0E40\u0E01\u0E08\u0E1B\u0E34\u0E14 \u0E44\u0E21\u0E48\u0E2A\u0E32\u0E21\u0E32\u0E23\u0E16\u0E0B\u0E37\u0E49\u0E2D\u0E2A\u0E31\u0E0D\u0E0D\u0E32\u0E40\u0E1E\u0E34\u0E48\u0E21\u0E40\u0E15\u0E34\u0E21\u0E2D\u0E37\u0E48\u0E19\u0E40\u0E1E\u0E34\u0E48\u0E21\u0E44\u0E14\u0E49",
+                        selected.CANCERMAX ? " ยกเว้น คช. ซึ่งผู้เยาว์อายุ 0-14 ปี ต้องซื้อเพิ่มด้วย" : "")),
+                    React.createElement("div", { className: "grid grid-cols-4 gap-1.5 sm:gap-2" }, CATEGORY_GROUPS.map((group) => (React.createElement("div", { key: group.id, className: "space-y-1" },
+                        React.createElement("p", { className: "text-[13px] sm:text-[14px] font-bold text-center leading-tight px-0.5 py-1.5 rounded-lg", style: { background: BRAND.bg, color: BRAND.navy } }, group.label),
+                        sortByRecommended(PRODUCTS.filter((p) => group.ids.includes(p.id))).map((p) => (React.createElement(CompactChip, { key: p.id, product: p, checked: !!selected[p.id], picked: pickedRecommendations.includes(p.id), disabled: productDisabled(p), recommended: recommendedProductIds.has(p.id), tag: COMPACT_TAG[p.id], onCheckboxClick: () => { if (selected[p.id])
+                                toggle(p.id);
+                            else
+                                togglePicked(p.id); }, onNameClick: () => { if (selected[p.id])
+                                openEditor(p.id);
+                            else
+                                togglePicked(p.id); } }))))))),
+                    pickedRecommendations.length > 0 && (React.createElement("div", { className: "flex justify-end mt-3 pt-3", style: { borderTop: "1px dashed #D7E8F0" } },
+                        React.createElement("button", { onClick: confirmPickedRecommendations, className: "text-[24px] font-bold px-6 py-3 rounded-full", style: { background: BRAND.navy, color: "#fff" } },
+                            "\u2705 \u0E40\u0E25\u0E37\u0E2D\u0E01 (",
+                            pickedRecommendations.length,
+                            ")")))),
+                PRODUCTS.some((p) => selected[p.id] && openProductCards[p.id]) && (React.createElement("section", { className: "space-y-3" },
+                    React.createElement("h2", { className: "text-[24px] font-bold px-1", style: { color: BRAND.mainBlue } }, "\uD83D\uDCDD \u0E01\u0E23\u0E2D\u0E01\u0E02\u0E49\u0E2D\u0E21\u0E39\u0E25\u0E41\u0E1A\u0E1A\u0E1B\u0E23\u0E30\u0E01\u0E31\u0E19\u0E17\u0E35\u0E48\u0E40\u0E25\u0E37\u0E2D\u0E01"),
+                    PRODUCTS.filter((p) => selected[p.id] && openProductCards[p.id]).map((p) => (React.createElement(ProductRow, { key: p.id, product: p, checked: selected[p.id], onToggle: () => toggle(p.id), age: age, live: liveResults[p.id], pending: PRIMARY_FIELD_ZERO[p.id], disabled: productDisabled(p), recommended: recommendedProductIds.has(p.id), recommendedReason: autoMainReason[p.id] ? `companion-${autoMainReason[p.id]}` : undefined, expanded: true, onToggleExpand: () => toggleProductCard(p.id), onShowSchedule: () => setScheduleModal({ name: p.name, rows: buildPremiumSchedule(p.id) }) }, renderProductChildren(p)))))),
+                React.createElement("button", { onClick: handleCalculate, className: "w-full rounded-2xl py-4 font-semibold text-white text-[27px] flex items-center justify-center gap-2 transition active:scale-[0.99]", style: { background: `linear-gradient(120deg, ${BRAND.skyDeep}, ${BRAND.navy})`, boxShadow: "0 8px 20px rgba(11,42,85,0.25)" } },
+                    React.createElement("span", { style: { fontSize: 22 } }, "🧮"),
+                    " \u0E04\u0E33\u0E19\u0E27\u0E13\u0E40\u0E1A\u0E35\u0E49\u0E22\u0E1B\u0E23\u0E30\u0E01\u0E31\u0E19\u0E41\u0E25\u0E30\u0E04\u0E27\u0E32\u0E21\u0E04\u0E38\u0E49\u0E21\u0E04\u0E23\u0E2D\u0E07"),
+                result && (React.createElement("section", { className: "space-y-4" },
+                    React.createElement("div", { className: "rounded-2xl p-5 text-white", style: { background: `linear-gradient(120deg, ${BRAND.green}, ${BRAND.greenDeep})` } },
+                        React.createElement("p", { className: "text-[24px] opacity-90" },
+                            "\u0E40\u0E1A\u0E35\u0E49\u0E22\u0E1B\u0E23\u0E30\u0E01\u0E31\u0E19\u0E20\u0E31\u0E22\u0E23\u0E27\u0E21 (",
+                            result.payLabel,
+                            ")"),
+                        React.createElement("p", { className: "text-[54px] font-bold mt-1" }, baht(result.totalPay)),
+                        result.factor !== 1 && React.createElement("p", { className: "text-[24px] mt-1 opacity-90" },
+                            "\u0E40\u0E17\u0E35\u0E22\u0E1A\u0E40\u0E17\u0E48\u0E32\u0E40\u0E1A\u0E35\u0E49\u0E22\u0E23\u0E32\u0E22\u0E1B\u0E35\u0E23\u0E27\u0E21 ",
+                            baht(result.totalYear))),
+                    React.createElement(BenefitBoard, { cards: result.cards }),
+                    React.createElement("div", { className: "grid sm:grid-cols-2 gap-4" }, result.cards.map((c) => (React.createElement("div", { key: c.id, className: "rounded-2xl overflow-hidden", style: { background: BRAND.card, boxShadow: "0 6px 20px rgba(11,42,85,0.08)", borderTop: `4px solid ${BRAND.sky}`, position: "relative" } },
+                        c.renewalNote && (React.createElement("span", { className: "absolute top-3 right-3 text-[15px] font-medium px-2 py-1 rounded-full z-10", style: { background: BRAND.bg, color: BRAND.sub, border: "1px solid #D7E8F0" } }, c.renewalNote)),
+                        React.createElement("div", { className: "p-5" },
+                            React.createElement("div", { className: "flex items-start justify-between gap-2 pr-16" },
+                                React.createElement("div", null,
+                                    React.createElement("p", { className: "text-[21px]", style: { color: BRAND.sub } }, c.tag),
+                                    React.createElement("p", { className: "text-[27px] font-bold", style: { color: BRAND.nameBlue } }, c.name)),
+                                React.createElement("button", { onClick: () => setOpenCards((o) => (Object.assign(Object.assign({}, o), { [c.id]: !o[c.id] }))), className: "p-2 rounded-lg", style: { background: BRAND.bg } }, openCards[c.id] ? "▴" : "▾")),
+                            React.createElement("p", { className: "text-[45px] font-bold mt-3", style: { color: BRAND.dataBlack } }, baht(c.premium * result.factor) + (result.factor === 1 ? " / ปี" : "")),
+                            c.isMain && mainPolicyPaymentYears(c.id) > 0 && (React.createElement("p", { className: "text-[18px] mt-1", style: { color: BRAND.sub } },
+                                "(\u0E40\u0E1A\u0E35\u0E49\u0E22\u0E23\u0E27\u0E21\u0E15\u0E25\u0E2D\u0E14\u0E42\u0E04\u0E23\u0E07\u0E01\u0E32\u0E23 ",
+                                mainPolicyPaymentYears(c.id),
+                                " \u0E1B\u0E35 \u2248 ",
+                                baht(Math.round(c.premium * mainPolicyPaymentYears(c.id))),
+                                ")")),
+                            openCards[c.id] && (React.createElement("div", { className: "mt-3 pt-2 rounded-xl overflow-hidden", style: { border: "1px solid #E7EEF3" } }, c.benefits.map(([k, v], i) => (React.createElement("div", { key: i, className: "px-3 py-3", style: { background: i % 2 === 0 ? "#FBFDFE" : "#FFFFFF", borderTop: i === 0 ? "none" : "1px solid #EEF3F7" } },
+                                React.createElement("p", { className: "text-[21px] font-medium leading-snug", style: { color: BRAND.label } }, k),
+                                React.createElement("p", { className: "text-[27px] font-bold leading-snug mt-0.5", style: { color: BRAND.dataBlack } }, v)))))))))))))),
+            modal && (React.createElement("div", { className: "fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4", style: { background: "rgba(8,30,62,0.55)" } },
+                React.createElement("div", { className: "w-full max-w-md rounded-2xl p-5", style: { background: BRAND.card } },
+                    React.createElement("div", { className: "flex items-center gap-2 mb-3" },
+                        React.createElement("div", { className: "w-10 h-10 rounded-xl flex items-center justify-center", style: { background: "#FDEAEA" } },
+                            React.createElement("span", { style: { fontSize: 22 } }, "⚠️")),
+                        React.createElement("h3", { className: "text-[27px] font-semibold", style: { color: BRAND.navy } }, "\u0E02\u0E49\u0E2D\u0E21\u0E39\u0E25\u0E44\u0E21\u0E48\u0E15\u0E23\u0E07\u0E15\u0E32\u0E21\u0E40\u0E07\u0E37\u0E48\u0E2D\u0E19\u0E44\u0E02\u0E23\u0E31\u0E1A\u0E1B\u0E23\u0E30\u0E01\u0E31\u0E19")),
+                    React.createElement("div", { className: "space-y-2 max-h-72 overflow-y-auto" }, modal.map((e, i) => (React.createElement("div", { key: i, className: "text-[24px] rounded-xl p-3", style: { background: "#FFF5F5" } },
+                        React.createElement("p", { className: "font-medium", style: { color: BRAND.danger } }, e.product),
+                        React.createElement("p", { style: { color: "#7A2E2E" } }, e.msg))))),
+                    React.createElement("button", { onClick: () => setModal(null), className: "w-full mt-4 rounded-xl py-3 text-[27px] font-medium text-white flex items-center justify-center gap-1", style: { background: BRAND.navy } },
+                        React.createElement("span", { style: { fontSize: 18 } }, "✕"),
+                        " \u0E1B\u0E34\u0E14\u0E41\u0E25\u0E30\u0E41\u0E01\u0E49\u0E44\u0E02\u0E02\u0E49\u0E2D\u0E21\u0E39\u0E25")))),
+            scheduleModal && (React.createElement("div", { className: "fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4", style: { background: "rgba(8,30,62,0.55)" } },
+                React.createElement("div", { className: "w-full max-w-md rounded-2xl p-5", style: { background: BRAND.card, maxHeight: "85vh", display: "flex", flexDirection: "column" } },
+                    React.createElement("div", { className: "flex items-center gap-2 mb-1" },
+                        React.createElement("div", { className: "w-10 h-10 rounded-xl flex items-center justify-center shrink-0", style: { background: BRAND.bg } },
+                            React.createElement("span", { style: { fontSize: 20 } }, "\uD83D\uDCC8")),
+                        React.createElement("h3", { className: "text-[24px] font-semibold", style: { color: BRAND.navy } }, "\u0E2D\u0E31\u0E15\u0E23\u0E32\u0E40\u0E1A\u0E35\u0E49\u0E22\u0E17\u0E35\u0E48\u0E08\u0E30\u0E1B\u0E23\u0E31\u0E1A\u0E43\u0E19\u0E2D\u0E19\u0E32\u0E04\u0E15")),
+                    React.createElement("p", { className: "text-[19px] mb-3", style: { color: BRAND.sub } },
+                        scheduleModal.name,
+                        " \u2014 \u0E04\u0E33\u0E19\u0E27\u0E13\u0E08\u0E32\u0E01\u0E17\u0E38\u0E19\u0E1B\u0E23\u0E30\u0E01\u0E31\u0E19/\u0E41\u0E1C\u0E19\u0E17\u0E35\u0E48\u0E40\u0E25\u0E37\u0E2D\u0E01\u0E44\u0E27\u0E49\u0E1B\u0E31\u0E08\u0E08\u0E38\u0E1A\u0E31\u0E19 \u0E15\u0E31\u0E49\u0E07\u0E41\u0E15\u0E48\u0E2D\u0E32\u0E22\u0E38\u0E1B\u0E31\u0E08\u0E08\u0E38\u0E1A\u0E31\u0E19\u0E08\u0E19\u0E16\u0E36\u0E07\u0E1B\u0E35\u0E2A\u0E38\u0E14\u0E17\u0E49\u0E32\u0E22\u0E17\u0E35\u0E48\u0E15\u0E48\u0E2D\u0E2D\u0E32\u0E22\u0E38\u0E04\u0E27\u0E32\u0E21\u0E04\u0E38\u0E49\u0E21\u0E04\u0E23\u0E2D\u0E07\u0E44\u0E14\u0E49"),
+                    scheduleModal.rows.length === 0 ? (React.createElement("p", { className: "text-[21px]", style: { color: BRAND.sub } }, "\u0E01\u0E23\u0E38\u0E13\u0E32\u0E01\u0E23\u0E2D\u0E01\u0E02\u0E49\u0E2D\u0E21\u0E39\u0E25 (\u0E17\u0E38\u0E19\u0E1B\u0E23\u0E30\u0E01\u0E31\u0E19/\u0E41\u0E1C\u0E19) \u0E43\u0E2B\u0E49\u0E04\u0E23\u0E1A\u0E01\u0E48\u0E2D\u0E19 \u0E08\u0E36\u0E07\u0E08\u0E30\u0E41\u0E2A\u0E14\u0E07\u0E15\u0E32\u0E23\u0E32\u0E07\u0E2D\u0E31\u0E15\u0E23\u0E32\u0E40\u0E1A\u0E35\u0E49\u0E22\u0E44\u0E14\u0E49")) : (React.createElement("div", { className: "overflow-y-auto rounded-xl border", style: { borderColor: "#D7E8F0", flex: 1 } },
+                        React.createElement("table", { className: "w-full text-[21px]" },
+                            React.createElement("thead", { style: { background: BRAND.bg, position: "sticky", top: 0 } },
+                                React.createElement("tr", null,
+                                    React.createElement("th", { className: "text-left px-3 py-2", style: { color: BRAND.navy } }, "\u0E0A\u0E48\u0E27\u0E07\u0E17\u0E35\u0E48\u0E1B\u0E23\u0E31\u0E1A"),
+                                    React.createElement("th", { className: "text-right px-3 py-2", style: { color: BRAND.navy } }, "\u0E40\u0E1A\u0E35\u0E49\u0E22\u0E23\u0E32\u0E22\u0E1B\u0E35"))),
+                            React.createElement("tbody", null, scheduleModal.rows.map((r, i) => (React.createElement("tr", { key: i, style: { borderTop: "1px solid #EEF3F7", background: i === 0 ? "#F3FBEF" : "transparent" } },
+                                React.createElement("td", { className: "px-3 py-2", style: { color: BRAND.dataBlack } },
+                                    r.label,
+                                    i === 0 ? " (ปัจจุบัน)" : ""),
+                                React.createElement("td", { className: "px-3 py-2 text-right font-medium", style: { color: i === 0 ? BRAND.greenDeep : BRAND.dataBlack } }, baht(Math.round(r.premium)))))))))),
+                    React.createElement("button", { onClick: () => setScheduleModal(null), className: "w-full mt-4 rounded-xl py-3 text-[24px] font-medium text-white flex items-center justify-center gap-1 shrink-0", style: { background: BRAND.navy } },
+                        React.createElement("span", { style: { fontSize: 18 } }, "✕"),
+                        " \u0E1B\u0E34\u0E14")))),
+            pensionYearModal && (React.createElement("div", { className: "fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4", style: { background: "rgba(8,30,62,0.55)" }, onClick: () => setPensionYearModal(null) },
+                React.createElement("div", { className: "w-full max-w-sm rounded-2xl p-5", style: { background: BRAND.card }, onClick: (e) => e.stopPropagation() },
+                    React.createElement("div", { className: "flex items-center gap-2 mb-2" },
+                        React.createElement("div", { className: "w-10 h-10 rounded-xl flex items-center justify-center shrink-0", style: { background: BRAND.bg } },
+                            React.createElement("span", { style: { fontSize: 20 } }, "\uD83D\uDCCA")),
+                        React.createElement("h3", { className: "text-[24px] font-semibold", style: { color: BRAND.navy } },
+                            "IRR \u0E13 \u0E2D\u0E32\u0E22\u0E38 ",
+                            pensionYearModal.age,
+                            " \u0E1B\u0E35")),
+                    React.createElement("p", { className: "text-[19px] mb-3", style: { color: BRAND.sub } },
+                        pensionYearModal.name,
+                        " \u2014 \u0E2D\u0E31\u0E15\u0E23\u0E32\u0E1C\u0E25\u0E15\u0E2D\u0E1A\u0E41\u0E17\u0E19\u0E2B\u0E32\u0E01\u0E04\u0E34\u0E14\u0E01\u0E23\u0E30\u0E41\u0E2A\u0E40\u0E07\u0E34\u0E19\u0E2A\u0E14\u0E2A\u0E30\u0E2A\u0E21\u0E17\u0E31\u0E49\u0E07\u0E2B\u0E21\u0E14\u0E08\u0E19\u0E16\u0E36\u0E07\u0E2D\u0E32\u0E22\u0E38\u0E19\u0E35\u0E49\u0E40\u0E1B\u0E47\u0E19\u0E08\u0E38\u0E14\u0E2A\u0E34\u0E49\u0E19\u0E2A\u0E38\u0E14"),
+                    React.createElement("div", { className: "rounded-xl p-4 text-center", style: { background: BRAND.bg } },
+                        React.createElement("span", { className: "text-[36px] font-bold", style: { color: BRAND.greenDeep } }, pensionYearModal.irr !== null && pensionYearModal.irr !== undefined ? (pensionYearModal.irr * 100).toFixed(2) + "%" : "คำนวณไม่ได้ (ยังไม่มีบำนาญเข้าในช่วงนี้)")),
+                    React.createElement("button", { onClick: () => setPensionYearModal(null), className: "w-full mt-4 rounded-xl py-3 text-[24px] font-medium text-white flex items-center justify-center gap-1", style: { background: BRAND.navy } },
+                        React.createElement("span", { style: { fontSize: 18 } }, "✕"),
+                        " \u0E1B\u0E34\u0E14")))),
+            React.createElement("footer", { className: "text-center text-[21px] py-6", style: { color: BRAND.sub } }, "\u0E40\u0E1E\u0E37\u0E48\u0E2D\u0E01\u0E32\u0E23\u0E19\u0E33\u0E40\u0E2A\u0E19\u0E2D\u0E40\u0E1A\u0E37\u0E49\u0E2D\u0E07\u0E15\u0E49\u0E19\u0E40\u0E17\u0E48\u0E32\u0E19\u0E31\u0E49\u0E19 \u0E44\u0E21\u0E48\u0E43\u0E0A\u0E48\u0E40\u0E2D\u0E01\u0E2A\u0E32\u0E23\u0E40\u0E2A\u0E19\u0E2D\u0E02\u0E32\u0E22\u0E2D\u0E22\u0E48\u0E32\u0E07\u0E40\u0E1B\u0E47\u0E19\u0E17\u0E32\u0E07\u0E01\u0E32\u0E23")),
         React.createElement("style", null, `
+        .print-only-container { display: none; }
         @media print {
-          body * { visibility: hidden; }
-          #print-table-container, #print-table-container * { visibility: visible; }
-          #print-table-container { position: absolute; top: 0; left: 0; width: 100%; padding: 16px; }
+          #app-root-content { display: none !important; }
+          .print-only-container { display: block !important; }
           * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; color-adjust: exact !important; }
           @page { size: auto; margin: 10mm; }
         }
       `),
-        printData && (React.createElement("div", { id: "print-table-container", style: { display: "none" } },
-            React.createElement(PrintTableView, { data: printData }))),
-        React.createElement("footer", { className: "text-center text-[21px] py-6", style: { color: BRAND.sub } }, "\u0E40\u0E1E\u0E37\u0E48\u0E2D\u0E01\u0E32\u0E23\u0E19\u0E33\u0E40\u0E2A\u0E19\u0E2D\u0E40\u0E1A\u0E37\u0E49\u0E2D\u0E07\u0E15\u0E49\u0E19\u0E40\u0E17\u0E48\u0E32\u0E19\u0E31\u0E49\u0E19 \u0E44\u0E21\u0E48\u0E43\u0E0A\u0E48\u0E40\u0E2D\u0E01\u0E2A\u0E32\u0E23\u0E40\u0E2A\u0E19\u0E2D\u0E02\u0E32\u0E22\u0E2D\u0E22\u0E48\u0E32\u0E07\u0E40\u0E1B\u0E47\u0E19\u0E17\u0E32\u0E07\u0E01\u0E32\u0E23")));
+        printData && (React.createElement("div", { className: "print-only-container" },
+            React.createElement(PrintTableView, { data: printData })))));
 }
 /* ============================== BENEFIT BOARD (compact dashboard style) ============================== */
 const BOARD_COLUMNS = [
@@ -3720,80 +3739,93 @@ function PlanRow({ label, children }) {
 // ตารางกระแสเงินคืนรายปี (การันตี) + ความคุ้มครองตลอดสัญญา สำหรับแบบสะสมทรัพย์ — แสดงเต็มพื้นที่ในหน้าเดียวกัน ไม่ใช่ป็อปอัพ
 // ตารางการจ่ายบำนาญรายปี — ไฮไลต์อายุจุดคุ้มทุน กดแถวเพื่อดู IRR ณ อายุนั้นในป็อปอัพ
 function PensionScheduleTable({ rows, breakEvenAge, onRowClick, title, onPrint }) {
-    const [collapsed, setCollapsed] = useState(true);
+    const [fitLevel, setFitLevel] = useState(0);
     if (!rows || rows.length === 0)
         return null;
-    const displayRows = collapsed ? collapseRows(rows, ["premium", "pension"], (r) => r.age === breakEvenAge) : rows;
+    const fit = TABLE_FIT_LEVELS[fitLevel];
+    const cell = { padding: fit.pad, fontSize: fit.fontSize };
     return (React.createElement("div", { className: "mt-2" },
         React.createElement("div", { className: "flex items-center justify-between gap-2 mb-1.5 flex-wrap" },
-            React.createElement("button", { onClick: () => setCollapsed((c) => !c), className: "text-[17px] font-medium px-3 py-1.5 rounded-full", style: { background: BRAND.bg, color: BRAND.navy, border: "1px solid #D7E8F0" } }, collapsed ? "📋 แสดงแบบละเอียด (รายปี)" : "📎 แสดงแบบย่อ (รวมปีที่ซ้ำ)"),
-            onPrint && (React.createElement("button", { onClick: () => onPrint({ type: "pension", title, rows: displayRows, breakEvenAge }), className: "text-[17px] font-medium px-3 py-1.5 rounded-full", style: { background: BRAND.bg, color: BRAND.navy, border: "1px solid #D7E8F0" } }, "\uD83D\uDDA8\uFE0F \u0E1E\u0E34\u0E21\u0E1E\u0E4C / \u0E1A\u0E31\u0E19\u0E17\u0E36\u0E01\u0E40\u0E1B\u0E47\u0E19 PDF"))),
+            React.createElement("button", { onClick: () => setFitLevel((l) => (l + 1) % TABLE_FIT_LEVELS.length), className: "text-[17px] font-medium px-3 py-1.5 rounded-full", style: { background: BRAND.bg, color: BRAND.navy, border: "1px solid #D7E8F0" } },
+                "\uD83D\uDD0D \u0E22\u0E48\u0E2D\u0E15\u0E32\u0E23\u0E32\u0E07\u0E43\u0E2B\u0E49\u0E1E\u0E2D\u0E14\u0E35\u0E08\u0E2D (",
+                fit.label,
+                ")"),
+            onPrint && (React.createElement("button", { onClick: () => onPrint({ type: "pension", title, rows, breakEvenAge }), className: "text-[17px] font-medium px-3 py-1.5 rounded-full", style: { background: BRAND.bg, color: BRAND.navy, border: "1px solid #D7E8F0" } }, "\uD83D\uDDA8\uFE0F \u0E1E\u0E34\u0E21\u0E1E\u0E4C / \u0E1A\u0E31\u0E19\u0E17\u0E36\u0E01\u0E40\u0E1B\u0E47\u0E19 PDF"))),
         React.createElement("div", { className: "rounded-xl border overflow-x-auto", style: { borderColor: "#D7E8F0" } },
-            React.createElement("table", { className: "w-full text-[18px]", style: { minWidth: 680 } },
+            React.createElement("table", { className: "w-full", style: { minWidth: 680 } },
                 React.createElement("thead", { style: { background: BRAND.bg } },
                     React.createElement("tr", null,
-                        React.createElement("th", { className: "text-center px-2 py-2", style: { color: BRAND.navy } }, "\u0E2D\u0E32\u0E22\u0E38"),
-                        React.createElement("th", { className: "text-right px-2 py-2", style: { color: BRAND.navy } }, "\u0E40\u0E1A\u0E35\u0E49\u0E22\u0E15\u0E48\u0E2D\u0E1B\u0E35"),
-                        React.createElement("th", { className: "text-right px-2 py-2", style: { color: BRAND.navy } }, "\u0E1A\u0E33\u0E19\u0E32\u0E0D\u0E15\u0E48\u0E2D\u0E1B\u0E35"),
-                        React.createElement("th", { className: "text-right px-2 py-2", style: { color: BRAND.navy } }, "\u0E40\u0E1A\u0E35\u0E49\u0E22\u0E2A\u0E30\u0E2A\u0E21"),
-                        React.createElement("th", { className: "text-right px-2 py-2", style: { color: BRAND.navy } }, "\u0E1A\u0E33\u0E19\u0E32\u0E0D\u0E2A\u0E30\u0E2A\u0E21"),
-                        React.createElement("th", { className: "text-right px-2 py-2", style: { color: BRAND.navy } }, "\u0E01\u0E23\u0E13\u0E35\u0E40\u0E2A\u0E35\u0E22\u0E0A\u0E35\u0E27\u0E34\u0E15"),
-                        React.createElement("th", { className: "text-left px-2 py-2", style: { color: BRAND.navy } }, "\u0E2B\u0E21\u0E32\u0E22\u0E40\u0E2B\u0E15\u0E38"))),
-                React.createElement("tbody", null, displayRows.map((r) => {
+                        React.createElement("th", { className: "text-center", style: Object.assign(Object.assign({}, cell), { color: BRAND.navy }) }, "\u0E2D\u0E32\u0E22\u0E38"),
+                        React.createElement("th", { className: "text-right", style: Object.assign(Object.assign({}, cell), { color: BRAND.navy }) }, "\u0E40\u0E1A\u0E35\u0E49\u0E22\u0E15\u0E48\u0E2D\u0E1B\u0E35"),
+                        React.createElement("th", { className: "text-right", style: Object.assign(Object.assign({}, cell), { color: BRAND.navy }) }, "\u0E1A\u0E33\u0E19\u0E32\u0E0D\u0E15\u0E48\u0E2D\u0E1B\u0E35"),
+                        React.createElement("th", { className: "text-right", style: Object.assign(Object.assign({}, cell), { color: BRAND.navy }) }, "\u0E40\u0E1A\u0E35\u0E49\u0E22\u0E2A\u0E30\u0E2A\u0E21"),
+                        React.createElement("th", { className: "text-right", style: Object.assign(Object.assign({}, cell), { color: BRAND.navy }) }, "\u0E1A\u0E33\u0E19\u0E32\u0E0D\u0E2A\u0E30\u0E2A\u0E21"),
+                        React.createElement("th", { className: "text-right", style: Object.assign(Object.assign({}, cell), { color: BRAND.navy }) }, "\u0E01\u0E23\u0E13\u0E35\u0E40\u0E2A\u0E35\u0E22\u0E0A\u0E35\u0E27\u0E34\u0E15"),
+                        React.createElement("th", { className: "text-left", style: Object.assign(Object.assign({}, cell), { color: BRAND.navy }) }, "\u0E2B\u0E21\u0E32\u0E22\u0E40\u0E2B\u0E15\u0E38"))),
+                React.createElement("tbody", null, rows.map((r) => {
                     const isBreakEven = r.age === breakEvenAge;
-                    return (React.createElement("tr", { key: r.age, onClick: () => onRowClick(r.isRange ? r.ageEnd : r.age), style: { borderTop: "1px solid #EEF3F7", background: isBreakEven ? "#F3FBEF" : "transparent", cursor: "pointer" } },
-                        React.createElement("td", { className: "text-center px-2 py-2 font-medium", style: { color: isBreakEven ? BRAND.greenDeep : BRAND.dataBlack } }, r.isRange ? `${r.age}-${r.ageEnd}` : r.age),
-                        React.createElement("td", { className: "text-right px-2 py-2", style: { color: BRAND.dataBlack } }, r.premium > 0 ? fmt(r.premium) : "-"),
-                        React.createElement("td", { className: "text-right px-2 py-2 font-semibold", style: { color: r.pension > 0 ? BRAND.greenDeep : BRAND.dataBlack } }, r.pension > 0 ? fmt(r.pension) : "-"),
-                        React.createElement("td", { className: "text-right px-2 py-2", style: { color: BRAND.dataBlack } }, fmt(r.cumPremium)),
-                        React.createElement("td", { className: "text-right px-2 py-2", style: { color: BRAND.dataBlack } }, fmt(r.cumPension)),
-                        React.createElement("td", { className: "text-right px-2 py-2", style: { color: BRAND.danger } }, fmt(r.deathBenefit)),
-                        React.createElement("td", { className: "text-left px-2 py-2", style: { color: BRAND.warn } },
+                    return (React.createElement("tr", { key: r.age, onClick: () => onRowClick(r.age), style: { borderTop: "1px solid #EEF3F7", background: isBreakEven ? "#F3FBEF" : "transparent", cursor: "pointer" } },
+                        React.createElement("td", { className: "text-center font-medium", style: Object.assign(Object.assign({}, cell), { color: isBreakEven ? BRAND.greenDeep : BRAND.dataBlack }) }, r.age),
+                        React.createElement("td", { className: "text-right", style: Object.assign(Object.assign({}, cell), { color: BRAND.dataBlack }) }, r.premium > 0 ? fmt(r.premium) : "-"),
+                        React.createElement("td", { className: "text-right font-semibold", style: Object.assign(Object.assign({}, cell), { color: r.pension > 0 ? BRAND.greenDeep : BRAND.dataBlack }) }, r.pension > 0 ? fmt(r.pension) : "-"),
+                        React.createElement("td", { className: "text-right", style: Object.assign(Object.assign({}, cell), { color: BRAND.dataBlack }) }, fmt(r.cumPremium)),
+                        React.createElement("td", { className: "text-right", style: Object.assign(Object.assign({}, cell), { color: BRAND.dataBlack }) }, fmt(r.cumPension)),
+                        React.createElement("td", { className: "text-right", style: Object.assign(Object.assign({}, cell), { color: BRAND.danger }) }, fmt(r.deathBenefit)),
+                        React.createElement("td", { className: "text-left", style: Object.assign(Object.assign({}, cell), { color: BRAND.warn }) },
                             isBreakEven ? "จุดคุ้มทุน · " : "",
                             r.note)));
                 }))))));
 }
+const TABLE_FIT_LEVELS = [
+    { label: "100%", fontSize: 18, pad: "8px 8px" },
+    { label: "85%", fontSize: 15, pad: "5px 6px" },
+    { label: "70%", fontSize: 12, pad: "3px 4px" },
+];
 function SavingsScheduleTable({ rows, irr, title, onPrint }) {
-    const [collapsed, setCollapsed] = useState(true);
+    const [fitLevel, setFitLevel] = useState(0);
     if (!rows || rows.length === 0)
         return null;
     const totalPremium = rows.reduce((a, r) => a + r.premium, 0);
     const totalCash = rows.reduce((a, r) => a + r.cashBaht, 0);
     const diff = totalCash - totalPremium;
-    const displayRows = collapsed ? collapseRows(rows, ["premium", "cashPct", "cashBaht", "coverageBaht"]) : rows;
+    const fit = TABLE_FIT_LEVELS[fitLevel];
+    const cell = { padding: fit.pad, fontSize: fit.fontSize };
     return (React.createElement("div", { className: "mt-2" },
         React.createElement("div", { className: "flex items-center justify-between gap-2 mb-1.5 flex-wrap" },
-            React.createElement("button", { onClick: () => setCollapsed((c) => !c), className: "text-[17px] font-medium px-3 py-1.5 rounded-full", style: { background: BRAND.bg, color: BRAND.navy, border: "1px solid #D7E8F0" } }, collapsed ? "📋 แสดงแบบละเอียด (รายปี)" : "📎 แสดงแบบย่อ (รวมปีที่ซ้ำ)"),
-            onPrint && (React.createElement("button", { onClick: () => onPrint({ type: "savings", title, rows: displayRows, totalPremium, totalCash, diff, irr }), className: "text-[17px] font-medium px-3 py-1.5 rounded-full", style: { background: BRAND.bg, color: BRAND.navy, border: "1px solid #D7E8F0" } }, "\uD83D\uDDA8\uFE0F \u0E1E\u0E34\u0E21\u0E1E\u0E4C / \u0E1A\u0E31\u0E19\u0E17\u0E36\u0E01\u0E40\u0E1B\u0E47\u0E19 PDF"))),
+            React.createElement("button", { onClick: () => setFitLevel((l) => (l + 1) % TABLE_FIT_LEVELS.length), className: "text-[17px] font-medium px-3 py-1.5 rounded-full", style: { background: BRAND.bg, color: BRAND.navy, border: "1px solid #D7E8F0" } },
+                "\uD83D\uDD0D \u0E22\u0E48\u0E2D\u0E15\u0E32\u0E23\u0E32\u0E07\u0E43\u0E2B\u0E49\u0E1E\u0E2D\u0E14\u0E35\u0E08\u0E2D (",
+                fit.label,
+                ")"),
+            onPrint && (React.createElement("button", { onClick: () => onPrint({ type: "savings", title, rows, totalPremium, totalCash, diff, irr }), className: "text-[17px] font-medium px-3 py-1.5 rounded-full", style: { background: BRAND.bg, color: BRAND.navy, border: "1px solid #D7E8F0" } }, "\uD83D\uDDA8\uFE0F \u0E1E\u0E34\u0E21\u0E1E\u0E4C / \u0E1A\u0E31\u0E19\u0E17\u0E36\u0E01\u0E40\u0E1B\u0E47\u0E19 PDF"))),
         React.createElement("div", { className: "rounded-xl border overflow-x-auto", style: { borderColor: "#D7E8F0" } },
-            React.createElement("table", { className: "w-full text-[18px]", style: { minWidth: 560 } },
+            React.createElement("table", { className: "w-full", style: { minWidth: 560 } },
                 React.createElement("thead", { style: { background: BRAND.bg } },
                     React.createElement("tr", null,
-                        React.createElement("th", { className: "text-center px-2 py-2", style: { color: BRAND.navy } }, "\u0E2D\u0E32\u0E22\u0E38"),
-                        React.createElement("th", { className: "text-right px-2 py-2", style: { color: BRAND.navy } }, "\u0E40\u0E1A\u0E35\u0E49\u0E22\u0E15\u0E48\u0E2D\u0E1B\u0E35"),
-                        React.createElement("th", { className: "text-right px-2 py-2", style: { color: BRAND.navy } }, "\u0E40\u0E07\u0E34\u0E19\u0E04\u0E37\u0E19 %"),
-                        React.createElement("th", { className: "text-right px-2 py-2", style: { color: BRAND.navy } }, "\u0E40\u0E07\u0E34\u0E19\u0E04\u0E37\u0E19 (\u0E1A\u0E32\u0E17)"),
-                        React.createElement("th", { className: "text-right px-2 py-2", style: { color: BRAND.navy } }, "\u0E04\u0E27\u0E32\u0E21\u0E04\u0E38\u0E49\u0E21\u0E04\u0E23\u0E2D\u0E07 (\u0E1A\u0E32\u0E17)"),
-                        React.createElement("th", { className: "text-left px-2 py-2", style: { color: BRAND.navy } }, "\u0E2B\u0E21\u0E32\u0E22\u0E40\u0E2B\u0E15\u0E38"))),
-                React.createElement("tbody", null, displayRows.map((r) => (React.createElement("tr", { key: r.age, style: { borderTop: "1px solid #EEF3F7", background: r.note ? "#FFF9EE" : "transparent" } },
-                    React.createElement("td", { className: "text-center px-2 py-2", style: { color: BRAND.dataBlack } }, r.isRange ? `${r.age}-${r.ageEnd}` : r.age),
-                    React.createElement("td", { className: "text-right px-2 py-2", style: { color: BRAND.dataBlack } }, r.premium > 0 ? fmt(r.premium) : "-"),
-                    React.createElement("td", { className: "text-right px-2 py-2", style: { color: BRAND.dataBlack } },
+                        React.createElement("th", { className: "text-center", style: Object.assign(Object.assign({}, cell), { color: BRAND.navy }) }, "\u0E2D\u0E32\u0E22\u0E38"),
+                        React.createElement("th", { className: "text-right", style: Object.assign(Object.assign({}, cell), { color: BRAND.navy }) }, "\u0E40\u0E1A\u0E35\u0E49\u0E22\u0E15\u0E48\u0E2D\u0E1B\u0E35"),
+                        React.createElement("th", { className: "text-right", style: Object.assign(Object.assign({}, cell), { color: BRAND.navy }) }, "\u0E40\u0E07\u0E34\u0E19\u0E04\u0E37\u0E19 %"),
+                        React.createElement("th", { className: "text-right", style: Object.assign(Object.assign({}, cell), { color: BRAND.navy }) }, "\u0E40\u0E07\u0E34\u0E19\u0E04\u0E37\u0E19 (\u0E1A\u0E32\u0E17)"),
+                        React.createElement("th", { className: "text-right", style: Object.assign(Object.assign({}, cell), { color: BRAND.navy }) }, "\u0E04\u0E27\u0E32\u0E21\u0E04\u0E38\u0E49\u0E21\u0E04\u0E23\u0E2D\u0E07 (\u0E1A\u0E32\u0E17)"),
+                        React.createElement("th", { className: "text-left", style: Object.assign(Object.assign({}, cell), { color: BRAND.navy }) }, "\u0E2B\u0E21\u0E32\u0E22\u0E40\u0E2B\u0E15\u0E38"))),
+                React.createElement("tbody", null, rows.map((r) => (React.createElement("tr", { key: r.age, style: { borderTop: "1px solid #EEF3F7", background: r.note ? "#FFF9EE" : "transparent" } },
+                    React.createElement("td", { className: "text-center", style: Object.assign(Object.assign({}, cell), { color: BRAND.dataBlack }) }, r.age),
+                    React.createElement("td", { className: "text-right", style: Object.assign(Object.assign({}, cell), { color: BRAND.dataBlack }) }, r.premium > 0 ? fmt(r.premium) : "-"),
+                    React.createElement("td", { className: "text-right", style: Object.assign(Object.assign({}, cell), { color: BRAND.dataBlack }) },
                         r.cashPct,
                         "%"),
-                    React.createElement("td", { className: "text-right px-2 py-2 font-semibold", style: { color: BRAND.greenDeep } }, fmt(r.cashBaht)),
-                    React.createElement("td", { className: "text-right px-2 py-2", style: { color: BRAND.dataBlack } }, fmt(r.coverageBaht)),
-                    React.createElement("td", { className: "text-left px-2 py-2", style: { color: BRAND.warn } }, r.note))))),
+                    React.createElement("td", { className: "text-right font-semibold", style: Object.assign(Object.assign({}, cell), { color: BRAND.greenDeep }) }, fmt(r.cashBaht)),
+                    React.createElement("td", { className: "text-right", style: Object.assign(Object.assign({}, cell), { color: BRAND.dataBlack }) }, fmt(r.coverageBaht)),
+                    React.createElement("td", { className: "text-left", style: Object.assign(Object.assign({}, cell), { color: BRAND.warn }) }, r.note))))),
                 React.createElement("tfoot", null,
                     React.createElement("tr", { style: { borderTop: `2px solid ${BRAND.navy}`, background: BRAND.bg } },
-                        React.createElement("td", { className: "text-center px-2 py-2 font-bold", style: { color: BRAND.navy } }, "\u0E23\u0E27\u0E21"),
-                        React.createElement("td", { className: "text-right px-2 py-2 font-bold", style: { color: BRAND.navy } }, fmt(totalPremium)),
-                        React.createElement("td", { className: "px-2 py-2" }),
-                        React.createElement("td", { className: "text-right px-2 py-2 font-bold", style: { color: BRAND.greenDeep } }, fmt(totalCash)),
-                        React.createElement("td", { className: "px-2 py-2" }),
-                        React.createElement("td", { className: "px-2 py-2" })),
+                        React.createElement("td", { className: "text-center font-bold", style: Object.assign(Object.assign({}, cell), { color: BRAND.navy }) }, "\u0E23\u0E27\u0E21"),
+                        React.createElement("td", { className: "text-right font-bold", style: Object.assign(Object.assign({}, cell), { color: BRAND.navy }) }, fmt(totalPremium)),
+                        React.createElement("td", { style: cell }),
+                        React.createElement("td", { className: "text-right font-bold", style: Object.assign(Object.assign({}, cell), { color: BRAND.greenDeep }) }, fmt(totalCash)),
+                        React.createElement("td", { style: cell }),
+                        React.createElement("td", { style: cell })),
                     React.createElement("tr", { style: { background: BRAND.bg } },
-                        React.createElement("td", { colSpan: 6, className: "text-right px-2 pb-2 pt-0.5 text-[16px]", style: { color: "#B8C2CC" } },
+                        React.createElement("td", { colSpan: 6, className: "text-right", style: { padding: fit.pad, paddingTop: 2, fontSize: Math.max(fit.fontSize - 2, 10), color: "#B8C2CC" } },
                             "IRR (\u0E01\u0E32\u0E23\u0E31\u0E19\u0E15\u0E35): ",
                             irr !== null && irr !== undefined ? (irr * 100).toFixed(2) + "%" : "คำนวณไม่ได้"))))),
         React.createElement("div", { className: "mt-1.5" },
@@ -3876,25 +3908,6 @@ function PrintTableView({ data }) {
                 })))));
     }
     return null;
-}
-function collapseRows(rows, keyFields, forceBreak) {
-    const isBoundary = (r) => !!r.note || (forceBreak && forceBreak(r));
-    const out = [];
-    let i = 0;
-    while (i < rows.length) {
-        let j = i;
-        const sameAsFirst = (r) => keyFields.every((f) => r[f] === rows[i][f]);
-        while (j + 1 < rows.length && !isBoundary(rows[j]) && !isBoundary(rows[j + 1]) && sameAsFirst(rows[j + 1]))
-            j++;
-        if (j === i) {
-            out.push(rows[i]);
-        }
-        else {
-            out.push(Object.assign(Object.assign({}, rows[j]), { age: rows[i].age, ageEnd: rows[j].age, isRange: true }));
-        }
-        i = j + 1;
-    }
-    return out;
 }
 function CompactChip({ product, checked, picked, disabled, recommended, tag, onCheckboxClick, onNameClick }) {
     return (React.createElement("div", { className: "rounded-lg", style: {
