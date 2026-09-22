@@ -8,6 +8,7 @@ const BRAND = {
     ink: "#000000", sub: "#404040", danger: "#B93232", warn: "#6B4508",
     label: "#000000", nameBlue: "#1668D6", mainBlue: "#0C2F63", dataBlack: "#000000",
 };
+const APP_VERSION = "v2.9.0 (2569-01-20)"; // อัปเดตเลขนี้ทุกครั้งที่มีการแก้ไข/เพิ่มแบบประกันใหม่ เพื่อให้รู้ว่าไฟล์ที่ใช้อยู่เป็นเวอร์ชันล่าสุดหรือไม่
 const fmt = (n) => (n === null || n === undefined || isNaN(n) ? "0" : Math.round(n).toLocaleString("th-TH"));
 const baht = (n) => (n === null || n === undefined ? "-" : (typeof n === "string" ? n : fmt(n) + " บาท"));
 /* ============================== PERSISTENT STORAGE (works in Claude.ai artifact and standalone browser) ============================== */
@@ -3387,7 +3388,8 @@ function App() {
     return (React.createElement("div", { style: { minHeight: "100vh", background: `linear-gradient(180deg, ${BRAND.bg} 0%, #FFFFFF 320px)`, fontFamily: "'IBM Plex Sans Thai','Prompt',sans-serif", color: BRAND.ink, fontSize: "17px", fontWeight: 500, WebkitFontSmoothing: "antialiased", textRendering: "optimizeLegibility" } },
         React.createElement("style", null, font),
         React.createElement("header", { style: { background: `linear-gradient(120deg, ${BRAND.navy}, ${BRAND.navyDeep})` }, className: "text-white" },
-            React.createElement("div", { className: "max-w-5xl mx-auto px-5 py-4 flex items-center gap-4" },
+            React.createElement("div", { className: "max-w-5xl mx-auto px-5 py-4 flex items-center gap-4 relative" },
+                React.createElement("span", { className: "absolute top-2 right-2 text-[14px] px-2 py-0.5 rounded-full", style: { background: "rgba(255,255,255,0.15)", color: "#BFE3F5" } }, APP_VERSION),
                 React.createElement("div", { style: { background: "#fff" }, className: "w-24 h-24 sm:w-28 sm:h-28 rounded-3xl flex items-center justify-center shrink-0 overflow-hidden shadow-lg" },
                     React.createElement("img", { src: LOGO_DATA_URI, alt: "\u0E04\u0E33\u0E19\u0E27\u0E13\u0E40\u0E1A\u0E35\u0E49\u0E22\u0E2D\u0E22\u0E48\u0E32\u0E07\u0E07\u0E48\u0E32\u0E22", className: "w-full h-full object-cover" })),
                 React.createElement("div", null,
@@ -3760,16 +3762,17 @@ function SavingsScheduleTable({ rows, irr }) {
                         React.createElement("td", { className: "px-2 py-2" }),
                         React.createElement("td", { className: "text-right px-2 py-2 font-bold", style: { color: BRAND.greenDeep } }, fmt(totalCash)),
                         React.createElement("td", { className: "px-2 py-2" }),
-                        React.createElement("td", { className: "px-2 py-2" }))))),
-        React.createElement("div", { className: "flex justify-between items-center mt-1.5 flex-wrap gap-1.5" },
+                        React.createElement("td", { className: "px-2 py-2" })),
+                    React.createElement("tr", { style: { background: BRAND.bg } },
+                        React.createElement("td", { colSpan: 6, className: "text-right px-2 pb-2 pt-0.5 text-[16px]", style: { color: "#B8C2CC" } },
+                            "IRR (\u0E01\u0E32\u0E23\u0E31\u0E19\u0E15\u0E35): ",
+                            irr !== null && irr !== undefined ? (irr * 100).toFixed(2) + "%" : "คำนวณไม่ได้"))))),
+        React.createElement("div", { className: "mt-1.5" },
             React.createElement("span", { className: "text-[18px]", style: { color: BRAND.sub } },
                 "\u0E2A\u0E48\u0E27\u0E19\u0E15\u0E48\u0E32\u0E07 (\u0E40\u0E07\u0E34\u0E19\u0E04\u0E37\u0E19\u0E23\u0E27\u0E21 \u2212 \u0E40\u0E1A\u0E35\u0E49\u0E22\u0E23\u0E27\u0E21): ",
                 React.createElement("span", { className: "font-semibold", style: { color: diff >= 0 ? BRAND.greenDeep : BRAND.danger } },
                     diff >= 0 ? "+" : "",
-                    fmt(diff))),
-            React.createElement("span", { className: "text-[19px] font-bold px-3 py-1.5 rounded-lg", style: { background: BRAND.bg, color: BRAND.sub } },
-                "IRR (\u0E01\u0E32\u0E23\u0E31\u0E19\u0E15\u0E35): ",
-                irr !== null && irr !== undefined ? (irr * 100).toFixed(2) + "%" : "คำนวณไม่ได้"))));
+                    fmt(diff))))));
 }
 function CompactChip({ product, checked, picked, disabled, recommended, tag, onCheckboxClick, onNameClick }) {
     return (React.createElement("div", { className: "rounded-lg", style: {
@@ -3789,7 +3792,7 @@ function CompactChip({ product, checked, picked, disabled, recommended, tag, onC
 function ProductRow({ product, checked, onToggle, age, live, pending, children, disabled, recommended, recommendedReason, expanded, onToggleExpand, onShowSchedule }) {
     const outOfRange = age < product.ageMin || age > product.ageMax;
     const invalid = checked && !disabled && live && !live.ok && !pending;
-    return (React.createElement("div", { id: `product-row-${product.id}`, className: `rounded-2xl p-4 ${(product.renewalNote || recommended) ? "pt-10" : ""}`, style: {
+    return (React.createElement("div", { id: `product-row-${product.id}`, className: `rounded-2xl p-4 ${(product.renewalNote || recommended || product.name.includes("มีเงินปันผล")) ? "pt-10" : ""}`, style: {
             background: disabled ? "#F3F5F7" : (invalid ? "#FFF7F7" : (checked ? "#F3FBEF" : BRAND.card)),
             boxShadow: disabled ? "none" : "0 4px 14px rgba(11,42,85,0.06)",
             border: invalid ? `2.5px solid ${BRAND.danger}` : (checked && !disabled ? `2.5px solid ${BRAND.greenDeep}` : (recommended && !disabled ? `1.5px solid ${BRAND.green}` : "1.5px solid transparent")),
@@ -3797,7 +3800,9 @@ function ProductRow({ product, checked, onToggle, age, live, pending, children, 
             filter: disabled ? "grayscale(0.4)" : "none",
             position: "relative",
         } },
-        product.renewalNote && (React.createElement("span", { className: "absolute top-2 right-2 text-[15px] font-medium px-2 py-1 rounded-full", style: { background: BRAND.bg, color: BRAND.sub, border: "1px solid #D7E8F0" } }, product.renewalNote)),
+        (product.renewalNote || product.name.includes("มีเงินปันผล")) && (React.createElement("div", { className: "absolute top-2 right-2 flex items-center gap-1.5 flex-wrap justify-end", style: { maxWidth: "70%" } },
+            product.name.includes("มีเงินปันผล") && (React.createElement("span", { className: "text-[15px] font-medium px-2 py-1 rounded-full whitespace-nowrap", style: { background: "#FFF9EE", color: BRAND.warn, border: `1px solid #F3D98B` } }, "\uD83C\uDF81 \u0E21\u0E35\u0E2A\u0E34\u0E17\u0E18\u0E34\u0E4C\u0E23\u0E31\u0E1A\u0E1B\u0E31\u0E19\u0E1C\u0E25")),
+            product.renewalNote && (React.createElement("span", { className: "text-[15px] font-medium px-2 py-1 rounded-full whitespace-nowrap", style: { background: BRAND.bg, color: BRAND.sub, border: "1px solid #D7E8F0" } }, product.renewalNote)))),
         recommended && !disabled && (React.createElement("span", { className: "absolute top-2 left-2 text-[15px] font-bold px-2.5 py-1 rounded-full", style: { background: "#fff", color: BRAND.greenDeep, border: `1.5px solid ${BRAND.greenDeep}` } }, recommendedReason === "companion-1" ? "⭐ แนะนำคู่ อันดับ 1 (เบี้ยถูกสุด)" : recommendedReason === "companion-2" ? "⭐ แนะนำคู่ อันดับ 2" : "⭐ แนะนำ")),
         React.createElement("div", { className: "flex items-center gap-3 pr-2" },
             React.createElement("button", { onClick: disabled ? undefined : onToggle, disabled: disabled, className: "w-7 h-7 rounded-lg flex items-center justify-center shrink-0", style: { background: checked && !disabled ? (invalid ? BRAND.danger : BRAND.greenDeep) : "#EFF2F5", cursor: disabled ? "not-allowed" : "pointer" } }, checked && !disabled && React.createElement("span", { style: { color: "#fff", fontWeight: 700 } }, "✓")),
