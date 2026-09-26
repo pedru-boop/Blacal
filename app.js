@@ -8,7 +8,7 @@ const BRAND = {
     ink: "#000000", sub: "#404040", danger: "#B93232", warn: "#6B4508",
     label: "#000000", nameBlue: "#1668D6", mainBlue: "#0C2F63", dataBlack: "#000000",
 };
-const APP_VERSION = "v2.10.1 (2569-09-26)"; // อัปเดตเลขนี้ทุกครั้งที่มีการแก้ไข/เพิ่มแบบประกันใหม่ เพื่อให้รู้ว่าไฟล์ที่ใช้อยู่เป็นเวอร์ชันล่าสุดหรือไม่
+const APP_VERSION = "v2.10.3 (2569-09-26)"; // อัปเดตเลขนี้ทุกครั้งที่มีการแก้ไข/เพิ่มแบบประกันใหม่ เพื่อให้รู้ว่าไฟล์ที่ใช้อยู่เป็นเวอร์ชันล่าสุดหรือไม่
 const fmt = (n) => (n === null || n === undefined || isNaN(n) ? "0" : Math.round(n).toLocaleString("th-TH"));
 const baht = (n) => (n === null || n === undefined ? "-" : (typeof n === "string" ? n : fmt(n) + " บาท"));
 /* ============================== PERSISTENT STORAGE (works in Claude.ai artifact and standalone browser) ============================== */
@@ -1058,6 +1058,13 @@ const solveSIFromPremium = (premium, effRate) => {
     }
     return best || base;
 };
+// แบบประกันหลักที่คู่มือตัวแทน V.14 ระบุว่า "มีเบี้ยประกันภัยเพิ่มตามอาชีพ" ของตัวแบบหลักเอง (รบข.56/2567 — อาชีพเสี่ยงสูงบางประเภท พันละ 2-10 บาท ตามการพิจารณาของบริษัท)
+// ไม่รวมแบบออมทรัพย์ที่ระบุให้คิดเบี้ยเพิ่มเฉพาะสัญญาเพิ่มเติมที่ซื้อ และแบบที่คู่มือไม่ได้ระบุ
+const OCC_EXTRA_MAIN_IDS = ["LIFE99", "HRP9920", "PRESTIGE", "HAPPYSAVING", "HS2515", "CANCERMAX"];
+const OCC_EXTRA_NOTE = "⚠️ อาชีพเสี่ยงสูงบางประเภทอาจมีเบี้ยเพิ่มพิเศษ 2-10 บาท ต่อทุน 1,000 บาท/ปี ตามการพิจารณาของบริษัท";
+// แบบออมทรัพย์ที่คู่มือระบุว่า "กรณีซื้อสัญญาเพิ่มเติม มีการคิดเบี้ยเพิ่มตามอาชีพ" (เฉพาะสัญญาเพิ่มเติมที่ซื้อ) — เตือนเฉพาะเมื่อมีอนุสัญญาแนบ
+const OCC_EXTRA_WITH_RIDER_MAIN_IDS = ["HS208", "HS126", "HS157", "HS147", "HS168", "HS1810", "TAXSAVER105", "HAPPYPENSION"];
+const OCC_EXTRA_RIDER_NOTE = "⚠️ เมื่อซื้อสัญญาเพิ่มเติม อาชีพเสี่ยงสูงบางประเภทอาจมีเบี้ยเพิ่มพิเศษสำหรับสัญญาเพิ่มเติม ตามการพิจารณาของบริษัท";
 const CS_FORBIDDEN_MAIN_IDS = ["UNJAI", "PRESTIGE", "HAPPYWL", "HAPPYWL9901", "PSAVE104", "PSAVE126", "HS208", "HS126", "HS157", "HS147", "HS168", "TAXSAVER105", "BLASAVE168"];
 // กิมมิก "ความกังวลของลูกค้า" — แต่ละความกังวลจับคู่กับแบบประกันที่เกี่ยวข้อง เพื่อขึ้นป้าย "แนะนำ" ให้เอเจนต์ตัดสินใจ (ไม่ติ๊กเลือกให้อัตโนมัติ)
 const CONCERNS = [
@@ -3780,6 +3787,8 @@ function App() {
                                 " \u0E1B\u0E35 \u2248 ",
                                 baht(Math.round(c.premium * mainPolicyPaymentYears(c.id))),
                                 ")")),
+                            OCC_EXTRA_MAIN_IDS.includes(c.id) && (React.createElement("p", { className: "text-[17px] mt-2 px-3 py-2 rounded-lg", style: { background: "#FFF8E6", color: "#7A5A00", border: "1px solid #F3DFA8" } }, OCC_EXTRA_NOTE)),
+                            OCC_EXTRA_WITH_RIDER_MAIN_IDS.includes(c.id) && result.cards.some((x) => !x.isMain) && (React.createElement("p", { className: "text-[17px] mt-2 px-3 py-2 rounded-lg", style: { background: "#FFF8E6", color: "#7A5A00", border: "1px solid #F3DFA8" } }, OCC_EXTRA_RIDER_NOTE)),
                             openCards[c.id] && (React.createElement("div", { className: "mt-3 pt-2 rounded-xl overflow-hidden", style: { border: "1px solid #E7EEF3" } }, c.benefits.map(([k, v], i) => (React.createElement("div", { key: i, className: "px-3 py-3", style: { background: i % 2 === 0 ? "#FBFDFE" : "#FFFFFF", borderTop: i === 0 ? "none" : "1px solid #EEF3F7" } },
                                 React.createElement("p", { className: "text-[21px] font-medium leading-snug", style: { color: BRAND.label } }, k),
                                 React.createElement("p", { className: "text-[27px] font-bold leading-snug mt-0.5", style: { color: BRAND.dataBlack } }, v)))))))))))))),
