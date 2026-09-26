@@ -1,4 +1,4 @@
-const { useState, useEffect } = React;
+const { useState, useEffect, useRef } = React;
 "use strict";
 /* ============================== BRAND TOKENS ============================== */
 const LOGO_DATA_URI = "icon-192.png";
@@ -8,7 +8,7 @@ const BRAND = {
     ink: "#000000", sub: "#404040", danger: "#B93232", warn: "#6B4508",
     label: "#000000", nameBlue: "#1668D6", mainBlue: "#0C2F63", dataBlack: "#000000",
 };
-const APP_VERSION = "v2.10.4 (2569-09-26)"; // อัปเดตเลขนี้ทุกครั้งที่มีการแก้ไข/เพิ่มแบบประกันใหม่ เพื่อให้รู้ว่าไฟล์ที่ใช้อยู่เป็นเวอร์ชันล่าสุดหรือไม่
+const APP_VERSION = "v2.11.0 (2569-09-26)"; // อัปเดตเลขนี้ทุกครั้งที่มีการแก้ไข/เพิ่มแบบประกันใหม่ เพื่อให้รู้ว่าไฟล์ที่ใช้อยู่เป็นเวอร์ชันล่าสุดหรือไม่
 const fmt = (n) => (n === null || n === undefined || isNaN(n) ? "0" : Math.round(n).toLocaleString("th-TH"));
 const baht = (n) => (n === null || n === undefined ? "-" : (typeof n === "string" ? n : fmt(n) + " บาท"));
 /* ============================== PERSISTENT STORAGE (works in Claude.ai artifact and standalone browser) ============================== */
@@ -1250,6 +1250,10 @@ function App() {
     // ทุนประกันหลักที่ใช้เป็นค่าอ้างอิงให้อนุสัญญาอื่นๆ เช็คเงื่อนไข (ต้องมาหลังประกาศ state ของทุกแบบทุนหลักด้านบนแล้วเท่านั้น)
     // ทุนประกันหลัก (mainSI) ย้ายไปคำนวณหลัง SAVINGS_DEFS — ดู mainSIOf()
     const [result, setResult] = useState(null);
+    const [showComm, setShowComm] = useState(false); // ป๊อปอัพค่าคอม (แสดงเฉพาะตอนกดค้างกล่องเบี้ยรวม 4 วินาที)
+    const commTimer = useRef(null);
+    const commPressStart = () => { clearTimeout(commTimer.current); commTimer.current = setTimeout(() => setShowComm(true), 4000); };
+    const commPressEnd = () => { clearTimeout(commTimer.current); setShowComm(false); };
     const [scheduleModal, setScheduleModal] = useState(null); // { name, rows } — ตารางอัตราเบี้ยที่จะปรับในอนาคตของแบบที่ไม่ใช่เบี้ยคงที่
     const [savingsScheduleOpen, setSavingsScheduleOpen] = useState({}); // เปิด/ปิดตารางกระแสเงินคืนรายปีของแบบสะสมทรัพย์ (แสดงในหน้าเดียวกัน ไม่ใช่ป็อปอัพ)
     const [modal, setModal] = useState(null);
@@ -3592,6 +3596,77 @@ function App() {
         CHAK: chakTerm === 0 || chakSI === 0, CHAP: chapTerm === 0 || chapSI === 0 || chapPayorAge === 0, PH: phPlan === 0 || phDeduct === null, PSAVE104: psave104SI === 0, PSAVE126: psave126SI === 0,
         HS208: hs208SI === 0, HS126: hs126SI === 0, HS157: hs157SI === 0, HS147: hs147SI === 0, HS168: hs168SI === 0, HS1810: hs1810SI === 0, HS2515: hs2515SI === 0, TAXSAVER105: taxsaver105SI === 0, BLASAVE168: blasave168SI === 0, PENSION888: (pension888Mode === "premium" ? pension888PremiumInput === 0 : pension888TargetPension === 0), CS: csPayorAge === 0,
     };
+    /* ===== ค่านายหน้าปีที่ 1 (FYC) — ตาราง "ค่าตอบแทนสำหรับตัวแทน" 10-09-2026 ===== */
+    function commissionRate(c, cards) {
+        const a = age;
+        const band = (edges, vals) => { for (let i = 0; i < edges.length; i++) if (a <= edges[i]) return vals[i]; return vals[vals.length - 1]; };
+        const mainCard = cards.find((x) => x.isMain);
+        const riderSum = cards.filter((x) => !x.isMain).reduce((t, x) => t + (x.premium || 0), 0);
+        const rar = mainCard && mainCard.premium ? (riderSum / mainCard.premium) * 100 : 0; // % เบี้ยสัญญาเพิ่มเติม / เบี้ยสัญญาหลัก (รายปี)
+        const si = c.isMain ? mainSIOf(c.id) : 0;
+        const mainRate = () => (mainCard ? commissionRate(mainCard, cards) : null);
+        const age3 = (v) => band([60, 65, 70], v); // 0-60 / 61-65 / 66-70
+        switch (c.id) {
+            case "LIFE99": return a <= 70 ? (si >= 200000 ? 40 : 10) : 10;
+            case "SUD": case "HRP9920": {
+                if (si >= 500000) return age3([40, 35, 30]);
+                const cut = si >= 300000 ? [50, 100] : [100, 150];
+                return rar < cut[0] ? age3([30, 25, 20]) : rar < cut[1] ? age3([35, 30, 25]) : age3([40, 35, 30]);
+            }
+            case "HRPDIV": {
+                const T = { 5: [[10, 8, 6], [12, 10, 8], [15, 12, 10]], 10: [[20, 15, 10], [25, 18, 12], [30, 20, 15]], 15: [[25, 15, 10], [30, 20, 12], [35, 25, 15]], 20: [[30, 20, 10], [35, 25, 15], [40, 30, 20]] }[hrpdivTerm];
+                return T ? age3(T[si >= 500000 ? 2 : si >= 300000 ? 1 : 0]) : null;
+            }
+            case "HRP9901": case "HAPPYWL9901": return a <= 60 ? 1 : 0.5;
+            case "HAPPYWL": return { 5: 10, 10: 30, 15: 40 }[happywlTerm] ?? null;
+            case "PRESTIGE": return { 5: a <= 65 ? 10 : 6, 10: a <= 65 ? 25 : 15, 15: 35, 20: a <= 60 ? 40 : 35 }[prestigeTerm] ?? null;
+            case "HAPPYKID": return 40;
+            case "UNJAI": return UNJAI_PLANS.indexOf(unjaiPlan) <= 1 ? band([65, 70], [20, 17, 15]) : band([65, 70], [25, 22, 20]);
+            case "CANCERMAX": return band([50, 60], [40, 35, 30]);
+            case "PLUS2": return 40;
+            case "HAPPYPENSION": {
+                if (happypensionTerm === "once") return 1;
+                if (happypensionTerm === "5y") return 5;
+                if (happypensionTerm === "10y") return 7.5;
+                if (happypensionTerm === "to60") return a <= 30 ? 20 : a <= 35 ? 25 : a <= 40 ? 20 : a <= 45 ? 15 : a <= 50 ? 10 : ({ 51: 9, 52: 8, 53: 7, 54: 6, 55: 5 }[a] ?? null);
+                return null;
+            }
+            case "HAPPYSAVING": {
+                const hi = rar >= 20;
+                if (happysavingTerm === 5) return band([50, 55, 60], hi ? [10, 8, 6, 4] : [7.5, 5, 4, 2.5]);
+                if (happysavingTerm === 10) return band([50, 55, 60], hi ? [20, 10, 7, 5] : [15, 8, 5, 3]);
+                return null;
+            }
+            case "PSAVE104": return a <= 60 ? 2 : 1;
+            case "PSAVE126": return band([60, 70, 80], [2.75, 2.5, 2, 1.5]);
+            case "HS208": return rar >= 10 ? 7 : rar >= 5 ? 6 : rar >= 3 ? 5.5 : 5;
+            case "HS126": { const k = rar >= 10 ? 3 : rar >= 5 ? 2 : rar >= 3 ? 1 : 0; return band([60, 70], [[2.75, 2.5, 2], [3.25, 3, 2.5], [3.75, 3.5, 3], [4.75, 4.5, 4]][k]); }
+            case "HS157": return band([50, 70, 80], [7, 5, 4, 2]);
+            case "HS147": return band([50, 60], [5, 4, 3]);
+            case "HS168": return a <= 60 ? 5 : 3;
+            case "HS1810": return band([50, 60], [10, 7.5, 5]);
+            case "HS2515": return band([50, 55], si >= 500000 ? [35, 30, 25] : si >= 300000 ? [30, 25, 20] : [25, 20, 15]);
+            case "TAXSAVER105": return a <= 80 ? 2 : 1;
+            case "BLASAVE168": return band([50, 70, 80], [8, 6, 5, 3]);
+            case "PENSION888": return 7;
+            // ---------- สัญญาเพิ่มเติม ----------
+            case "VH": return band([60, 70], vhPlan <= 3000 ? [35, 25, 10] : [40, 25, 10]);
+            case "VHKIDS": return 10;
+            case "HHP": return 25;
+            case "PH": return phDeduct > 0 ? 20 : 18;
+            case "OPD": return 10;
+            case "ACC": return a <= 65 ? 40 : 35;
+            case "SUPER": { const yrs = mainCard ? mainPolicyPaymentYears(mainCard.id) : 7; return yrs >= 7 ? (a <= 60 ? 40 : 30) : 30; }
+            case "HAPPYCI": return band([60, 65, 70], happyciSI >= 1000000 ? [40, 30, 25, 20] : happyciSI >= 500000 ? [35, 28, 23, 20] : [30, 25, 20, 15]);
+            case "LLC": return a <= 60 ? 40 : 30;
+            case "SS": case "RPPR": return 40;
+            case "ACC3": case "TPD": return mainRate();
+            case "CS": return csPayorAge <= 50 ? mainRate() : 15;
+            case "CHAK": return chakTerm === 18 ? mainRate() : ({ 5: 10, 10: 25, 15: 25 }[chakTerm] ?? null);
+            case "CHAP": return chapTerm === 18 ? mainRate() : ({ 5: 10, 10: 25, 15: 25 }[chapTerm] ?? null);
+            default: return null;
+        }
+    }
     function handleCalculate() {
         const errs = [];
         const cards = [];
@@ -3620,6 +3695,14 @@ function App() {
         cards.forEach((c) => {
             c.single = isSinglePremiumMain(c.id);
             c.factor = (mode === "year" || c.single) ? 1 : (c.id === "HS2515" && mode === "month") ? 1 / 12 : modeDef.factor;
+        });
+        const nPerYear = { year: 1, half: 2, quarter: 4, month: 12 }[mode] || 1;
+        cards.forEach((c) => {
+            const rate = commissionRate(c, cards);
+            c.commRate = rate;
+            c.commN = c.single ? 1 : (mode === "year" ? 1 : nPerYear);
+            c.commPerPay = rate === null ? null : (c.premium || 0) * c.factor * rate / 100;
+            c.commYear1 = rate === null ? null : c.commPerPay * c.commN;
         });
         const totalYear = cards.reduce((s, c) => s + (c.premium || 0), 0);
         const totalPay = cards.reduce((s, c) => s + (c.premium || 0) * c.factor, 0);
@@ -3764,7 +3847,7 @@ function App() {
                     React.createElement("span", { style: { fontSize: 22 } }, "🧮"),
                     " \u0E04\u0E33\u0E19\u0E27\u0E13\u0E40\u0E1A\u0E35\u0E49\u0E22\u0E1B\u0E23\u0E30\u0E01\u0E31\u0E19\u0E41\u0E25\u0E30\u0E04\u0E27\u0E32\u0E21\u0E04\u0E38\u0E49\u0E21\u0E04\u0E23\u0E2D\u0E07"),
                 result && (React.createElement("section", { className: "space-y-4" },
-                    React.createElement("div", { className: "rounded-2xl p-5 text-white", style: { background: `linear-gradient(120deg, ${BRAND.green}, ${BRAND.greenDeep})` } },
+                    React.createElement("div", { className: "rounded-2xl p-5 text-white", style: { background: `linear-gradient(120deg, ${BRAND.green}, ${BRAND.greenDeep})`, userSelect: "none", WebkitUserSelect: "none", WebkitTouchCallout: "none" }, onPointerDown: commPressStart, onPointerUp: commPressEnd, onPointerLeave: commPressEnd, onPointerCancel: commPressEnd, onContextMenu: (e) => e.preventDefault() },
                         React.createElement("p", { className: "text-[24px] opacity-90" },
                             "\u0E40\u0E1A\u0E35\u0E49\u0E22\u0E1B\u0E23\u0E30\u0E01\u0E31\u0E19\u0E20\u0E31\u0E22\u0E23\u0E27\u0E21 (",
                             result.payLabel,
@@ -3775,6 +3858,7 @@ function App() {
                             "\u0E40\u0E17\u0E35\u0E22\u0E1A\u0E40\u0E17\u0E48\u0E32\u0E40\u0E1A\u0E35\u0E49\u0E22\u0E23\u0E32\u0E22\u0E1B\u0E35\u0E23\u0E27\u0E21 ",
                             baht(result.totalYear))),
                     React.createElement(BenefitBoard, { cards: result.cards }),
+                    showComm && React.createElement(CommissionPopup, { result }),
                     React.createElement("div", { className: "grid sm:grid-cols-2 gap-4" }, result.cards.map((c) => (React.createElement("div", { key: c.id, className: "rounded-2xl overflow-hidden", style: { background: BRAND.card, boxShadow: "0 6px 20px rgba(11,42,85,0.08)", borderTop: `4px solid ${BRAND.sky}`, position: "relative" } },
                         c.renewalNote && (React.createElement("span", { className: "absolute top-3 right-3 text-[15px] font-medium px-2 py-1 rounded-full z-10", style: { background: BRAND.bg, color: BRAND.sub, border: "1px solid #D7E8F0" } }, c.renewalNote)),
                         React.createElement("div", { className: "p-5" },
@@ -3902,6 +3986,37 @@ function BenefitBoard({ cards }) {
         }))));
 }
 /* ============================== UI PARTS ============================== */
+function CommissionPopup({ result }) {
+    const rows = result.cards;
+    const perPay = rows.reduce((t, c) => t + (c.commPerPay || 0), 0);
+    const year1 = rows.reduce((t, c) => t + (c.commYear1 || 0), 0);
+    const missing = rows.some((c) => c.commRate === null);
+    const multi = rows.some((c) => c.commN > 1);
+    const cell = "py-1.5 px-1 text-right whitespace-nowrap";
+    return (React.createElement("div", { className: "fixed inset-0 z-50 flex items-center justify-center p-3", style: { background: "rgba(10,36,82,0.55)", pointerEvents: "none" } },
+        React.createElement("div", { className: "w-full max-w-md rounded-2xl p-4", style: { background: "#fff", color: BRAND.navy, boxShadow: "0 12px 40px rgba(0,0,0,0.35)" } },
+            React.createElement("p", { className: "text-[22px] font-semibold mb-2" }, "💼 ค่านายหน้าปีที่ 1 (FYC)"),
+            React.createElement("table", { className: "w-full text-[17px]" },
+                React.createElement("thead", null, React.createElement("tr", { style: { color: BRAND.sub, borderBottom: "1px solid #D7E8F0" } },
+                    React.createElement("th", { className: "py-1 text-left font-medium" }, "แบบ"),
+                    React.createElement("th", { className: cell + " font-medium" }, "%"),
+                    multi && React.createElement("th", { className: cell + " font-medium" }, "ต่องวด"),
+                    React.createElement("th", { className: cell + " font-medium" }, "ปีที่ 1"))),
+                React.createElement("tbody", null, rows.map((c) => (React.createElement("tr", { key: c.id, style: { borderBottom: "1px solid #EEF4F8" } },
+                    React.createElement("td", { className: "py-1.5 pr-1 leading-tight" }, c.name),
+                    React.createElement("td", { className: cell }, c.commRate === null ? "-" : c.commRate + "%"),
+                    multi && React.createElement("td", { className: cell }, c.commPerPay === null ? "-" : fmt(c.commPerPay)),
+                    React.createElement("td", { className: cell + " font-semibold" }, c.commYear1 === null ? "-" : fmt(c.commYear1)))))),
+                React.createElement("tfoot", null, React.createElement("tr", { style: { color: BRAND.greenDeep } },
+                    React.createElement("td", { className: "pt-2 font-semibold" }, "รวม"),
+                    React.createElement("td", null),
+                    multi && React.createElement("td", { className: cell + " pt-2 font-semibold" }, fmt(perPay)),
+                    React.createElement("td", { className: cell + " pt-2 text-[21px] font-bold" }, baht(year1))))),
+            React.createElement("p", { className: "text-[14px] mt-2", style: { color: BRAND.sub } },
+                multi ? `คิดจากเบี้ยที่ชำระจริง ${result.payLabel} × จำนวนงวดในปีแรก` : "คิดจากเบี้ยที่ชำระจริงปีแรก",
+                " · ตารางค่าตอบแทน 10-09-2026",
+                missing ? " · \"-\" = ไม่พบอัตราในตาราง" : ""))));
+}
 function Field({ label, children }) {
     return (React.createElement("div", { className: "flex flex-col gap-1.5" },
         React.createElement("span", { className: "text-[21px] font-medium", style: { color: BRAND.sub } }, label),
