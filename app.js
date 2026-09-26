@@ -8,7 +8,7 @@ const BRAND = {
     ink: "#000000", sub: "#404040", danger: "#B93232", warn: "#6B4508",
     label: "#000000", nameBlue: "#1668D6", mainBlue: "#0C2F63", dataBlack: "#000000",
 };
-const APP_VERSION = "v2.10.3 (2569-09-26)"; // อัปเดตเลขนี้ทุกครั้งที่มีการแก้ไข/เพิ่มแบบประกันใหม่ เพื่อให้รู้ว่าไฟล์ที่ใช้อยู่เป็นเวอร์ชันล่าสุดหรือไม่
+const APP_VERSION = "v2.10.4 (2569-09-26)"; // อัปเดตเลขนี้ทุกครั้งที่มีการแก้ไข/เพิ่มแบบประกันใหม่ เพื่อให้รู้ว่าไฟล์ที่ใช้อยู่เป็นเวอร์ชันล่าสุดหรือไม่
 const fmt = (n) => (n === null || n === undefined || isNaN(n) ? "0" : Math.round(n).toLocaleString("th-TH"));
 const baht = (n) => (n === null || n === undefined ? "-" : (typeof n === "string" ? n : fmt(n) + " บาท"));
 /* ============================== PERSISTENT STORAGE (works in Claude.ai artifact and standalone browser) ============================== */
@@ -1076,7 +1076,7 @@ const CONCERNS = [
     { id: "accident", icon: "🚑", label: "ห่วงเรื่องอุบัติเหตุ", products: ["ACC", "ACC3"] },
 ];
 const PRODUCTS = [
-    { id: "CS", name: "คช. คุ้มครองการชำระเบี้ย", tag: "คุ้มครองผู้ชำระเบี้ย (ผู้ปกครอง 20-55 ปี) สำหรับผู้เยาว์ 0-14 ปี · ระยะคุ้มครองตามระยะชำระเบี้ยของแบบหลัก", ageMin: 0, ageMax: 14, coverAge: 21, isTop: true, renewalNote: "เบี้ยคงที่",
+    { id: "CS", name: "คช. คุ้มครองการชำระเบี้ย", tag: "คุ้มครองผู้ชำระเบี้ย (ผู้ปกครอง 20-55 ปี) สำหรับผู้เยาว์ 0-14 ปี · ระยะคุ้มครองตามระยะชำระเบี้ยของแบบหลัก", ageMin: 0, ageMax: 14, coverAge: 21, isTop: true, renewalNote: "ปรับตามเบี้ยที่คุ้มครอง",
         occNote: "ไม่ขึ้นกับชั้นอาชีพ", siNote: "เบี้ยคิดจากผลรวมเบี้ยประกันภัยของทุกแบบที่เลือกไว้" },
     { id: "SUD", name: "ตลอดชีพ สุดคุ้ม", tag: "แบบประกันหลัก · ชำระเบี้ย 20 ปี", ageMin: 0, ageMax: 70, coverAge: 99, isMain: true, renewalNote: "เบี้ยคงที่",
         occNote: "รับประกันเฉพาะชั้นอาชีพ 1-2 เท่านั้น (ไม่รับชั้นอาชีพ 3)", siNote: "ทุนประกันขั้นต่ำ 100,000 บาท · ถ้าทุนต่ำกว่า 500,000 บาท ต้องซื้อสัญญาเพิ่มเติมอย่างน้อย 1 รายการควบคู่ด้วย (ทุนตั้งแต่ 500,000 บาทขึ้นไป ซื้อเดี่ยวได้) · เลือกได้เพียง 1 แบบ จาก 26 แบบทุนประกันหลัก" },
@@ -1129,7 +1129,7 @@ const PRODUCTS = [
     { id: "HAPPYWL9901", name: "แฮปปี้ โฮลไลฟ์ 9901 (มีเงินปันผล)", tag: "แบบประกันหลัก · ชำระเบี้ยครั้งเดียว ทุนสูง", ageMin: 0, ageMax: 65, coverAge: 99, isMain: true, renewalNote: "เบี้ยคงที่",
         occNote: "รับประกันเฉพาะชั้นอาชีพ 1-2 เท่านั้น (ไม่รับชั้นอาชีพ 3)", siNote: "ทุนประกันขั้นต่ำ 500,000 บาท สูงสุด 100,000,000 บาท (รวมทุกกรมธรรม์ตระกูลเพรสทีจา ไลฟ์/แฮปปี้ โฮลไลฟ์) · ชำระเบี้ยครั้งเดียว · เลือกได้เพียง 1 แบบ จาก 26 แบบทุนประกันหลัก" },
     { id: "HAPPYKID", name: "กรุงเทพ แฮปปี้ คิดส์ 99/20", tag: "แบบประกันหลัก · สำหรับเด็ก ชำระเบี้ย 20 ปี", ageMin: 0, ageMax: 14, coverAge: 99, isMain: true, renewalNote: "เบี้ยคงที่",
-        occNote: "รับได้ทุกเพศ (สำหรับผู้เยาว์)", siNote: "ทุนประกันขั้นต่ำ 150,000 บาท สูงสุด 10,000,000 บาท · แถมฟรีสัญญาเพิ่มเติมเพเยอร์ โพรเทค (ทุพพลภาพผู้ชำระเบี้ย) · ผู้ชำระเบี้ยอายุ 20-55 ปี ต้องซื้อ คช. เพิ่ม (มีค่าเบี้ย) · เลือกได้เพียง 1 แบบ จาก 26 แบบทุนประกันหลัก" },
+        occNote: "รับได้ทุกชั้นอาชีพ (สำหรับผู้เยาว์)", siNote: "ทุนประกันขั้นต่ำ 150,000 บาท สูงสุด 10,000,000 บาท · แถมฟรีสัญญาเพิ่มเติมเพเยอร์ โพรเทค (ทุพพลภาพผู้ชำระเบี้ย) · ผู้ชำระเบี้ยอายุ 20-55 ปี ต้องซื้อ คช. เพิ่ม (มีค่าเบี้ย) · เลือกได้เพียง 1 แบบ จาก 26 แบบทุนประกันหลัก" },
     { id: "CHAK", name: "เฉพาะกาล (ฉก.)", tag: "คุ้มครองชีวิตเพิ่มเติมชั่วระยะเวลา 5/10/15/18 ปี", ageMin: 15, ageMax: 60, coverAge: 78, renewalNote: "เบี้ยคงที่",
         occNote: "รับประกันเฉพาะชั้นอาชีพ 1-2 เท่านั้น (ไม่รับชั้นอาชีพ 3)", siNote: "ทุนประกันขั้นต่ำ 100,000 บาท สูงสุดไม่เกิน 10 เท่าของทุนประกันชีวิตหลัก · ระยะเวลาเอาประกันต้องไม่เกินระยะเวลาของกรมธรรม์หลัก" },
     { id: "CHAP", name: "เฉพาะกาลผู้ปกครอง (ฉป.)", tag: "คุ้มครองชีวิตผู้ปกครอง จ่ายให้ผู้เยาว์หากผู้ปกครองเสียชีวิต", ageMin: 0, ageMax: 14, coverAge: 14, renewalNote: "เบี้ยคงที่",
@@ -1161,6 +1161,9 @@ const PRODUCTS = [
     { id: "PENSION888", name: "บีแอลเอ เพนชั่น 888", tag: "แบบประกันหลัก · บำนาญแบบลดหย่อนได้ รับบำนาญอายุ 60-88 ปี ชำระเบี้ย 8 ปี", ageMin: 20, ageMax: 52, coverAge: 88, isMain: true, renewalNote: "เบี้ยคงที่",
         occNote: "รับได้ทุกชั้นอาชีพ (เบี้ยเท่ากันทุกชั้น)", siNote: "ทุนประกันขั้นต่ำ 50,000 บาท ไม่จำกัดทุนสูงสุด · อายุรับประกัน 20-52 ปี · ชำระรายปี/6 เดือน/3 เดือน/รายเดือน (รายเดือนงวดแรกชำระ 2 งวด) · ไม่รับชาวต่างชาติ · ห้ามเพิ่ม/ลดทุนหลังครบรอบปีที่อายุครบ 59 ปี · ลดหย่อนภาษีแบบประกันบำนาญ (ประกาศฯ ฉบับที่ 194) · ไม่ซื้อสัญญาเพิ่มเติม: ใบคำขอไม่มีคำถามสุขภาพ ไม่ต้องตรวจสุขภาพ · กู้ได้ 90% ของมูลค่าเวนคืน ดอกเบี้ย 5.50%/ปี" },
 ];
+// ลำดับแสดงผล: ทุนหลักก่อน → อนุสัญญา → คช. ไว้ท้ายสุด (คช. คิดจากเบี้ยของแบบอื่น)
+const displayRank = (p) => (p.isMain ? 0 : p.id === "CS" ? 2 : 1);
+const PRODUCTS_DISPLAY = [...PRODUCTS].sort((a, b) => displayRank(a) - displayRank(b));
 const RIDER_IDS = PRODUCTS.filter((p) => !p.isMain).map((p) => p.id); // ทุกอย่างที่ไม่ใช่ทุนประกันหลัก (รวม คช.)
 const RIDER_IDS_NO_CS = RIDER_IDS.filter((id) => id !== "CS"); // สำหรับแพ็กเกจที่ยกเว้น คช. ได้ (แคนเซอร์ แม็กซ์)
 /* ============================== MAIN APP ============================== */
@@ -1171,7 +1174,7 @@ function App() {
     const [age, setAge] = useState(35);
     const [occClass, setOccClass] = useState(1);
     const [payMode, setPayMode] = useState("year");
-    const [selected, setSelected] = useState({ SUD: true, LIFE99: false, UNJAI: false, CANCERMAX: false, PLUS2: false, PRESTIGE: false, ACC: true, ACC3: false, TPD: false, SUPER: false, VH: false, VHKIDS: false, RPPR: false, HHP: false, OPD: false, HAPPYCI: false, LLC: false, SS: false, HAPPYPENSION: false, HAPPYSAVING: false, HAPPYWL: false, HRP9920: false, HRPDIV: false, HRP9901: false, HAPPYWL9901: false, HAPPYKID: false, CHAK: false, CHAP: false, PH: false, PSAVE104: false, PSAVE126: false, HS208: false, HS126: false, HS157: false, HS147: false, HS168: false, HS1810: false, HS2515: false, TAXSAVER105: false, BLASAVE168: false, PENSION888: false, CS: false });
+    const [selected, setSelected] = useState({ SUD: false, LIFE99: false, UNJAI: false, CANCERMAX: false, PLUS2: false, PRESTIGE: false, ACC: false, ACC3: false, TPD: false, SUPER: false, VH: false, VHKIDS: false, RPPR: false, HHP: false, OPD: false, HAPPYCI: false, LLC: false, SS: false, HAPPYPENSION: false, HAPPYSAVING: false, HAPPYWL: false, HRP9920: false, HRPDIV: false, HRP9901: false, HAPPYWL9901: false, HAPPYKID: false, CHAK: false, CHAP: false, PH: false, PSAVE104: false, PSAVE126: false, HS208: false, HS126: false, HS157: false, HS147: false, HS168: false, HS1810: false, HS2515: false, TAXSAVER105: false, BLASAVE168: false, PENSION888: false, CS: false });
     const [sudSI, setSudSI] = useState(500000);
     const [life99SI, setLife99SI] = useState(0);
     const [unjaiPlan, setUnjaiPlan] = useState(0);
@@ -2271,7 +2274,7 @@ function App() {
         if (bi < 0)
             return { ok: false, msg: "อายุรับประกัน 0-70 ปี (ต่ออายุได้ถึง 98 ปี)" };
         if (mainSI < 50000)
-            return { ok: false, msg: "ต้องมีทุนประกันหลัก (ตลอดชีพ สุดคุ้ม / ตลอดชีพ 99/99 / คุ้มครอง 2 พลัส / เพรสทีจ ไลฟ์ / แฮปปี้ เพนชั่น) ขั้นต่ำ 50,000 บาท จึงจะซื้อ แอคซิเดนท์ แคร์ ได้" };
+            return { ok: false, msg: "ต้องมีทุนประกันหลัก ขั้นต่ำ 50,000 บาท จึงจะซื้อ แอคซิเดนท์ แคร์ ได้" };
         const pi = ACC_PLANS.indexOf(accPlan);
         if (pi < 0)
             return { ok: false, msg: "กรุณาเลือกแผนความคุ้มครอง" };
@@ -2291,7 +2294,7 @@ function App() {
         if (age < 0 || age > 64)
             return { ok: false, msg: "อายุรับประกัน 0-64 ปี (คุ้มครองถึงอายุ 65 ปี)" };
         if (mainSI < 50000)
-            return { ok: false, msg: "ต้องมีทุนประกันหลัก (ตลอดชีพ สุดคุ้ม / ตลอดชีพ 99/99 / คุ้มครอง 2 พลัส / เพรสทีจ ไลฟ์ / แฮปปี้ เพนชั่น) ขั้นต่ำ 50,000 บาท จึงจะซื้อ อบ.3 พลัส ได้" };
+            return { ok: false, msg: "ต้องมีทุนประกันหลัก ขั้นต่ำ 50,000 บาท จึงจะซื้อ อบ.3 พลัส ได้" };
         const maxPlan = ACC3_MAX_BY_SI(mainSI);
         if (acc3Plan <= 0)
             return { ok: false, msg: "กรุณาเลือกวงเงินค่ารักษาพยาบาล" };
@@ -2310,7 +2313,7 @@ function App() {
             return { ok: false, msg: `อายุรับประกัน ${TPD_MIN_AGE}-65 ปี (ต่ออายุถึง ${TPD_MAX_AGE} ปี)` };
         const maxSI = Math.min(mainSI * 10, 30000000);
         if (mainSI <= 0)
-            return { ok: false, msg: "ต้องระบุทุนประกันหลัก (ตลอดชีพ สุดคุ้ม / ตลอดชีพ 99/99 / คุ้มครอง 2 พลัส / เพรสทีจ ไลฟ์ / แฮปปี้ เพนชั่น) ก่อนจึงจะซื้อทุพพลภาพ โพรเทค ได้" };
+            return { ok: false, msg: "ต้องระบุทุนประกันหลักก่อนจึงจะซื้อทุพพลภาพ โพรเทค ได้" };
         if (tpdSI > maxSI)
             return { ok: false, msg: `ทุนประกันสูงสุด ${baht(maxSI)} (ไม่เกิน 10 เท่าของทุนประกันหลัก ${baht(mainSI)} และไม่เกิน 30,000,000 บาท)` };
         const idx = age - TPD_MIN_AGE;
@@ -2351,7 +2354,7 @@ function App() {
         if (selected.VHKIDS)
             return { ok: false, msg: "ซื้อได้เพียง 1 สัญญา ระหว่าง แวลู เฮลธ์ หรือ แวลู เฮลธ์ คิดส์ พรีเมียร์ (ไม่สามารถเลือกพร้อมกันได้)" };
         if (mainSI < 50000)
-            return { ok: false, msg: "ต้องมีทุนประกันหลัก (ตลอดชีพ สุดคุ้ม / ตลอดชีพ 99/99 / คุ้มครอง 2 พลัส / เพรสทีจ ไลฟ์ / แฮปปี้ เพนชั่น) ขั้นต่ำ 50,000 บาท จึงจะซื้อ แวลู เฮลธ์ ได้" };
+            return { ok: false, msg: "ต้องมีทุนประกันหลัก ขั้นต่ำ 50,000 บาท จึงจะซื้อ แวลู เฮลธ์ ได้" };
         const occGroup = occClass === 3 ? "c3" : "c12";
         const pi = VH_PLANS.indexOf(vhPlan);
         if (pi < 0)
@@ -2370,7 +2373,7 @@ function App() {
         if (selected.VH)
             return { ok: false, msg: "ซื้อได้เพียง 1 สัญญา ระหว่าง แวลู เฮลธ์ หรือ แวลู เฮลธ์ คิดส์ พรีเมียร์ (ไม่สามารถเลือกพร้อมกันได้)" };
         if (mainSI < 50000)
-            return { ok: false, msg: "ต้องมีทุนประกันหลัก (ตลอดชีพ สุดคุ้ม / ตลอดชีพ 99/99 / คุ้มครอง 2 พลัส / เพรสทีจ ไลฟ์ / แฮปปี้ เพนชั่น) ขั้นต่ำ 50,000 บาท จึงจะซื้อ แวลู เฮลธ์ คิดส์ พรีเมียร์ ได้" };
+            return { ok: false, msg: "ต้องมีทุนประกันหลัก ขั้นต่ำ 50,000 บาท จึงจะซื้อ แวลู เฮลธ์ คิดส์ พรีเมียร์ ได้" };
         const pi = VHKIDS_PLANS.indexOf(vhkidsPlan);
         if (pi < 0)
             return { ok: false, msg: "กรุณาเลือกแผนความคุ้มครอง" };
@@ -2389,7 +2392,7 @@ function App() {
             return { ok: false, msg: "อายุรับประกัน 6-64 ปี (คุ้มครองถึงอายุ 65 ปี)" };
         const range = rpprRange(mainSI);
         if (!range)
-            return { ok: false, msg: "ทุนประกันหลัก (ตลอดชีพ สุดคุ้ม / ตลอดชีพ 99/99 / คุ้มครอง 2 พลัส / เพรสทีจ ไลฟ์ / แฮปปี้ เพนชั่น) ต้องขั้นต่ำ 50,000 บาท" };
+            return { ok: false, msg: "ต้องมีทุนประกันหลัก (แบบใดก็ได้) ขั้นต่ำ 50,000 บาท" };
         if (rpprDaily < range[0] || rpprDaily > range[1])
             return { ok: false, msg: `ทุนหลัก ${baht(mainSI)} เลือกความคุ้มครองได้ ${fmt(range[0])}-${fmt(range[1])} บาท/วัน` };
         if (age <= 15 && rpprDaily > 1000)
@@ -2409,7 +2412,7 @@ function App() {
         if (bi < 0)
             return { ok: false, msg: "อายุรับประกัน 11-80 ปี (คุ้มครองถึงอายุ 98 ปี)" };
         if (mainSI < 50000)
-            return { ok: false, msg: "ต้องมีทุนประกันหลัก (ตลอดชีพ สุดคุ้ม / ตลอดชีพ 99/99 / คุ้มครอง 2 พลัส / เพรสทีจ ไลฟ์ / แฮปปี้ เพนชั่น) ขั้นต่ำ 50,000 บาท จึงจะซื้อ แฮปปี้ เฮลธ์ พรีเมียร์ ได้" };
+            return { ok: false, msg: "ต้องมีทุนประกันหลัก ขั้นต่ำ 50,000 บาท จึงจะซื้อ แฮปปี้ เฮลธ์ พรีเมียร์ ได้" };
         const pi = HHP_PLANS.indexOf(hhpPlan);
         const di = HHP_DEDUCT.indexOf(hhpDeduct);
         if (pi < 0)
@@ -2692,7 +2695,7 @@ function App() {
         if (!happywlTerm)
             return { ok: false, msg: "กรุณาเลือกระยะเวลาชำระเบี้ย (5 / 10 / 15 ปี)" };
         if (happywlSI < HAPPYWL_MIN_SI || happywlSI > HAPPYWL_MAX_SI)
-            return { ok: false, msg: `ทุนประกัน ${baht(HAPPYWL_MIN_SI)}-${baht(HAPPYWL_MAX_SI)} บาท` };
+            return { ok: false, msg: `ทุนประกัน ${baht(HAPPYWL_MIN_SI)}-${baht(HAPPYWL_MAX_SI)}` };
         const ti = HAPPYWL_TERMS.indexOf(happywlTerm);
         const disc = happywlDiscount(happywlSI, happywlTerm);
         const rate = (gender === "female" ? HAPPYWL_FEMALE : HAPPYWL_MALE)[age][ti] - disc;
@@ -2772,7 +2775,7 @@ function App() {
         if (occClass === 3)
             return { ok: false, msg: "แฮปปี้ โฮลไลฟ์ 9901 รับประกันเฉพาะชั้นอาชีพ 1-2 เท่านั้น (ไม่รับชั้นอาชีพ 3)" };
         if (happywl9901SI < HAPPYWL9901_MIN_SI || happywl9901SI > HAPPYWL9901_MAX_SI)
-            return { ok: false, msg: `ทุนประกัน ${baht(HAPPYWL9901_MIN_SI)}-${baht(HAPPYWL9901_MAX_SI)} บาท` };
+            return { ok: false, msg: `ทุนประกัน ${baht(HAPPYWL9901_MIN_SI)}-${baht(HAPPYWL9901_MAX_SI)}` };
         const rate = (gender === "female" ? HAPPYWL9901_FEMALE : HAPPYWL9901_MALE)[age];
         const premium = (rate * happywl9901SI) / 1000;
         return { ok: true, premium, benefits: [
@@ -2790,7 +2793,7 @@ function App() {
         if (age < HAPPYKID_MIN_AGE || age > HAPPYKID_MAX_AGE)
             return { ok: false, msg: `อายุรับประกัน ${HAPPYKID_MIN_AGE}-${HAPPYKID_MAX_AGE} ปี (สำหรับผู้เยาว์เท่านั้น)` };
         if (happykidSI < HAPPYKID_MIN_SI || happykidSI > HAPPYKID_MAX_SI)
-            return { ok: false, msg: `ทุนประกัน ${baht(HAPPYKID_MIN_SI)}-${baht(HAPPYKID_MAX_SI)} บาท` };
+            return { ok: false, msg: `ทุนประกัน ${baht(HAPPYKID_MIN_SI)}-${baht(HAPPYKID_MAX_SI)}` };
         const rate = (gender === "female" ? HAPPYKID_FEMALE : HAPPYKID_MALE)[age];
         const premium = (rate * happykidSI) / 1000;
         return { ok: true, premium, benefits: [
@@ -3592,7 +3595,7 @@ function App() {
     function handleCalculate() {
         const errs = [];
         const cards = [];
-        for (const p of PRODUCTS) {
+        for (const p of PRODUCTS_DISPLAY) {
             if (!selected[p.id])
                 continue;
             const r = CALC[p.id]();
@@ -3756,7 +3759,7 @@ function App() {
                             ")")))),
                 PRODUCTS.some((p) => selected[p.id] && openProductCards[p.id]) && (React.createElement("section", { className: "space-y-3" },
                     React.createElement("h2", { className: "text-[24px] font-bold px-1", style: { color: BRAND.mainBlue } }, "\uD83D\uDCDD \u0E01\u0E23\u0E2D\u0E01\u0E02\u0E49\u0E2D\u0E21\u0E39\u0E25\u0E41\u0E1A\u0E1A\u0E1B\u0E23\u0E30\u0E01\u0E31\u0E19\u0E17\u0E35\u0E48\u0E40\u0E25\u0E37\u0E2D\u0E01"),
-                    PRODUCTS.filter((p) => selected[p.id] && openProductCards[p.id]).map((p) => (React.createElement(ProductRow, { key: p.id, product: p, checked: selected[p.id], onToggle: () => toggle(p.id), age: age, live: liveResults[p.id], pending: PRIMARY_FIELD_ZERO[p.id], disabled: productDisabled(p), recommended: recommendedProductIds.has(p.id), recommendedReason: autoMainReason[p.id] ? `companion-${autoMainReason[p.id]}` : undefined, expanded: true, onToggleExpand: () => toggleProductCard(p.id), onShowSchedule: () => setScheduleModal({ name: p.name, rows: buildPremiumSchedule(p.id) }) }, renderProductChildren(p)))))),
+                    PRODUCTS_DISPLAY.filter((p) => selected[p.id] && openProductCards[p.id]).map((p) => (React.createElement(ProductRow, { key: p.id, product: p, checked: selected[p.id], onToggle: () => toggle(p.id), age: age, live: liveResults[p.id], pending: PRIMARY_FIELD_ZERO[p.id], disabled: productDisabled(p), recommended: recommendedProductIds.has(p.id), recommendedReason: autoMainReason[p.id] ? `companion-${autoMainReason[p.id]}` : undefined, expanded: true, onToggleExpand: () => toggleProductCard(p.id), onShowSchedule: () => setScheduleModal({ name: p.name, rows: buildPremiumSchedule(p.id) }) }, renderProductChildren(p)))))),
                 React.createElement("button", { onClick: handleCalculate, className: "w-full rounded-2xl py-4 font-semibold text-white text-[27px] flex items-center justify-center gap-2 transition active:scale-[0.99]", style: { background: `linear-gradient(120deg, ${BRAND.skyDeep}, ${BRAND.navy})`, boxShadow: "0 8px 20px rgba(11,42,85,0.25)" } },
                     React.createElement("span", { style: { fontSize: 22 } }, "🧮"),
                     " \u0E04\u0E33\u0E19\u0E27\u0E13\u0E40\u0E1A\u0E35\u0E49\u0E22\u0E1B\u0E23\u0E30\u0E01\u0E31\u0E19\u0E41\u0E25\u0E30\u0E04\u0E27\u0E32\u0E21\u0E04\u0E38\u0E49\u0E21\u0E04\u0E23\u0E2D\u0E07"),
@@ -3914,7 +3917,8 @@ function NumInput({ value, onChange, min, max, step = 1 }) {
             setText(raw === "" ? "" : Number(raw).toLocaleString("th-TH"));
         }, onBlur: () => {
             setFocused(false);
-            let num = text === "" ? 0 : parseInt(text.replace(/,/g, ""), 10);
+            if (text === "") { setText(fmt(value)); return; } // แตะแล้วแตะออกโดยไม่พิมพ์ = คืนค่าเดิม ไม่เปลี่ยนเป็น 0
+            let num = parseInt(text.replace(/,/g, ""), 10);
             if (min !== undefined)
                 num = Math.max(min, num);
             if (max !== undefined)
