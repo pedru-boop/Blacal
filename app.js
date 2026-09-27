@@ -8,7 +8,7 @@ const BRAND = {
     ink: "#000000", sub: "#404040", danger: "#B93232", warn: "#6B4508",
     label: "#000000", nameBlue: "#1668D6", mainBlue: "#0C2F63", dataBlack: "#000000",
 };
-const APP_VERSION = "v2.11.0 (2569-09-26)"; // อัปเดตเลขนี้ทุกครั้งที่มีการแก้ไข/เพิ่มแบบประกันใหม่ เพื่อให้รู้ว่าไฟล์ที่ใช้อยู่เป็นเวอร์ชันล่าสุดหรือไม่
+const APP_VERSION = "v2.11.1 (2569-09-26)"; // อัปเดตเลขนี้ทุกครั้งที่มีการแก้ไข/เพิ่มแบบประกันใหม่ เพื่อให้รู้ว่าไฟล์ที่ใช้อยู่เป็นเวอร์ชันล่าสุดหรือไม่
 const fmt = (n) => (n === null || n === undefined || isNaN(n) ? "0" : Math.round(n).toLocaleString("th-TH"));
 const baht = (n) => (n === null || n === undefined ? "-" : (typeof n === "string" ? n : fmt(n) + " บาท"));
 /* ============================== PERSISTENT STORAGE (works in Claude.ai artifact and standalone browser) ============================== */
@@ -1250,10 +1250,15 @@ function App() {
     // ทุนประกันหลักที่ใช้เป็นค่าอ้างอิงให้อนุสัญญาอื่นๆ เช็คเงื่อนไข (ต้องมาหลังประกาศ state ของทุกแบบทุนหลักด้านบนแล้วเท่านั้น)
     // ทุนประกันหลัก (mainSI) ย้ายไปคำนวณหลัง SAVINGS_DEFS — ดู mainSIOf()
     const [result, setResult] = useState(null);
-    const [showComm, setShowComm] = useState(false); // ป๊อปอัพค่าคอม (แสดงเฉพาะตอนกดค้างกล่องเบี้ยรวม 4 วินาที)
-    const commTimer = useRef(null);
-    const commPressStart = () => { clearTimeout(commTimer.current); commTimer.current = setTimeout(() => setShowComm(true), 4000); };
-    const commPressEnd = () => { clearTimeout(commTimer.current); setShowComm(false); };
+    const [showComm, setShowComm] = useState(false); // ป๊อปอัพค่าคอม (แตะกล่องเบี้ยรวมติดกัน 3 ครั้ง, ปิดด้วยปุ่ม ✕)
+    const commTaps = useRef({ n: 0, t: 0 });
+    const commTap = () => {
+        const now = Date.now();
+        const c = commTaps.current;
+        c.n = now - c.t < 500 ? c.n + 1 : 1; // แต่ละครั้งห่างกันไม่เกิน 0.5 วินาที
+        c.t = now;
+        if (c.n >= 3) { c.n = 0; setShowComm(true); }
+    };
     const [scheduleModal, setScheduleModal] = useState(null); // { name, rows } — ตารางอัตราเบี้ยที่จะปรับในอนาคตของแบบที่ไม่ใช่เบี้ยคงที่
     const [savingsScheduleOpen, setSavingsScheduleOpen] = useState({}); // เปิด/ปิดตารางกระแสเงินคืนรายปีของแบบสะสมทรัพย์ (แสดงในหน้าเดียวกัน ไม่ใช่ป็อปอัพ)
     const [modal, setModal] = useState(null);
@@ -3847,7 +3852,7 @@ function App() {
                     React.createElement("span", { style: { fontSize: 22 } }, "🧮"),
                     " \u0E04\u0E33\u0E19\u0E27\u0E13\u0E40\u0E1A\u0E35\u0E49\u0E22\u0E1B\u0E23\u0E30\u0E01\u0E31\u0E19\u0E41\u0E25\u0E30\u0E04\u0E27\u0E32\u0E21\u0E04\u0E38\u0E49\u0E21\u0E04\u0E23\u0E2D\u0E07"),
                 result && (React.createElement("section", { className: "space-y-4" },
-                    React.createElement("div", { className: "rounded-2xl p-5 text-white", style: { background: `linear-gradient(120deg, ${BRAND.green}, ${BRAND.greenDeep})`, userSelect: "none", WebkitUserSelect: "none", WebkitTouchCallout: "none" }, onPointerDown: commPressStart, onPointerUp: commPressEnd, onPointerLeave: commPressEnd, onPointerCancel: commPressEnd, onContextMenu: (e) => e.preventDefault() },
+                    React.createElement("div", { className: "rounded-2xl p-5 text-white", style: { background: `linear-gradient(120deg, ${BRAND.green}, ${BRAND.greenDeep})`, userSelect: "none", WebkitUserSelect: "none", WebkitTouchCallout: "none" }, onClick: commTap },
                         React.createElement("p", { className: "text-[24px] opacity-90" },
                             "\u0E40\u0E1A\u0E35\u0E49\u0E22\u0E1B\u0E23\u0E30\u0E01\u0E31\u0E19\u0E20\u0E31\u0E22\u0E23\u0E27\u0E21 (",
                             result.payLabel,
@@ -3858,7 +3863,7 @@ function App() {
                             "\u0E40\u0E17\u0E35\u0E22\u0E1A\u0E40\u0E17\u0E48\u0E32\u0E40\u0E1A\u0E35\u0E49\u0E22\u0E23\u0E32\u0E22\u0E1B\u0E35\u0E23\u0E27\u0E21 ",
                             baht(result.totalYear))),
                     React.createElement(BenefitBoard, { cards: result.cards }),
-                    showComm && React.createElement(CommissionPopup, { result }),
+                    showComm && React.createElement(CommissionPopup, { result, onClose: () => setShowComm(false) }),
                     React.createElement("div", { className: "grid sm:grid-cols-2 gap-4" }, result.cards.map((c) => (React.createElement("div", { key: c.id, className: "rounded-2xl overflow-hidden", style: { background: BRAND.card, boxShadow: "0 6px 20px rgba(11,42,85,0.08)", borderTop: `4px solid ${BRAND.sky}`, position: "relative" } },
                         c.renewalNote && (React.createElement("span", { className: "absolute top-3 right-3 text-[15px] font-medium px-2 py-1 rounded-full z-10", style: { background: BRAND.bg, color: BRAND.sub, border: "1px solid #D7E8F0" } }, c.renewalNote)),
                         React.createElement("div", { className: "p-5" },
@@ -3986,16 +3991,17 @@ function BenefitBoard({ cards }) {
         }))));
 }
 /* ============================== UI PARTS ============================== */
-function CommissionPopup({ result }) {
+function CommissionPopup({ result, onClose }) {
     const rows = result.cards;
     const perPay = rows.reduce((t, c) => t + (c.commPerPay || 0), 0);
     const year1 = rows.reduce((t, c) => t + (c.commYear1 || 0), 0);
     const missing = rows.some((c) => c.commRate === null);
     const multi = rows.some((c) => c.commN > 1);
     const cell = "py-1.5 px-1 text-right whitespace-nowrap";
-    return (React.createElement("div", { className: "fixed inset-0 z-50 flex items-center justify-center p-3", style: { background: "rgba(10,36,82,0.55)", pointerEvents: "none" } },
-        React.createElement("div", { className: "w-full max-w-md rounded-2xl p-4", style: { background: "#fff", color: BRAND.navy, boxShadow: "0 12px 40px rgba(0,0,0,0.35)" } },
-            React.createElement("p", { className: "text-[22px] font-semibold mb-2" }, "💼 ค่านายหน้าปีที่ 1 (FYC)"),
+    return (React.createElement("div", { className: "fixed inset-0 z-50 flex items-center justify-center p-3", style: { background: "rgba(10,36,82,0.55)" } },
+        React.createElement("div", { className: "w-full max-w-md rounded-2xl p-4 relative", style: { background: "#fff", color: BRAND.navy, boxShadow: "0 12px 40px rgba(0,0,0,0.35)" } },
+            React.createElement("button", { onClick: onClose, "aria-label": "ปิด", className: "absolute top-2 right-2 w-10 h-10 rounded-full flex items-center justify-center text-[22px] font-bold", style: { background: BRAND.bg, color: BRAND.navy } }, "✕"),
+            React.createElement("p", { className: "text-[22px] font-semibold mb-2 pr-10" }, "💼 ค่านายหน้าปีที่ 1 (FYC)"),
             React.createElement("table", { className: "w-full text-[17px]" },
                 React.createElement("thead", null, React.createElement("tr", { style: { color: BRAND.sub, borderBottom: "1px solid #D7E8F0" } },
                     React.createElement("th", { className: "py-1 text-left font-medium" }, "แบบ"),
