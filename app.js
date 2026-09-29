@@ -8,7 +8,7 @@ const BRAND = {
     ink: "#000000", sub: "#404040", danger: "#B93232", warn: "#6B4508",
     label: "#000000", nameBlue: "#1668D6", mainBlue: "#0C2F63", dataBlack: "#000000",
 };
-const APP_VERSION = "v2.11.1 (2569-09-26)"; // อัปเดตเลขนี้ทุกครั้งที่มีการแก้ไข/เพิ่มแบบประกันใหม่ เพื่อให้รู้ว่าไฟล์ที่ใช้อยู่เป็นเวอร์ชันล่าสุดหรือไม่
+const APP_VERSION = "v2.11.3 (2569-09-27)"; // อัปเดตเลขนี้ทุกครั้งที่มีการแก้ไข/เพิ่มแบบประกันใหม่ เพื่อให้รู้ว่าไฟล์ที่ใช้อยู่เป็นเวอร์ชันล่าสุดหรือไม่
 const fmt = (n) => (n === null || n === undefined || isNaN(n) ? "0" : Math.round(n).toLocaleString("th-TH"));
 const baht = (n) => (n === null || n === undefined ? "-" : (typeof n === "string" ? n : fmt(n) + " บาท"));
 /* ============================== PERSISTENT STORAGE (works in Claude.ai artifact and standalone browser) ============================== */
@@ -1040,7 +1040,7 @@ const SINGLE_PREMIUM_MAIN_IDS = ["HRP9901", "HAPPYWL9901"]; // ชำระเ�
 const YEAR_OR_MONTH_MAIN_IDS = ["HS2515"]; // รายปี หรือ รายเดือนเท่านั้น (รายเดือน = เบี้ยรายปี ÷ 12)
 // แบบประกันหลักที่ไม่อนุญาตให้ผู้เยาว์ซื้อ คช. (หรือไม่อนุญาตให้ซื้อสัญญาเพิ่มเติมใดๆ)
 // แบบประกันหลักที่ผู้เยาว์ (0-14 ปี) ต้องซื้อ คช. ด้วย (ห่วงรัก 99/20 เฉพาะอายุ 0-4 ปี)
-const CS_REQUIRED_MAIN_IDS = ["CANCERMAX", "HAPPYKID", "HRPDIV", "HS1810", "HS2515"];
+const CS_REQUIRED_MAIN_IDS = ["CANCERMAX", "HAPPYKID", "HRPDIV", "HS1810", "HS2515", "HAPPYSAVING"];
 // แบบประกันหลักที่ไม่อนุญาตให้ซื้อสัญญาเพิ่มเติมใดๆ
 const NO_RIDER_MAIN_IDS = ["UNJAI", "PSAVE104", "PSAVE126"];
 // แบบที่ผลประโยชน์กรณีเสียชีวิต = % ของทุน หรือเบี้ยประกันชีวิตสะสม แล้วแต่อย่างใดมากกว่า
@@ -2518,18 +2518,18 @@ function App() {
         if (ti < 0)
             return { ok: false, msg: "กรุณาเลือกระยะเวลาชำระเบี้ย (20 ปี หรือ ถึงอายุ 99 ปี)" };
         if (happyciSI < HAPPYCI_MIN_SI || happyciSI > HAPPYCI_MAX_SI)
-            return { ok: false, msg: `ทุนประกัน ${baht(HAPPYCI_MIN_SI)}-${baht(HAPPYCI_MAX_SI)} บาทต่อกรมธรรม์` };
+            return { ok: false, msg: `ทุนประกัน ${baht(HAPPYCI_MIN_SI)}-${baht(HAPPYCI_MAX_SI)}ต่อกรมธรรม์` };
         const rate = (gender === "female" ? HAPPYCI_FEMALE : HAPPYCI_MALE)[age][ti];
         const premium = (rate * happyciSI) / 1000;
         const partialAmt = Math.round(happyciSI * 0.2);
         return { ok: true, premium, benefits: [
                 ["ระยะเวลาชำระเบี้ยที่เลือก", happyciTerm === 20 ? "20 ปี" : "ถึงอายุ 99 ปี"],
                 ["ทุนประกันภัย", baht(happyciSI)],
-                ["เจ็บป่วยด้วยมะเร็งระยะไม่ลุกลาม (ต่อครั้ง)", `รับ ${baht(partialAmt)} บาท (20% ของทุนประกันภัย) — เป็นมะเร็งต่างชนิด/อวัยวะกันเคลมซ้ำได้อีก แต่รวมกันไม่เกิน ${baht(happyciSI)} บาท`],
-                ["เจ็บป่วยด้วยโรคร้ายแรงอื่นๆ หรือมะเร็งระยะลุกลาม", `รับ ${baht(happyciSI)} บาท (100% ของทุนประกันภัย) หักด้วยยอดที่เคยเบิกกรณีมะเร็งระยะไม่ลุกลามไปแล้ว (ถ้ามี) — เมื่อรับผลประโยชน์ครบ ${baht(happyciSI)} บาทแล้ว สัญญาเพิ่มเติมนี้สิ้นผลบังคับทันที`],
-                ["ครบกำหนดสัญญา (อายุ 99 ปี หากยังไม่เคยเบิกครบ 100%)", `รับคืน ${baht(happyciSI)} บาท หรือเบี้ยที่ชำระแล้วสะสม หรือมูลค่าเวนคืนกรมธรรม์ แล้วแต่จำนวนใดมากกว่า หักด้วยผลประโยชน์โรคร้ายแรงที่เคยได้รับไปแล้ว (ถ้ามี)`],
+                ["เจ็บป่วยด้วยมะเร็งระยะไม่ลุกลาม (ต่อครั้ง)", `รับ ${baht(partialAmt)} (20% ของทุนประกันภัย) — เป็นมะเร็งต่างชนิด/อวัยวะกันเคลมซ้ำได้อีก แต่รวมกันไม่เกิน ${baht(happyciSI)}`],
+                ["เจ็บป่วยด้วยโรคร้ายแรงอื่นๆ หรือมะเร็งระยะลุกลาม", `รับ ${baht(happyciSI)} (100% ของทุนประกันภัย) หักด้วยยอดที่เคยเบิกกรณีมะเร็งระยะไม่ลุกลามไปแล้ว (ถ้ามี) — เมื่อรับผลประโยชน์ครบ ${baht(happyciSI)}แล้ว สัญญาเพิ่มเติมนี้สิ้นผลบังคับทันที`],
+                ["ครบกำหนดสัญญา (อายุ 99 ปี หากยังไม่เคยเบิกครบ 100%)", `รับคืน ${baht(happyciSI)} หรือเบี้ยที่ชำระแล้วสะสม หรือมูลค่าเวนคืนกรมธรรม์ แล้วแต่จำนวนใดมากกว่า หักด้วยผลประโยชน์โรคร้ายแรงที่เคยได้รับไปแล้ว (ถ้ามี)`],
                 ["เสียชีวิต (กรณีทั่วไป ไม่เกี่ยวกับโรคร้ายแรง)", "รับมูลค่าเวนคืนกรมธรรม์ของสัญญาเพิ่มเติมนี้ (ถ้ามี)"],
-                ["เสียชีวิตระหว่างบริษัทกำลังพิจารณาจ่ายเคลมโรคร้ายแรง", `รับผลประโยชน์โรคร้ายแรงที่กำลังพิจารณาแทน สูงสุด ${baht(happyciSI)} บาท ให้แก่ผู้รับประโยชน์`],
+                ["เสียชีวิตระหว่างบริษัทกำลังพิจารณาจ่ายเคลมโรคร้ายแรง", `รับผลประโยชน์โรคร้ายแรงที่กำลังพิจารณาแทน สูงสุด ${baht(happyciSI)} ให้แก่ผู้รับประโยชน์`],
                 ["ระยะเวลาคุ้มครอง", "รับประกันตั้งแต่อายุแรกเกิด (0 ปี) ถึง 75 ปี คุ้มครองถึงอายุ 99 ปี"],
             ] };
     }
@@ -2542,7 +2542,7 @@ function App() {
         if (!llcVariant)
             return { ok: false, msg: "กรุณาเลือกแบบ ลองไลฟ์แคร์ (10) หรือ ลองไลฟ์แคร์ พลัส (99)" };
         if (llcSI < LLC_MIN_SI || llcSI > LLC_MAX_SI)
-            return { ok: false, msg: `ทุนประกัน ${baht(LLC_MIN_SI)}-${baht(LLC_MAX_SI)} บาทต่อกรมธรรม์` };
+            return { ok: false, msg: `ทุนประกัน ${baht(LLC_MIN_SI)}-${baht(LLC_MAX_SI)}ต่อกรมธรรม์` };
         const table = llcVariant === "99" ? (gender === "female" ? LLC99_FEMALE : LLC99_MALE) : (gender === "female" ? LLC10_FEMALE : LLC10_MALE);
         const rate = table[idx];
         const premium = (rate * llcSI) / 1000;
@@ -2567,7 +2567,7 @@ function App() {
         if (bi < 0 || age > SS_MAX_AGE)
             return { ok: false, msg: `อายุรับประกัน ${SS_MIN_AGE}-${SS_MAX_AGE} ปี (ต่ออายุความคุ้มครองได้ถึงอายุ 65 ปี)` };
         if (ssSI < SS_MIN_SI)
-            return { ok: false, msg: `ทุนประกันขั้นต่ำ ${baht(SS_MIN_SI)} บาท` };
+            return { ok: false, msg: `ทุนประกันขั้นต่ำ ${baht(SS_MIN_SI)}` };
         const rate = (gender === "female" ? SS_FEMALE : SS_MALE)[bi];
         const premium = (rate * ssSI) / 1000;
         return { ok: true, premium, benefits: [
@@ -2641,7 +2641,7 @@ function App() {
             }
             else if (effectiveSI < minSI) {
                 ok = false;
-                msg = `ทุนที่คำนวณได้ต่ำกว่าขั้นต่ำ ${baht(minSI)} บาท`;
+                msg = `ทุนที่คำนวณได้ต่ำกว่าขั้นต่ำ ${baht(minSI)}`;
             }
         }
         const pension = ok ? effectiveSI * pct : 0;
@@ -2678,7 +2678,7 @@ function App() {
             return { ok: false, msg: "กรุณาเลือกระยะเวลาชำระเบี้ย (5 ปี หรือ 10 ปี)" };
         const si = getEffectiveSI("HAPPYSAVING");
         if (si < HAPPYSAVING_MIN_SI)
-            return { ok: false, msg: (savingsMode.HAPPYSAVING === "premium" ? `เบี้ยที่กรอกต่ำเกินไป (ทุนที่คำนวณได้ต้องไม่ต่ำกว่า ${baht(HAPPYSAVING_MIN_SI)})` : `ทุนประกันขั้นต่ำ ${baht(HAPPYSAVING_MIN_SI)} บาท`) };
+            return { ok: false, msg: (savingsMode.HAPPYSAVING === "premium" ? `เบี้ยที่กรอกต่ำเกินไป (ทุนที่คำนวณได้ต้องไม่ต่ำกว่า ${baht(HAPPYSAVING_MIN_SI)})` : `ทุนประกันขั้นต่ำ ${baht(HAPPYSAVING_MIN_SI)}`) };
         const table = happysavingTerm === 5
             ? (gender === "female" ? HAPPYSAVING5_FEMALE : HAPPYSAVING5_MALE)
             : (gender === "female" ? HAPPYSAVING10_FEMALE : HAPPYSAVING10_MALE);
@@ -2688,7 +2688,7 @@ function App() {
                 ["ระยะเวลาชำระเบี้ยที่เลือก", happysavingTerm + " ปี"],
                 ["ทุนประกันภัย", baht(si)],
                 ["เงินคืนรายปี", baht(Math.round(si * 0.04)) + " ต่อปี (4% ของทุนประกันภัย) ตั้งแต่ปีกรมธรรม์ที่ 1 จนถึงอายุครบ 98 ปี"],
-                ["คุ้มครองชีวิต ปีกรมธรรม์ที่ 1-5", "100% / 200% / 300% / 400% / 500% ของทุนประกันภัย ตามลำดับปี"],
+                ["คุ้มครองชีวิต ปีกรมธรรม์ที่ 1-5", "100% / 200% / 300% / 400% / 500% ของทุนประกันภัย ตามลำดับปี หรือ 105% ของเบี้ยสะสม แล้วแต่อย่างใดมากกว่า"],
                 ["คุ้มครองชีวิตเพิ่มพิเศษ ปีที่ 6 เป็นต้นไป", "เพิ่มขึ้นปีละ 10% ของทุนประกันภัย จากปีที่ 5 (500%) สูงสุดถึง 700% ของทุนประกันภัย"],
                 ["ครบกำหนดสัญญา (อายุ 99 ปี)", "รับ 700% ของทุนประกันภัย หรือเบี้ยประกันชีวิตสะสมตามจริง แล้วแต่จำนวนใดมากกว่า"],
                 ["เงินปันผล", "ไม่รับประกัน ขึ้นอยู่กับผลตอบแทนการลงทุนของบริษัทในแต่ละปี"],
@@ -2725,7 +2725,7 @@ function App() {
         if (age < HRP9920_MIN_AGE || age > HRP9920_MAX_AGE)
             return { ok: false, msg: `อายุรับประกัน ${HRP9920_MIN_AGE}-${HRP9920_MAX_AGE} ปี` };
         if (hrp9920SI < HRP9920_MIN_SI)
-            return { ok: false, msg: `ทุนประกันขั้นต่ำ ${baht(HRP9920_MIN_SI)} บาท` };
+            return { ok: false, msg: `ทุนประกันขั้นต่ำ ${baht(HRP9920_MIN_SI)}` };
         if (hrp9920SI < 500000 && !RIDER_IDS.some((id) => selected[id]))
             return { ok: false, msg: "ทุนประกันต่ำกว่า 500,000 บาท ต้องซื้อสัญญาเพิ่มเติมอย่างน้อย 1 รายการควบคู่ (ตั้งแต่ 500,000 บาทขึ้นไปซื้อเดี่ยวได้)" };
         const rate = (gender === "female" ? HRP9920_FEMALE : HRP9920_MALE)[age] - hrp9920Discount(hrp9920SI);
@@ -2745,7 +2745,7 @@ function App() {
         if (!hrpdivTerm)
             return { ok: false, msg: "กรุณาเลือกระยะเวลาชำระเบี้ย (5 / 10 / 15 / 20 ปี)" };
         if (hrpdivSI < HRPDIV_MIN_SI)
-            return { ok: false, msg: `ทุนประกันขั้นต่ำ ${baht(HRPDIV_MIN_SI)} บาท` };
+            return { ok: false, msg: `ทุนประกันขั้นต่ำ ${baht(HRPDIV_MIN_SI)}` };
         const ti = HRPDIV_TERMS.indexOf(hrpdivTerm);
         const disc = hrpdivDiscount(hrpdivSI, hrpdivTerm);
         const rate = (gender === "female" ? HRPDIV_FEMALE : HRPDIV_MALE)[age][ti] - disc;
@@ -2765,7 +2765,7 @@ function App() {
         if (age < HRP9901_MIN_AGE || age > HRP9901_MAX_AGE)
             return { ok: false, msg: `อายุรับประกัน ${HRP9901_MIN_AGE}-${HRP9901_MAX_AGE} ปี` };
         if (hrp9901SI < HRP9901_MIN_SI)
-            return { ok: false, msg: `ทุนประกันขั้นต่ำ ${baht(HRP9901_MIN_SI)} บาท` };
+            return { ok: false, msg: `ทุนประกันขั้นต่ำ ${baht(HRP9901_MIN_SI)}` };
         const rate = (gender === "female" ? HRP9901_FEMALE : HRP9901_MALE)[age];
         const premium = (rate * hrp9901SI) / 1000;
         return { ok: true, premium, benefits: [
@@ -2827,7 +2827,7 @@ function App() {
             return { ok: false, msg: "ต้องระบุทุนประกันชีวิตหลักก่อน จึงจะซื้อ เฉพาะกาล (ฉก.) ได้" };
         const maxSI = mainSI * 10;
         if (chakSI < CHAK_MIN_SI)
-            return { ok: false, msg: `ทุนประกันขั้นต่ำ ${baht(CHAK_MIN_SI)} บาท` };
+            return { ok: false, msg: `ทุนประกันขั้นต่ำ ${baht(CHAK_MIN_SI)}` };
         if (chakSI > maxSI)
             return { ok: false, msg: `ทุนประกันสูงสุด ${baht(maxSI)} (ไม่เกิน 10 เท่าของทุนประกันชีวิตหลัก ${baht(mainSI)})` };
         const ti = CHAK_TERMS.indexOf(chakTerm);
@@ -2851,7 +2851,7 @@ function App() {
         if (chapPayorAge + chapTerm > 65)
             return { ok: false, msg: "อายุผู้ปกครองรวมกับระยะเวลาเอาประกันภัยต้องไม่เกิน 65 ปี" };
         if (chapSI < CHAK_MIN_SI)
-            return { ok: false, msg: `ทุนประกันขั้นต่ำ ${baht(CHAK_MIN_SI)} บาท` };
+            return { ok: false, msg: `ทุนประกันขั้นต่ำ ${baht(CHAK_MIN_SI)}` };
         const ti = CHAK_TERMS.indexOf(chapTerm);
         const idx = chapPayorAge - CHAK_MIN_AGE;
         if (idx < 0 || idx >= (chapPayorGender === "female" ? CHAK_FEMALE : CHAK_MALE).length)
@@ -2869,7 +2869,7 @@ function App() {
         if (age < PH_MIN_AGE || age > PH_MAX_AGE)
             return { ok: false, msg: `อายุรับประกัน ${PH_MIN_AGE}-${PH_MAX_AGE} ปี (ต่ออายุได้ถึงอายุ 98 ปี)` };
         if (mainSI < PH_MIN_MAIN_SI)
-            return { ok: false, msg: `ต้องมีทุนประกันชีวิตหลักขั้นต่ำ ${baht(PH_MIN_MAIN_SI)} บาท จึงจะซื้อ เพรสทีจ เฮลธ์ ปลดล็อค ได้` };
+            return { ok: false, msg: `ต้องมีทุนประกันชีวิตหลักขั้นต่ำ ${baht(PH_MIN_MAIN_SI)} จึงจะซื้อ เพรสทีจ เฮลธ์ ปลดล็อค ได้` };
         if (!phPlan)
             return { ok: false, msg: "กรุณาเลือกแผนความคุ้มครอง (20 / 30 / 50 / 100 / 200 ล้านบาท)" };
         if (phDeduct === null)
@@ -2941,7 +2941,7 @@ function App() {
             return { ok: false, msg: `อายุรับประกัน ${PSAVE104_MIN_AGE}-${PSAVE104_MAX_AGE} ปี` };
         const si = getEffectiveSI("PSAVE104");
         if (si < PSAVE104_MIN_SI)
-            return { ok: false, msg: (savingsMode.PSAVE104 === "premium" ? `เบี้ยที่กรอกต่ำเกินไป (ทุนที่คำนวณได้ต้องไม่ต่ำกว่า ${baht(PSAVE104_MIN_SI)})` : `ทุนประกันขั้นต่ำ ${baht(PSAVE104_MIN_SI)} บาท`) };
+            return { ok: false, msg: (savingsMode.PSAVE104 === "premium" ? `เบี้ยที่กรอกต่ำเกินไป (ทุนที่คำนวณได้ต้องไม่ต่ำกว่า ${baht(PSAVE104_MIN_SI)})` : `ทุนประกันขั้นต่ำ ${baht(PSAVE104_MIN_SI)}`) };
         const rate = PSAVE104_RATE - psave104Discount(si);
         const premium = getDisplayPremium("PSAVE104", (rate * si) / 1000);
         return { ok: true, premium, benefits: [
@@ -2965,7 +2965,7 @@ function App() {
             return { ok: false, msg: `อายุรับประกัน ${PSAVE126_MIN_AGE}-${PSAVE126_MAX_AGE} ปี` };
         const si = getEffectiveSI("PSAVE126");
         if (si < PSAVE126_MIN_SI)
-            return { ok: false, msg: (savingsMode.PSAVE126 === "premium" ? `เบี้ยที่กรอกต่ำเกินไป (ทุนที่คำนวณได้ต้องไม่ต่ำกว่า ${baht(PSAVE126_MIN_SI)})` : `ทุนประกันขั้นต่ำ ${baht(PSAVE126_MIN_SI)} บาท`) };
+            return { ok: false, msg: (savingsMode.PSAVE126 === "premium" ? `เบี้ยที่กรอกต่ำเกินไป (ทุนที่คำนวณได้ต้องไม่ต่ำกว่า ${baht(PSAVE126_MIN_SI)})` : `ทุนประกันขั้นต่ำ ${baht(PSAVE126_MIN_SI)}`) };
         const rate = psave126Rate(age);
         const premium = getDisplayPremium("PSAVE126", (rate * si) / 1000);
         return { ok: true, premium, benefits: [
@@ -3012,7 +3012,7 @@ function App() {
         }
         const lastCash = sch[sch.length - 1][1];
         lines.push(["เงินคืนรายปี (การันตี)", "ดูตารางเงินคืนตลอดสัญญาด้านล่าง"]);
-        lines.push(["ครบกำหนดสัญญา (ปีสุดท้าย)", baht(Math.round(si * lastCash / 100)) + ` (${lastCash}% ของทุนประกันภัย รวมเงินคืนปกติ+เงินคืนครบกำหนด)`]);
+        lines.push(["ครบกำหนดสัญญา (ปีสุดท้าย)", baht(Math.round(si * lastCash / 100)) + ` (${lastCash}% ของทุนประกันภัย — ยอดรวมที่ได้รับในวันครบกำหนดสัญญา)`]);
         return lines;
     }
     function calcGenericSavings(id) {
@@ -3023,7 +3023,7 @@ function App() {
             return { ok: false, msg: `อายุรับประกัน ${def.minAge}-${def.maxAge} ปี` };
         const si = getEffectiveSI(id);
         if (si < def.minSI)
-            return { ok: false, msg: (savingsMode[id] === "premium" ? `เบี้ยที่กรอกต่ำเกินไป (ทุนที่คำนวณได้ต้องไม่ต่ำกว่า ${baht(def.minSI)})` : `ทุนประกันขั้นต่ำ ${baht(def.minSI)} บาท`) };
+            return { ok: false, msg: (savingsMode[id] === "premium" ? `เบี้ยที่กรอกต่ำเกินไป (ทุนที่คำนวณได้ต้องไม่ต่ำกว่า ${baht(def.minSI)})` : `ทุนประกันขั้นต่ำ ${baht(def.minSI)}`) };
         const rate = def.rate(age, gender) - def.discount(si, age);
         const premium = getDisplayPremium(id, (rate * si) / 1000);
         return { ok: true, premium, benefits: [
@@ -3072,7 +3072,7 @@ function App() {
             }
             else if (effectiveSI < PENSION888_MIN_SI) {
                 ok = false;
-                msg = `ทุนที่คำนวณได้ต่ำกว่าขั้นต่ำ ${baht(PENSION888_MIN_SI)} บาท`;
+                msg = `ทุนที่คำนวณได้ต่ำกว่าขั้นต่ำ ${baht(PENSION888_MIN_SI)}`;
             }
         }
         const firstPension = ok ? effectiveSI * PENSION888_FIRST_PENSION_PCT : 0;
@@ -3293,7 +3293,7 @@ function App() {
                 else {
                     cashPct = 4;
                 }
-                rows.push({ year: n, age: age + n - 1, premium, cashPct, cashBaht: Math.round(si * (cashPct / 100)), coverageBaht: Math.round(si * (deathPct / 100)), note: n === happysavingTerm ? "ชำระเบี้ยปีสุดท้าย" : note });
+                rows.push({ year: n, age: age + n - 1, premium, cashPct, cashBaht: Math.round(si * (cashPct / 100)), coverageBaht: Math.round(Math.max(si * (deathPct / 100), cumPremium * 1.05)), /* เสียชีวิต = % ทุน หรือ 105% ของเบี้ยสะสม */ note: n === happysavingTerm ? "ชำระเบี้ยปีสุดท้าย" : note });
             }
             const irr = calcIRR((() => {
                 const cf = new Array(totalYears + 1).fill(0);
@@ -4118,44 +4118,45 @@ function SavingsScheduleTable({ rows, irr, title, onPrint }) {
     return (React.createElement("div", { className: "mt-2" },
         React.createElement("div", { className: "flex items-center justify-between gap-2 mb-1.5 flex-wrap" },
             React.createElement("button", { onClick: () => setFitLevel((l) => (l + 1) % TABLE_FIT_LEVELS.length), className: "text-[17px] font-medium px-3 py-1.5 rounded-full", style: { background: BRAND.bg, color: BRAND.navy, border: "1px solid #D7E8F0" } },
-                "\uD83D\uDD0D \u0E22\u0E48\u0E2D\u0E15\u0E32\u0E23\u0E32\u0E07\u0E43\u0E2B\u0E49\u0E1E\u0E2D\u0E14\u0E35\u0E08\u0E2D (",
+                "\uD83D\uDD0D ย่อตารางให้พอดีจอ (",
                 fit.label,
                 ")"),
-            onPrint && (React.createElement("button", { onClick: () => onPrint({ type: "savings", title, rows, totalPremium, totalCash, diff, irr }), className: "text-[17px] font-medium px-3 py-1.5 rounded-full", style: { background: BRAND.bg, color: BRAND.navy, border: "1px solid #D7E8F0" } }, "\uD83D\uDDA8\uFE0F \u0E1E\u0E34\u0E21\u0E1E\u0E4C / \u0E1A\u0E31\u0E19\u0E17\u0E36\u0E01\u0E40\u0E1B\u0E47\u0E19 PDF"))),
+            onPrint && (React.createElement("button", { onClick: () => onPrint({ type: "savings", title, rows, totalPremium, totalCash, diff, irr }), className: "text-[17px] font-medium px-3 py-1.5 rounded-full", style: { background: BRAND.bg, color: BRAND.navy, border: "1px solid #D7E8F0" } }, "\uD83D\uDDA8\uFE0F พิมพ์ / บันทึกเป็น PDF"))),
         React.createElement("div", { className: "rounded-xl border overflow-x-auto", style: { borderColor: "#D7E8F0" } },
-            React.createElement("table", { className: "w-full", style: { minWidth: 560 } },
+            React.createElement("table", { className: "w-full", style: { minWidth: 560, tableLayout: "fixed" } },
+                React.createElement("colgroup", null, ["10%", "20%", "10%", "20%", "20%", "20%"].map((w, i) => React.createElement("col", { key: i, style: { width: w } }))),
                 React.createElement("thead", { style: { background: BRAND.bg } },
                     React.createElement("tr", null,
-                        React.createElement("th", { className: "text-center", style: Object.assign(Object.assign({}, cell), { color: BRAND.navy }) }, "\u0E2D\u0E32\u0E22\u0E38"),
-                        React.createElement("th", { className: "text-right", style: Object.assign(Object.assign({}, cell), { color: BRAND.navy }) }, "\u0E40\u0E1A\u0E35\u0E49\u0E22\u0E15\u0E48\u0E2D\u0E1B\u0E35"),
-                        React.createElement("th", { className: "text-right", style: Object.assign(Object.assign({}, cell), { color: BRAND.navy }) }, "\u0E40\u0E07\u0E34\u0E19\u0E04\u0E37\u0E19 %"),
-                        React.createElement("th", { className: "text-right", style: Object.assign(Object.assign({}, cell), { color: BRAND.navy }) }, "\u0E40\u0E07\u0E34\u0E19\u0E04\u0E37\u0E19 (\u0E1A\u0E32\u0E17)"),
-                        React.createElement("th", { className: "text-right", style: Object.assign(Object.assign({}, cell), { color: BRAND.navy }) }, "\u0E04\u0E27\u0E32\u0E21\u0E04\u0E38\u0E49\u0E21\u0E04\u0E23\u0E2D\u0E07 (\u0E1A\u0E32\u0E17)"),
-                        React.createElement("th", { className: "text-left", style: Object.assign(Object.assign({}, cell), { color: BRAND.navy }) }, "\u0E2B\u0E21\u0E32\u0E22\u0E40\u0E2B\u0E15\u0E38"))),
+                        React.createElement("th", { className: "text-center", style: Object.assign(Object.assign({}, cell), { color: BRAND.navy }) }, "อายุ"),
+                        React.createElement("th", { className: "text-center", style: Object.assign(Object.assign({}, cell), { color: BRAND.navy }) }, "เบี้ยต่อปี", React.createElement("span", { style: { display: "block", fontSize: "0.78em", fontWeight: 400, color: BRAND.sub } }, "(ณ ต้นปีกรมธรรม์)")),
+                        React.createElement("th", { className: "text-center", style: Object.assign(Object.assign({}, cell), { color: BRAND.navy }) }, "เงินคืน %"),
+                        React.createElement("th", { className: "text-center", style: Object.assign(Object.assign({}, cell), { color: BRAND.navy }) }, "เงินคืน (บาท)", React.createElement("span", { style: { display: "block", fontSize: "0.78em", fontWeight: 400, color: BRAND.sub } }, "(ณ สิ้นปีกรมธรรม์)")),
+                        React.createElement("th", { className: "text-center", style: Object.assign(Object.assign({}, cell), { color: BRAND.navy }) }, "ความคุ้มครอง (บาท)"),
+                        React.createElement("th", { className: "text-center", style: Object.assign(Object.assign({}, cell), { color: BRAND.navy }) }, "หมายเหตุ"))),
                 React.createElement("tbody", null, rows.map((r) => (React.createElement("tr", { key: r.age, style: { borderTop: "1px solid #EEF3F7", background: r.note ? "#FFF9EE" : "transparent" } },
                     React.createElement("td", { className: "text-center", style: Object.assign(Object.assign({}, cell), { color: BRAND.dataBlack }) }, r.age),
-                    React.createElement("td", { className: "text-right", style: Object.assign(Object.assign({}, cell), { color: BRAND.dataBlack }) }, r.premium > 0 ? fmt(r.premium) : "-"),
-                    React.createElement("td", { className: "text-right", style: Object.assign(Object.assign({}, cell), { color: BRAND.dataBlack }) },
+                    React.createElement("td", { className: "text-center", style: Object.assign(Object.assign({}, cell), { color: BRAND.dataBlack }) }, r.premium > 0 ? fmt(r.premium) : "-"),
+                    React.createElement("td", { className: "text-center", style: Object.assign(Object.assign({}, cell), { color: BRAND.dataBlack }) },
                         r.cashPct,
                         "%"),
-                    React.createElement("td", { className: "text-right font-semibold", style: Object.assign(Object.assign({}, cell), { color: BRAND.greenDeep }) }, fmt(r.cashBaht)),
-                    React.createElement("td", { className: "text-right", style: Object.assign(Object.assign({}, cell), { color: BRAND.dataBlack }) }, fmt(r.coverageBaht)),
-                    React.createElement("td", { className: "text-left", style: Object.assign(Object.assign({}, cell), { color: BRAND.warn }) }, r.note))))),
+                    React.createElement("td", { className: "text-center font-semibold", style: Object.assign(Object.assign({}, cell), { color: BRAND.greenDeep }) }, fmt(r.cashBaht)),
+                    React.createElement("td", { className: "text-center", style: Object.assign(Object.assign({}, cell), { color: BRAND.dataBlack }) }, fmt(r.coverageBaht)),
+                    React.createElement("td", { className: "text-center", style: Object.assign(Object.assign({}, cell), { color: BRAND.warn }) }, r.note))))),
                 React.createElement("tfoot", null,
                     React.createElement("tr", { style: { borderTop: `2px solid ${BRAND.navy}`, background: BRAND.bg } },
-                        React.createElement("td", { className: "text-center font-bold", style: Object.assign(Object.assign({}, cell), { color: BRAND.navy }) }, "\u0E23\u0E27\u0E21"),
-                        React.createElement("td", { className: "text-right font-bold", style: Object.assign(Object.assign({}, cell), { color: BRAND.navy }) }, fmt(totalPremium)),
+                        React.createElement("td", { className: "text-center font-bold", style: Object.assign(Object.assign({}, cell), { color: BRAND.navy }) }, "รวม"),
+                        React.createElement("td", { className: "text-center font-bold", style: Object.assign(Object.assign({}, cell), { color: BRAND.navy }) }, fmt(totalPremium)),
                         React.createElement("td", { style: cell }),
-                        React.createElement("td", { className: "text-right font-bold", style: Object.assign(Object.assign({}, cell), { color: BRAND.greenDeep }) }, fmt(totalCash)),
+                        React.createElement("td", { className: "text-center font-bold", style: Object.assign(Object.assign({}, cell), { color: BRAND.greenDeep }) }, fmt(totalCash)),
                         React.createElement("td", { style: cell }),
                         React.createElement("td", { style: cell })),
                     React.createElement("tr", { style: { background: BRAND.bg } },
                         React.createElement("td", { colSpan: 6, className: "text-right", style: { padding: fit.pad, paddingTop: 2, fontSize: Math.max(fit.fontSize - 2, 10), color: "#B8C2CC" } },
-                            "IRR (\u0E01\u0E32\u0E23\u0E31\u0E19\u0E15\u0E35): ",
+                            "IRR (การันตี): ",
                             irr !== null && irr !== undefined ? (irr * 100).toFixed(2) + "%" : "คำนวณไม่ได้"))))),
         React.createElement("div", { className: "mt-1.5" },
             React.createElement("span", { className: "text-[18px]", style: { color: BRAND.sub } },
-                "\u0E2A\u0E48\u0E27\u0E19\u0E15\u0E48\u0E32\u0E07 (\u0E40\u0E07\u0E34\u0E19\u0E04\u0E37\u0E19\u0E23\u0E27\u0E21 \u2212 \u0E40\u0E1A\u0E35\u0E49\u0E22\u0E23\u0E27\u0E21): ",
+                "ส่วนต่าง (เงินคืนรวม \u2212 เบี้ยรวม): ",
                 React.createElement("span", { className: "font-semibold", style: { color: diff >= 0 ? BRAND.greenDeep : BRAND.danger } },
                     diff >= 0 ? "+" : "",
                     fmt(diff))))));
@@ -4169,39 +4170,40 @@ function PrintTableView({ data }) {
         const { title, rows, totalPremium, totalCash, diff, irr } = data;
         return (React.createElement("div", null,
             React.createElement("h2", { style: { fontSize: 20, fontWeight: 700, color: BRAND.navy, marginBottom: 10 } }, title),
-            React.createElement("table", { style: { width: "100%", borderCollapse: "collapse", fontSize: 13 } },
+            React.createElement("table", { style: { width: "100%", borderCollapse: "collapse", fontSize: 13, tableLayout: "fixed" } },
+                React.createElement("colgroup", null, ["10%", "20%", "10%", "20%", "20%", "20%"].map((w, i) => React.createElement("col", { key: i, style: { width: w } }))),
                 React.createElement("thead", { style: { background: BRAND.bg } },
                     React.createElement("tr", null,
-                        React.createElement("th", { style: { textAlign: "center", padding: 6, color: BRAND.navy, border: "1px solid #D7E8F0" } }, "\u0E2D\u0E32\u0E22\u0E38"),
-                        React.createElement("th", { style: { textAlign: "right", padding: 6, color: BRAND.navy, border: "1px solid #D7E8F0" } }, "\u0E40\u0E1A\u0E35\u0E49\u0E22\u0E15\u0E48\u0E2D\u0E1B\u0E35"),
-                        React.createElement("th", { style: { textAlign: "right", padding: 6, color: BRAND.navy, border: "1px solid #D7E8F0" } }, "\u0E40\u0E07\u0E34\u0E19\u0E04\u0E37\u0E19 %"),
-                        React.createElement("th", { style: { textAlign: "right", padding: 6, color: BRAND.navy, border: "1px solid #D7E8F0" } }, "\u0E40\u0E07\u0E34\u0E19\u0E04\u0E37\u0E19 (\u0E1A\u0E32\u0E17)"),
-                        React.createElement("th", { style: { textAlign: "right", padding: 6, color: BRAND.navy, border: "1px solid #D7E8F0" } }, "\u0E04\u0E27\u0E32\u0E21\u0E04\u0E38\u0E49\u0E21\u0E04\u0E23\u0E2D\u0E07 (\u0E1A\u0E32\u0E17)"),
-                        React.createElement("th", { style: { textAlign: "left", padding: 6, color: BRAND.navy, border: "1px solid #D7E8F0" } }, "\u0E2B\u0E21\u0E32\u0E22\u0E40\u0E2B\u0E15\u0E38"))),
+                        React.createElement("th", { style: { textAlign: "center", padding: 6, color: BRAND.navy, border: "1px solid #D7E8F0" } }, "อายุ"),
+                        React.createElement("th", { style: { textAlign: "center", padding: 6, color: BRAND.navy, border: "1px solid #D7E8F0" } }, "เบี้ยต่อปี", React.createElement("span", { style: { display: "block", fontSize: 11, fontWeight: 400, color: BRAND.sub } }, "(ณ ต้นปีกรมธรรม์)")),
+                        React.createElement("th", { style: { textAlign: "center", padding: 6, color: BRAND.navy, border: "1px solid #D7E8F0" } }, "เงินคืน %"),
+                        React.createElement("th", { style: { textAlign: "center", padding: 6, color: BRAND.navy, border: "1px solid #D7E8F0" } }, "เงินคืน (บาท)", React.createElement("span", { style: { display: "block", fontSize: 11, fontWeight: 400, color: BRAND.sub } }, "(ณ สิ้นปีกรมธรรม์)")),
+                        React.createElement("th", { style: { textAlign: "center", padding: 6, color: BRAND.navy, border: "1px solid #D7E8F0" } }, "ความคุ้มครอง (บาท)"),
+                        React.createElement("th", { style: { textAlign: "center", padding: 6, color: BRAND.navy, border: "1px solid #D7E8F0" } }, "หมายเหตุ"))),
                 React.createElement("tbody", null, rows.map((r) => (React.createElement("tr", { key: r.age, style: { background: r.note ? "#FFF9EE" : "transparent" } },
                     React.createElement("td", { style: { textAlign: "center", padding: 6, color: BRAND.dataBlack, border: "1px solid #EEF3F7" } }, r.isRange ? `${r.age}-${r.ageEnd}` : r.age),
-                    React.createElement("td", { style: { textAlign: "right", padding: 6, color: BRAND.dataBlack, border: "1px solid #EEF3F7" } }, r.premium > 0 ? fmt(r.premium) : "-"),
-                    React.createElement("td", { style: { textAlign: "right", padding: 6, color: BRAND.dataBlack, border: "1px solid #EEF3F7" } },
+                    React.createElement("td", { style: { textAlign: "center", padding: 6, color: BRAND.dataBlack, border: "1px solid #EEF3F7" } }, r.premium > 0 ? fmt(r.premium) : "-"),
+                    React.createElement("td", { style: { textAlign: "center", padding: 6, color: BRAND.dataBlack, border: "1px solid #EEF3F7" } },
                         r.cashPct,
                         "%"),
-                    React.createElement("td", { style: { textAlign: "right", padding: 6, color: BRAND.greenDeep, fontWeight: 600, border: "1px solid #EEF3F7" } }, fmt(r.cashBaht)),
-                    React.createElement("td", { style: { textAlign: "right", padding: 6, color: BRAND.dataBlack, border: "1px solid #EEF3F7" } }, fmt(r.coverageBaht)),
-                    React.createElement("td", { style: { textAlign: "left", padding: 6, color: BRAND.warn, border: "1px solid #EEF3F7" } }, r.note))))),
+                    React.createElement("td", { style: { textAlign: "center", padding: 6, color: BRAND.greenDeep, fontWeight: 600, border: "1px solid #EEF3F7" } }, fmt(r.cashBaht)),
+                    React.createElement("td", { style: { textAlign: "center", padding: 6, color: BRAND.dataBlack, border: "1px solid #EEF3F7" } }, fmt(r.coverageBaht)),
+                    React.createElement("td", { style: { textAlign: "center", padding: 6, color: BRAND.warn, border: "1px solid #EEF3F7" } }, r.note))))),
                 React.createElement("tfoot", null,
                     React.createElement("tr", { style: { background: BRAND.bg, borderTop: `2px solid ${BRAND.navy}` } },
-                        React.createElement("td", { style: { textAlign: "center", padding: 6, color: BRAND.navy, fontWeight: 700, border: "1px solid #D7E8F0" } }, "\u0E23\u0E27\u0E21"),
-                        React.createElement("td", { style: { textAlign: "right", padding: 6, color: BRAND.navy, fontWeight: 700, border: "1px solid #D7E8F0" } }, fmt(totalPremium)),
+                        React.createElement("td", { style: { textAlign: "center", padding: 6, color: BRAND.navy, fontWeight: 700, border: "1px solid #D7E8F0" } }, "รวม"),
+                        React.createElement("td", { style: { textAlign: "center", padding: 6, color: BRAND.navy, fontWeight: 700, border: "1px solid #D7E8F0" } }, fmt(totalPremium)),
                         React.createElement("td", { style: { border: "1px solid #D7E8F0" } }),
-                        React.createElement("td", { style: { textAlign: "right", padding: 6, color: BRAND.greenDeep, fontWeight: 700, border: "1px solid #D7E8F0" } }, fmt(totalCash)),
+                        React.createElement("td", { style: { textAlign: "center", padding: 6, color: BRAND.greenDeep, fontWeight: 700, border: "1px solid #D7E8F0" } }, fmt(totalCash)),
                         React.createElement("td", { style: { border: "1px solid #D7E8F0" } }),
                         React.createElement("td", { style: { border: "1px solid #D7E8F0" } })))),
             React.createElement("p", { style: { fontSize: 13, color: BRAND.sub, marginTop: 8 } },
-                "\u0E2A\u0E48\u0E27\u0E19\u0E15\u0E48\u0E32\u0E07 (\u0E40\u0E07\u0E34\u0E19\u0E04\u0E37\u0E19\u0E23\u0E27\u0E21 \u2212 \u0E40\u0E1A\u0E35\u0E49\u0E22\u0E23\u0E27\u0E21): ",
+                "ส่วนต่าง (เงินคืนรวม \u2212 เบี้ยรวม): ",
                 React.createElement("b", { style: { color: diff >= 0 ? BRAND.greenDeep : BRAND.danger } },
                     diff >= 0 ? "+" : "",
                     fmt(diff)),
                 "  ·  ",
-                "IRR (\u0E01\u0E32\u0E23\u0E31\u0E19\u0E15\u0E35): ",
+                "IRR (การันตี): ",
                 irr !== null && irr !== undefined ? (irr * 100).toFixed(2) + "%" : "คำนวณไม่ได้")));
     }
     if (data.type === "pension") {
