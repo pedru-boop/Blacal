@@ -8,7 +8,7 @@ const BRAND = {
     ink: "#000000", sub: "#404040", danger: "#B93232", warn: "#6B4508",
     label: "#000000", nameBlue: "#1668D6", mainBlue: "#0C2F63", dataBlack: "#000000",
 };
-const APP_VERSION = "v2.11.3 (2569-09-27)"; // อัปเดตเลขนี้ทุกครั้งที่มีการแก้ไข/เพิ่มแบบประกันใหม่ เพื่อให้รู้ว่าไฟล์ที่ใช้อยู่เป็นเวอร์ชันล่าสุดหรือไม่
+const APP_VERSION = "v2.11.4 (2569-10-01)"; // อัปเดตเลขนี้ทุกครั้งที่มีการแก้ไข/เพิ่มแบบประกันใหม่ เพื่อให้รู้ว่าไฟล์ที่ใช้อยู่เป็นเวอร์ชันล่าสุดหรือไม่
 const fmt = (n) => (n === null || n === undefined || isNaN(n) ? "0" : Math.round(n).toLocaleString("th-TH"));
 const baht = (n) => (n === null || n === undefined ? "-" : (typeof n === "string" ? n : fmt(n) + " บาท"));
 /* ============================== PERSISTENT STORAGE (works in Claude.ai artifact and standalone browser) ============================== */
@@ -3584,7 +3584,32 @@ function App() {
                 const d = Math.min(selectedMainId ? mainPolicyPaymentYears(selectedMainId) : 0, 21 - age, 65 - csPayorAge);
                 return [{ icon: "💵", value: (d > 0 ? d : 0) + " ปี", label: "บริษัทชำระเบี้ยแทนหากทุพพลภาพ/เสียชีวิต" }];
             }
-            default: return [];
+            case "CHAK": return [{ icon: "⏳", value: baht(chakSI), label: `เสียชีวิต (คุ้มครอง ${chakTerm || "-"} ปี)` }];
+            case "CHAP": return [{ icon: "👨‍👧", value: baht(chapSI), label: `ผู้ปกครองเสียชีวิต จ่ายให้ผู้เยาว์ (คุ้มครอง ${chapTerm || "-"} ปี)` }];
+            case "PH": return [
+                { icon: "🏥", value: baht(phPlan) + "/ปี", label: "วงเงินผู้ป่วยในต่อรอบปี (ค่ารักษาจ่ายตามจริง)" },
+                { icon: "💵", value: phDeduct ? baht(phDeduct) : "ไม่มี", label: "ความรับผิดส่วนแรกต่อครั้ง" },
+            ];
+            case "PENSION888": {
+                const row = pension888Row();
+                return row.ok ? [
+                    { icon: "🏖️", value: baht(Math.round(row.firstPension)), label: "บำนาญงวดแรก (อายุ 60)" },
+                    { icon: "🏖️", value: baht(Math.round(row.annualPension)) + "/ปี", label: "บำนาญอายุ 61-88 ปี" },
+                ] : [];
+            }
+            default: {
+                const sav = SAVINGS_DEFS[id] ? { si: getEffectiveSI(id), sch: SAVINGS_DEFS[id].schedule }
+                    : id === "PSAVE104" ? { si: psave104SI, sch: PSAVE104_SCHEDULE }
+                    : id === "PSAVE126" ? { si: psave126SI, sch: PSAVE126_SCHEDULE } : null;
+                if (!sav || !sav.sch) return [];
+                const total = sav.sch.reduce((t, r) => t + r[1], 0);
+                const last = sav.sch[sav.sch.length - 1][1];
+                return [
+                    { icon: "❤️", value: baht(sav.si), label: "ทุนประกันภัย (คุ้มครองชีวิต)" },
+                    { icon: "💰", value: baht(Math.round(sav.si * total / 100)), label: `รับเงินรวมตลอดสัญญา ${sav.sch.length} ปี (การันตี)` },
+                    { icon: "🎁", value: baht(Math.round(sav.si * last / 100)), label: "รับวันครบกำหนดสัญญา" },
+                ];
+            }
         }
     }
     const CATEGORY = { SUD: "life", LIFE99: "life", UNJAI: "life", CANCERMAX: "life", PLUS2: "life", PRESTIGE: "life", ACC: "life", ACC3: "life", TPD: "life", SUPER: "life", VH: "ipd", VHKIDS: "ipd", HHP: "ipd", OPD: "opd", HAPPYCI: "life", LLC: "life", SS: "life", HAPPYPENSION: "life", HAPPYSAVING: "life", HAPPYWL: "life", HRP9920: "life", HRPDIV: "life", HRP9901: "life", HAPPYWL9901: "life", HAPPYKID: "life", CHAK: "life", CHAP: "life", PH: "ipd", PSAVE104: "life", PSAVE126: "life", HS208: "life", HS126: "life", HS157: "life", HS147: "life", HS168: "life", HS1810: "life", HS2515: "life", TAXSAVER105: "life", BLASAVE168: "life", PENSION888: "life", RPPR: "opd", CS: "opd" };
