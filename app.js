@@ -8,7 +8,7 @@ const BRAND = {
     ink: "#000000", sub: "#404040", danger: "#B93232", warn: "#6B4508",
     label: "#000000", nameBlue: "#1668D6", mainBlue: "#0C2F63", dataBlack: "#000000",
 };
-const APP_VERSION = "v2.17.0 (2569-10-03)"; // อัปเดตเลขนี้ทุกครั้งที่มีการแก้ไข/เพิ่มแบบประกันใหม่ เพื่อให้รู้ว่าไฟล์ที่ใช้อยู่เป็นเวอร์ชันล่าสุดหรือไม่
+const APP_VERSION = "v2.18.0 (2569-10-03)"; // อัปเดตเลขนี้ทุกครั้งที่มีการแก้ไข/เพิ่มแบบประกันใหม่ เพื่อให้รู้ว่าไฟล์ที่ใช้อยู่เป็นเวอร์ชันล่าสุดหรือไม่
 const fmt = (n) => (n === null || n === undefined || isNaN(n) ? "0" : Math.round(n).toLocaleString("th-TH"));
 const baht = (n) => (n === null || n === undefined ? "-" : (typeof n === "string" ? n : fmt(n) + " บาท"));
 /* ============================== PERSISTENT STORAGE (works in Claude.ai artifact and standalone browser) ============================== */
@@ -4733,7 +4733,7 @@ function PensionScheduleTable({ rows, breakEvenAge, onRowClick, title, onPrint, 
                 "\uD83D\uDD0D \u0E22\u0E48\u0E2D\u0E15\u0E32\u0E23\u0E32\u0E07\u0E43\u0E2B\u0E49\u0E1E\u0E2D\u0E14\u0E35\u0E08\u0E2D (",
                 fit.label,
                 ")"),
-            onPrint && (React.createElement("button", { onClick: () => onPrint({ type: "pension", title, rows, breakEvenAge }), className: "text-[17px] font-medium px-3 py-1.5 rounded-full", style: { background: BRAND.bg, color: BRAND.navy, border: "1px solid #D7E8F0" } }, "\uD83D\uDDA8\uFE0F \u0E1E\u0E34\u0E21\u0E1E\u0E4C / \u0E1A\u0E31\u0E19\u0E17\u0E36\u0E01\u0E40\u0E1B\u0E47\u0E19 PDF"))),
+            null),
             onShare && (React.createElement("button", { onClick: () => onShare(Object.assign({ mode: "text" }, { type: "pension", title, rows, breakEvenAge })), className: "text-[17px] font-medium px-3 py-1.5 rounded-full text-white", style: { background: "#06C755" } }, "💬 ส่งข้อความ LINE")),
             onShare && (React.createElement("button", { onClick: () => onShare(Object.assign({ mode: "image" }, { type: "pension", title, rows, breakEvenAge })), className: "text-[17px] font-medium px-3 py-1.5 rounded-full text-white", style: { background: "#06C755" } }, "🖼️ ส่งรูป LINE")),
         React.createElement("div", { className: "rounded-xl border overflow-x-auto", style: { borderColor: "#D7E8F0" } },
@@ -4781,7 +4781,7 @@ function SavingsScheduleTable({ rows, irr, title, onPrint, onShare }) {
                 "\uD83D\uDD0D ย่อตารางให้พอดีจอ (",
                 fit.label,
                 ")"),
-            onPrint && (React.createElement("button", { onClick: () => onPrint({ type: "savings", title, rows, totalPremium, totalCash, diff, irr }), className: "text-[17px] font-medium px-3 py-1.5 rounded-full", style: { background: BRAND.bg, color: BRAND.navy, border: "1px solid #D7E8F0" } }, "\uD83D\uDDA8\uFE0F พิมพ์ / บันทึกเป็น PDF"))),
+            null),
             onShare && (React.createElement("button", { onClick: () => onShare(Object.assign({ mode: "text" }, { type: "savings", title, rows, totalPremium, totalCash, diff, irr })), className: "text-[17px] font-medium px-3 py-1.5 rounded-full text-white", style: { background: "#06C755" } }, "💬 ส่งข้อความ LINE")),
             onShare && (React.createElement("button", { onClick: () => onShare(Object.assign({ mode: "image" }, { type: "savings", title, rows, totalPremium, totalCash, diff, irr })), className: "text-[17px] font-medium px-3 py-1.5 rounded-full text-white", style: { background: "#06C755" } }, "🖼️ ส่งรูป LINE")),
         React.createElement("div", { className: "rounded-xl border overflow-x-auto", style: { borderColor: "#D7E8F0" } },
@@ -5285,7 +5285,7 @@ const FREQ = {
   monthly: { label: "\u0E23\u0E32\u0E22\u0E40\u0E14\u0E37\u0E2D\u0E19", perYear: 12, min: 200 }
 };
 const ROUNDING_EDGE = 0.49;
-const APP_VERSION = "\u0E2A\u0E38\u0E14\u0E04\u0E38\u0E49\u0E21 v1.2 \xB7 2026-10-03";
+const APP_VERSION = "\u0E2A\u0E38\u0E14\u0E04\u0E38\u0E49\u0E21 v1.3 \xB7 2026-10-03";
 const fmt = (n) => Math.round(n || 0).toLocaleString("en-US", { maximumFractionDigits: 0 });
 function NumberField({ value, onChange, className }) {
   return /* @__PURE__ */ React.createElement(
@@ -5392,33 +5392,37 @@ function openLineText(text) {
   }
   window.open("https://line.me/R/share?text=" + encodeURIComponent(text), "_blank");
 }
-function skSections(d) {
-  const s = [];
-  s.push(["\u0E2A\u0E23\u0E38\u0E1B\u0E41\u0E1C\u0E19", [
-    ["\u0E17\u0E38\u0E19\u0E1B\u0E23\u0E30\u0E01\u0E31\u0E19", baht(d.sumInsured)],
-    ["\u0E40\u0E1A\u0E35\u0E49\u0E22\u0E1B\u0E23\u0E30\u0E01\u0E31\u0E19", `${d.freqLabel} ${baht(d.perInstallment)}${d.perYear > 1 ? ` (\u0E1B\u0E35\u0E25\u0E30 ${baht(d.annual)})` : ""}`],
-    ["\u0E23\u0E30\u0E22\u0E30\u0E40\u0E27\u0E25\u0E32", `\u0E0A\u0E33\u0E23\u0E30\u0E40\u0E1A\u0E35\u0E49\u0E22 ${d.pay} \u0E1B\u0E35 \xB7 \u0E04\u0E38\u0E49\u0E21\u0E04\u0E23\u0E2D\u0E07 ${d.term} \u0E1B\u0E35`],
-    ["\u0E23\u0E27\u0E21\u0E40\u0E1A\u0E35\u0E49\u0E22\u0E17\u0E31\u0E49\u0E07\u0E2B\u0E21\u0E14", baht(d.totalPremium)],
-    [`\u0E40\u0E07\u0E34\u0E19\u0E04\u0E37\u0E19\u0E1E\u0E34\u0E40\u0E28\u0E29 ${d.bonusPct}% \u0E02\u0E2D\u0E07\u0E40\u0E1A\u0E35\u0E49\u0E22`, baht(d.totalBonus)],
-    ["\u0E04\u0E23\u0E1A\u0E2A\u0E31\u0E0D\u0E0D\u0E32\u0E23\u0E31\u0E1A", baht(d.maturity)]
-  ].concat(d.irr != null ? [["\u0E1C\u0E25\u0E15\u0E2D\u0E1A\u0E41\u0E17\u0E19\u0E40\u0E21\u0E37\u0E48\u0E2D\u0E04\u0E23\u0E1A\u0E2A\u0E31\u0E0D\u0E0D\u0E32 (IRR)", `${(d.irr * 100).toFixed(2)}% \u0E15\u0E48\u0E2D\u0E1B\u0E35`]] : [])]);
-  s.push(["\u0E04\u0E27\u0E32\u0E21\u0E04\u0E38\u0E49\u0E21\u0E04\u0E23\u0E2D\u0E07\u0E23\u0E30\u0E2B\u0E27\u0E48\u0E32\u0E07\u0E2A\u0E31\u0E0D\u0E0D\u0E32", [
-    ["\u0E40\u0E2A\u0E35\u0E22\u0E0A\u0E35\u0E27\u0E34\u0E15\u0E17\u0E31\u0E48\u0E27\u0E44\u0E1B", `${baht(d.deathGeneral)} (\u0E17\u0E38\u0E19 + \u0E40\u0E1A\u0E35\u0E49\u0E22\u0E2A\u0E30\u0E2A\u0E21 + \u0E40\u0E07\u0E34\u0E19\u0E04\u0E37\u0E19\u0E1E\u0E34\u0E40\u0E28\u0E29 \xB7 \u0E2A\u0E39\u0E07\u0E2A\u0E38\u0E14\u0E40\u0E21\u0E37\u0E48\u0E2D\u0E0A\u0E33\u0E23\u0E30\u0E40\u0E1A\u0E35\u0E49\u0E22\u0E04\u0E23\u0E1A)`],
-    ["\u0E40\u0E2A\u0E35\u0E22\u0E0A\u0E35\u0E27\u0E34\u0E15\u0E08\u0E32\u0E01\u0E2D\u0E38\u0E1A\u0E31\u0E15\u0E34\u0E40\u0E2B\u0E15\u0E38", `${baht(d.deathAccident)} (\u0E17\u0E38\u0E19 x 2 + \u0E40\u0E1A\u0E35\u0E49\u0E22\u0E2A\u0E30\u0E2A\u0E21 + \u0E40\u0E07\u0E34\u0E19\u0E04\u0E37\u0E19\u0E1E\u0E34\u0E40\u0E28\u0E29 \xB7 \u0E2A\u0E39\u0E07\u0E2A\u0E38\u0E14\u0E40\u0E21\u0E37\u0E48\u0E2D\u0E0A\u0E33\u0E23\u0E30\u0E40\u0E1A\u0E35\u0E49\u0E22\u0E04\u0E23\u0E1A)`]
-  ]]);
-  s.push(["\u0E41\u0E16\u0E21\u0E1F\u0E23\u0E35 \u0E04\u0E38\u0E49\u0E21\u0E04\u0E23\u0E2D\u0E07\u0E2D\u0E38\u0E1A\u0E31\u0E15\u0E34\u0E40\u0E2B\u0E15\u0E38", [
-    ["\u0E04\u0E48\u0E32\u0E23\u0E31\u0E01\u0E29\u0E32\u0E1E\u0E22\u0E32\u0E1A\u0E32\u0E25\u0E08\u0E32\u0E01\u0E2D\u0E38\u0E1A\u0E31\u0E15\u0E34\u0E40\u0E2B\u0E15\u0E38 (\u0E15\u0E32\u0E21\u0E08\u0E23\u0E34\u0E07)", `\u0E44\u0E21\u0E48\u0E40\u0E01\u0E34\u0E19 ${baht(d.medicalCap)} \u0E15\u0E48\u0E2D\u0E04\u0E23\u0E31\u0E49\u0E07 (5 \u0E40\u0E17\u0E48\u0E32\u0E02\u0E2D\u0E07\u0E40\u0E1A\u0E35\u0E49\u0E22\u0E23\u0E32\u0E22\u0E40\u0E14\u0E37\u0E2D\u0E19)`],
-    ["\u0E2A\u0E39\u0E0D\u0E40\u0E2A\u0E35\u0E22\u0E21\u0E37\u0E2D/\u0E40\u0E17\u0E49\u0E32 2 \u0E02\u0E49\u0E32\u0E07 \u0E2B\u0E23\u0E37\u0E2D\u0E2A\u0E32\u0E22\u0E15\u0E32 (100%)", baht(d.acc100)],
-    ["\u0E2A\u0E39\u0E0D\u0E40\u0E2A\u0E35\u0E22\u0E21\u0E37\u0E2D/\u0E40\u0E17\u0E49\u0E32/\u0E2A\u0E32\u0E22\u0E15\u0E32 1 \u0E02\u0E49\u0E32\u0E07 (60%)", baht(d.acc60)],
-    ["\u0E19\u0E34\u0E49\u0E27\u0E2B\u0E31\u0E27\u0E41\u0E21\u0E48\u0E21\u0E37\u0E2D + \u0E19\u0E34\u0E49\u0E27\u0E0A\u0E35\u0E49\u0E02\u0E49\u0E32\u0E07\u0E40\u0E14\u0E35\u0E22\u0E27\u0E01\u0E31\u0E19 (25%)", baht(d.acc25)]
-  ]]);
-  if (d.isKids) {
-    const kids = [["\u0E42\u0E23\u0E04\u0E23\u0E49\u0E32\u0E22\u0E41\u0E23\u0E07 4 \u0E42\u0E23\u0E04\u0E02\u0E2D\u0E07\u0E40\u0E14\u0E47\u0E01 (50% \u0E02\u0E2D\u0E07\u0E17\u0E38\u0E19)", `${baht(d.ci4)} \xB7 \u0E44\u0E02\u0E49\u0E23\u0E39\u0E21\u0E32\u0E15\u0E34\u0E01\u0E17\u0E35\u0E48\u0E21\u0E35\u0E1C\u0E25\u0E15\u0E48\u0E2D\u0E2B\u0E31\u0E27\u0E43\u0E08, \u0E04\u0E32\u0E27\u0E32\u0E0B\u0E32\u0E01\u0E34\u0E17\u0E35\u0E48\u0E21\u0E35\u0E20\u0E32\u0E27\u0E30\u0E41\u0E17\u0E23\u0E01\u0E0B\u0E49\u0E2D\u0E19\u0E2B\u0E31\u0E27\u0E43\u0E08, \u0E40\u0E1A\u0E32\u0E2B\u0E27\u0E32\u0E19, \u0E20\u0E32\u0E27\u0E30\u0E19\u0E49\u0E33\u0E04\u0E31\u0E48\u0E07\u0E43\u0E19\u0E2A\u0E21\u0E2D\u0E07\u0E17\u0E35\u0E48\u0E15\u0E49\u0E2D\u0E07\u0E43\u0E2A\u0E48\u0E17\u0E48\u0E2D\u0E23\u0E30\u0E1A\u0E32\u0E22 \xB7 \u0E04\u0E38\u0E49\u0E21\u0E04\u0E23\u0E2D\u0E07\u0E16\u0E36\u0E07\u0E19\u0E49\u0E2D\u0E07\u0E2D\u0E32\u0E22\u0E38\u0E04\u0E23\u0E1A 21 \u0E1B\u0E35 \u0E2B\u0E23\u0E37\u0E2D\u0E2B\u0E21\u0E14\u0E23\u0E30\u0E22\u0E30\u0E0A\u0E33\u0E23\u0E30\u0E40\u0E1A\u0E35\u0E49\u0E22 \u0E41\u0E25\u0E49\u0E27\u0E41\u0E15\u0E48\u0E16\u0E36\u0E07\u0E01\u0E48\u0E2D\u0E19`]];
-    if (d.korChorPerInstallment != null) kids.push(["\u0E04\u0E38\u0E49\u0E21\u0E04\u0E23\u0E2D\u0E07\u0E1C\u0E39\u0E49\u0E0A\u0E33\u0E23\u0E30\u0E40\u0E1A\u0E35\u0E49\u0E22 (\u0E04\u0E0A.) \u2014 \u0E40\u0E1A\u0E35\u0E49\u0E22\u0E40\u0E1E\u0E34\u0E48\u0E21", `${d.freqLabel} ${baht(d.korChorPerInstallment)} (\u0E1B\u0E35\u0E25\u0E30 ${baht(d.korChorAnnual)})`]);
-    kids.push(["\u0E1C\u0E39\u0E49\u0E1B\u0E01\u0E04\u0E23\u0E2D\u0E07\u0E17\u0E38\u0E1E\u0E1E\u0E25\u0E20\u0E32\u0E1E\u0E16\u0E32\u0E27\u0E23\u0E2A\u0E34\u0E49\u0E19\u0E40\u0E0A\u0E34\u0E07\u0E2B\u0E23\u0E37\u0E2D\u0E40\u0E2A\u0E35\u0E22\u0E0A\u0E35\u0E27\u0E34\u0E15", `\u0E22\u0E01\u0E40\u0E27\u0E49\u0E19\u0E40\u0E1A\u0E35\u0E49\u0E22\u0E01\u0E23\u0E21\u0E18\u0E23\u0E23\u0E21\u0E4C\u0E2B\u0E25\u0E31\u0E01 + \u0E08\u0E48\u0E32\u0E22\u0E40\u0E1E\u0E34\u0E48\u0E21 ${baht(d.payer50)} (50% \u0E02\u0E2D\u0E07\u0E17\u0E38\u0E19) \xB7 \u0E04\u0E38\u0E49\u0E21\u0E04\u0E23\u0E2D\u0E07\u0E16\u0E36\u0E07\u0E19\u0E49\u0E2D\u0E07\u0E2D\u0E32\u0E22\u0E38\u0E04\u0E23\u0E1A 21 \u0E1B\u0E35 \u0E2B\u0E23\u0E37\u0E2D\u0E1C\u0E39\u0E49\u0E1B\u0E01\u0E04\u0E23\u0E2D\u0E07\u0E2D\u0E32\u0E22\u0E38\u0E04\u0E23\u0E1A 65 \u0E1B\u0E35 \u0E2B\u0E23\u0E37\u0E2D\u0E2B\u0E21\u0E14\u0E23\u0E30\u0E22\u0E30\u0E0A\u0E33\u0E23\u0E30\u0E40\u0E1A\u0E35\u0E49\u0E22 \u0E41\u0E25\u0E49\u0E27\u0E41\u0E15\u0E48\u0E16\u0E36\u0E07\u0E01\u0E48\u0E2D\u0E19`]);
-    s.push(["\u0E2A\u0E33\u0E2B\u0E23\u0E31\u0E1A\u0E40\u0E14\u0E47\u0E01 (\u0E41\u0E19\u0E1A \u0E0B\u0E35\u0E44\u0E2D \u0E04\u0E34\u0E14\u0E2A\u0E4C + \u0E04\u0E0A.)", kids]);
-  }
-  return s;
+const genderTh = (g) => g === "female" ? "\u0E40\u0E1E\u0E28\u0E2B\u0E0D\u0E34\u0E07" : "\u0E40\u0E1E\u0E28\u0E0A\u0E32\u0E22";
+function skCoverage(d) {
+  return [
+    { title: "1. \u0E21\u0E35\u0E0A\u0E35\u0E27\u0E34\u0E15\u0E2D\u0E22\u0E39\u0E48\u0E04\u0E23\u0E1A\u0E2A\u0E31\u0E0D\u0E0D\u0E32", formula: "\u0E23\u0E31\u0E1A\u0E40\u0E1A\u0E35\u0E49\u0E22\u0E2A\u0E30\u0E2A\u0E21 + \u0E40\u0E07\u0E34\u0E19\u0E04\u0E37\u0E19\u0E1E\u0E34\u0E40\u0E28\u0E29", amount: d.maturity, color: C.blue },
+    { title: "2. \u0E40\u0E2A\u0E35\u0E22\u0E0A\u0E35\u0E27\u0E34\u0E15\u0E17\u0E31\u0E48\u0E27\u0E44\u0E1B", formula: "\u0E17\u0E38\u0E19\u0E1B\u0E23\u0E30\u0E01\u0E31\u0E19 + \u0E40\u0E1A\u0E35\u0E49\u0E22\u0E2A\u0E30\u0E2A\u0E21 + \u0E40\u0E07\u0E34\u0E19\u0E04\u0E37\u0E19\u0E1E\u0E34\u0E40\u0E28\u0E29", amount: d.deathGeneral, note: "(\u0E2A\u0E39\u0E07\u0E2A\u0E38\u0E14\u0E40\u0E21\u0E37\u0E48\u0E2D\u0E0A\u0E33\u0E23\u0E30\u0E40\u0E1A\u0E35\u0E49\u0E22\u0E1B\u0E23\u0E30\u0E01\u0E31\u0E19\u0E04\u0E23\u0E1A)", color: C.green },
+    { title: "3. \u0E40\u0E2A\u0E35\u0E22\u0E0A\u0E35\u0E27\u0E34\u0E15\u0E08\u0E32\u0E01\u0E2D\u0E38\u0E1A\u0E31\u0E15\u0E34\u0E40\u0E2B\u0E15\u0E38", formula: "\u0E17\u0E38\u0E19\u0E1B\u0E23\u0E30\u0E01\u0E31\u0E19 x 2 + \u0E40\u0E1A\u0E35\u0E49\u0E22\u0E2A\u0E30\u0E2A\u0E21 + \u0E40\u0E07\u0E34\u0E19\u0E04\u0E37\u0E19\u0E1E\u0E34\u0E40\u0E28\u0E29", amount: d.deathAccident, note: "(\u0E2A\u0E39\u0E07\u0E2A\u0E38\u0E14\u0E40\u0E21\u0E37\u0E48\u0E2D\u0E0A\u0E33\u0E23\u0E30\u0E40\u0E1A\u0E35\u0E49\u0E22\u0E1B\u0E23\u0E30\u0E01\u0E31\u0E19\u0E04\u0E23\u0E1A)", color: C.green }
+  ];
+}
+function skFree(d) {
+  return [
+    { label: "\u0E04\u0E48\u0E32\u0E23\u0E31\u0E01\u0E29\u0E32\u0E1E\u0E22\u0E32\u0E1A\u0E32\u0E25\u0E08\u0E32\u0E01\u0E2D\u0E38\u0E1A\u0E31\u0E15\u0E34\u0E40\u0E2B\u0E15\u0E38 (\u0E15\u0E32\u0E21\u0E08\u0E23\u0E34\u0E07)", value: `\u0E44\u0E21\u0E48\u0E40\u0E01\u0E34\u0E19 ${baht(d.medicalCap)}`, sub: "\u0E2A\u0E39\u0E07\u0E2A\u0E38\u0E14 5 \u0E40\u0E17\u0E48\u0E32\u0E02\u0E2D\u0E07\u0E40\u0E1A\u0E35\u0E49\u0E22\u0E23\u0E32\u0E22\u0E40\u0E14\u0E37\u0E2D\u0E19 \u0E15\u0E48\u0E2D\u0E04\u0E23\u0E31\u0E49\u0E07" },
+    { label: "\u0E2A\u0E39\u0E0D\u0E40\u0E2A\u0E35\u0E22\u0E21\u0E37\u0E2D/\u0E40\u0E17\u0E49\u0E32 2 \u0E02\u0E49\u0E32\u0E07 \u0E2B\u0E23\u0E37\u0E2D\u0E2A\u0E32\u0E22\u0E15\u0E32 (100%)", value: baht(d.acc100) },
+    { label: "\u0E2A\u0E39\u0E0D\u0E40\u0E2A\u0E35\u0E22\u0E21\u0E37\u0E2D/\u0E40\u0E17\u0E49\u0E32/\u0E2A\u0E32\u0E22\u0E15\u0E32 1 \u0E02\u0E49\u0E32\u0E07 (60%)", value: baht(d.acc60) },
+    { label: "\u0E19\u0E34\u0E49\u0E27\u0E2B\u0E31\u0E27\u0E41\u0E21\u0E48\u0E21\u0E37\u0E2D+\u0E19\u0E34\u0E49\u0E27\u0E0A\u0E35\u0E49\u0E02\u0E49\u0E32\u0E07\u0E40\u0E14\u0E35\u0E22\u0E27\u0E01\u0E31\u0E19 (25%)", value: baht(d.acc25) }
+  ];
+}
+function skKids(d) {
+  if (!d.isKids) return [];
+  const out = [
+    {
+      label: "\u0E04\u0E38\u0E49\u0E21\u0E04\u0E23\u0E2D\u0E07\u0E42\u0E23\u0E04\u0E23\u0E49\u0E32\u0E22\u0E41\u0E23\u0E07 4 \u0E42\u0E23\u0E04\u0E02\u0E2D\u0E07\u0E40\u0E14\u0E47\u0E01",
+      value: `${baht(d.ci4)} (50% \u0E02\u0E2D\u0E07\u0E17\u0E38\u0E19\u0E1B\u0E23\u0E30\u0E01\u0E31\u0E19)`,
+      sub: "\u0E44\u0E02\u0E49\u0E23\u0E39\u0E21\u0E32\u0E15\u0E34\u0E01\u0E17\u0E35\u0E48\u0E21\u0E35\u0E1C\u0E25\u0E15\u0E48\u0E2D\u0E2B\u0E31\u0E27\u0E43\u0E08, \u0E04\u0E32\u0E27\u0E32\u0E0B\u0E32\u0E01\u0E34\u0E17\u0E35\u0E48\u0E21\u0E35\u0E20\u0E32\u0E27\u0E30\u0E41\u0E17\u0E23\u0E01\u0E0B\u0E49\u0E2D\u0E19\u0E2B\u0E31\u0E27\u0E43\u0E08, \u0E40\u0E1A\u0E32\u0E2B\u0E27\u0E32\u0E19, \u0E20\u0E32\u0E27\u0E30\u0E19\u0E49\u0E33\u0E04\u0E31\u0E48\u0E07\u0E43\u0E19\u0E2A\u0E21\u0E2D\u0E07\u0E17\u0E35\u0E48\u0E15\u0E49\u0E2D\u0E07\u0E43\u0E2A\u0E48\u0E17\u0E48\u0E2D\u0E23\u0E30\u0E1A\u0E32\u0E22 \u2014 \u0E04\u0E38\u0E49\u0E21\u0E04\u0E23\u0E2D\u0E07\u0E08\u0E19\u0E19\u0E49\u0E2D\u0E07\u0E2D\u0E32\u0E22\u0E38\u0E04\u0E23\u0E1A 21 \u0E1B\u0E35 \u0E2B\u0E23\u0E37\u0E2D\u0E08\u0E19\u0E2B\u0E21\u0E14\u0E23\u0E30\u0E22\u0E30\u0E40\u0E27\u0E25\u0E32\u0E0A\u0E33\u0E23\u0E30\u0E40\u0E1A\u0E35\u0E49\u0E22\u0E1B\u0E23\u0E30\u0E01\u0E31\u0E19\u0E20\u0E31\u0E22 (\u0E41\u0E25\u0E49\u0E27\u0E41\u0E15\u0E48\u0E27\u0E48\u0E32\u0E40\u0E27\u0E25\u0E32\u0E44\u0E2B\u0E19\u0E08\u0E30\u0E16\u0E36\u0E07\u0E01\u0E48\u0E2D\u0E19)"
+    }
+  ];
+  out.push({
+    label: "\u0E04\u0E38\u0E49\u0E21\u0E04\u0E23\u0E2D\u0E07\u0E1C\u0E39\u0E49\u0E0A\u0E33\u0E23\u0E30\u0E40\u0E1A\u0E35\u0E49\u0E22 (\u0E04\u0E0A.)",
+    value: d.korChorPerInstallment != null ? `\u0E40\u0E1A\u0E35\u0E49\u0E22\u0E40\u0E1E\u0E34\u0E48\u0E21 ${d.freqLabel} ${baht(d.korChorPerInstallment)} (\u0E23\u0E27\u0E21\u0E17\u0E31\u0E49\u0E07\u0E1B\u0E35 ${baht(d.korChorAnnual)} \u0E08\u0E48\u0E32\u0E22\u0E1E\u0E23\u0E49\u0E2D\u0E21\u0E07\u0E27\u0E14\u0E40\u0E14\u0E35\u0E22\u0E27\u0E01\u0E31\u0E1A\u0E40\u0E1A\u0E35\u0E49\u0E22\u0E2B\u0E25\u0E31\u0E01)` : "",
+    sub: `\u0E2B\u0E32\u0E01\u0E1C\u0E39\u0E49\u0E1B\u0E01\u0E04\u0E23\u0E2D\u0E07(\u0E1C\u0E39\u0E49\u0E0A\u0E33\u0E23\u0E30\u0E40\u0E1A\u0E35\u0E49\u0E22)\u0E17\u0E38\u0E1E\u0E1E\u0E25\u0E20\u0E32\u0E1E\u0E16\u0E32\u0E27\u0E23\u0E2A\u0E34\u0E49\u0E19\u0E40\u0E0A\u0E34\u0E07\u0E2B\u0E23\u0E37\u0E2D\u0E40\u0E2A\u0E35\u0E22\u0E0A\u0E35\u0E27\u0E34\u0E15 \u0E1A\u0E23\u0E34\u0E29\u0E31\u0E17\u0E22\u0E01\u0E40\u0E27\u0E49\u0E19\u0E01\u0E32\u0E23\u0E0A\u0E33\u0E23\u0E30\u0E40\u0E1A\u0E35\u0E49\u0E22\u0E02\u0E2D\u0E07\u0E01\u0E23\u0E21\u0E18\u0E23\u0E23\u0E21\u0E4C\u0E2B\u0E25\u0E31\u0E01\u0E43\u0E2B\u0E49 \u0E1E\u0E23\u0E49\u0E2D\u0E21\u0E08\u0E48\u0E32\u0E22\u0E40\u0E1E\u0E34\u0E48\u0E21\u0E2D\u0E35\u0E01 ${baht(d.payer50)} (50% \u0E02\u0E2D\u0E07\u0E17\u0E38\u0E19\u0E1B\u0E23\u0E30\u0E01\u0E31\u0E19) \u2014 \u0E04\u0E38\u0E49\u0E21\u0E04\u0E23\u0E2D\u0E07\u0E08\u0E19\u0E19\u0E49\u0E2D\u0E07\u0E2D\u0E32\u0E22\u0E38\u0E04\u0E23\u0E1A 21 \u0E1B\u0E35 \u0E2B\u0E23\u0E37\u0E2D\u0E1C\u0E39\u0E49\u0E1B\u0E01\u0E04\u0E23\u0E2D\u0E07\u0E2D\u0E32\u0E22\u0E38\u0E04\u0E23\u0E1A 65 \u0E1B\u0E35 \u0E2B\u0E23\u0E37\u0E2D\u0E2B\u0E21\u0E14\u0E23\u0E30\u0E22\u0E30\u0E40\u0E27\u0E25\u0E32\u0E0A\u0E33\u0E23\u0E30\u0E40\u0E1A\u0E35\u0E49\u0E22\u0E02\u0E2D\u0E07\u0E01\u0E23\u0E21\u0E18\u0E23\u0E23\u0E21\u0E4C\u0E2B\u0E25\u0E31\u0E01 \u0E41\u0E25\u0E49\u0E27\u0E41\u0E15\u0E48\u0E23\u0E30\u0E22\u0E30\u0E43\u0E14\u0E16\u0E36\u0E07\u0E01\u0E48\u0E2D\u0E19`
+  });
+  return out;
 }
 function skGreeting(d) {
   const out = [];
@@ -5431,11 +5435,29 @@ function buildSKText(d) {
   const g = skGreeting(d);
   if (g.length) out.push(...g, "");
   out.push(`\u{1F4CB} ${d.productName} ${d.plan}`);
-  out.push(`\u{1F464} ${d.isKids ? "\u0E1C\u0E39\u0E49\u0E40\u0E2D\u0E32\u0E1B\u0E23\u0E30\u0E01\u0E31\u0E19 (\u0E40\u0E14\u0E47\u0E01) " : ""}${d.gender === "female" ? "\u0E40\u0E1E\u0E28\u0E2B\u0E0D\u0E34\u0E07" : "\u0E40\u0E1E\u0E28\u0E0A\u0E32\u0E22"} \u0E2D\u0E32\u0E22\u0E38 ${d.age} \u0E1B\u0E35`);
-  skSections(d).forEach(([h, rows]) => {
-    out.push("", `\u2501\u2501 ${h} \u2501\u2501`);
-    rows.forEach(([k, v]) => out.push(`\u2022 ${k}: ${v}`));
+  out.push(`\u{1F464} ${d.isKids ? "\u0E1C\u0E39\u0E49\u0E40\u0E2D\u0E32\u0E1B\u0E23\u0E30\u0E01\u0E31\u0E19 " : ""}${genderTh(d.gender)} \u0E2D\u0E32\u0E22\u0E38 ${d.age} \u0E1B\u0E35`);
+  out.push(`\u{1F4B3} \u0E40\u0E1A\u0E35\u0E49\u0E22${d.freqLabel} ${baht(d.perInstallment)} \u0E0A\u0E33\u0E23\u0E30 ${d.pay} \u0E1B\u0E35`);
+  out.push(`\u{1F6E1}\uFE0F \u0E17\u0E38\u0E19\u0E1B\u0E23\u0E30\u0E01\u0E31\u0E19 ${baht(d.sumInsured)}`);
+  const gain = d.maturity - d.totalPremium;
+  out.push("", "\u{1F4AC} \u0E2A\u0E23\u0E38\u0E1B\u0E07\u0E48\u0E32\u0E22\u0E46", `\u0E08\u0E48\u0E32\u0E22\u0E40\u0E1A\u0E35\u0E49\u0E22\u0E23\u0E27\u0E21 ${baht(d.totalPremium)} \u0E04\u0E23\u0E1A ${d.term} \u0E1B\u0E35\u0E23\u0E31\u0E1A\u0E04\u0E37\u0E19 ${baht(d.maturity)}${gain > 0 ? ` \u0E44\u0E14\u0E49\u0E21\u0E32\u0E01\u0E01\u0E27\u0E48\u0E32\u0E17\u0E35\u0E48\u0E08\u0E48\u0E32\u0E22 ${baht(gain)}` : ""}`);
+  out.push("", "\u2501\u2501 \u0E04\u0E27\u0E32\u0E21\u0E04\u0E38\u0E49\u0E21\u0E04\u0E23\u0E2D\u0E07\u0E23\u0E30\u0E2B\u0E27\u0E48\u0E32\u0E07\u0E2A\u0E31\u0E0D\u0E0D\u0E32 \u2501\u2501");
+  skCoverage(d).forEach((c) => {
+    out.push(c.title, `   ${c.formula} ${baht(c.amount)}`);
+    if (c.note) out.push(`   ${c.note}`);
   });
+  out.push("", "\u2501\u2501 \u0E41\u0E16\u0E21\u0E1F\u0E23\u0E35 \u0E04\u0E38\u0E49\u0E21\u0E04\u0E23\u0E2D\u0E07\u0E2D\u0E38\u0E1A\u0E31\u0E15\u0E34\u0E40\u0E2B\u0E15\u0E38 \u2501\u2501");
+  skFree(d).forEach((f) => {
+    out.push(`\u2022 ${f.label} ${f.value}${f.sub ? ` (${f.sub})` : ""}`);
+  });
+  const kids = skKids(d);
+  if (kids.length) {
+    out.push("", "\u2501\u2501 \u0E04\u0E27\u0E32\u0E21\u0E04\u0E38\u0E49\u0E21\u0E04\u0E23\u0E2D\u0E07\u0E2A\u0E33\u0E2B\u0E23\u0E31\u0E1A\u0E40\u0E14\u0E47\u0E01 \u2501\u2501", "(\u0E41\u0E19\u0E1A\u0E2A\u0E31\u0E0D\u0E0D\u0E32\u0E40\u0E1E\u0E34\u0E48\u0E21\u0E40\u0E15\u0E34\u0E21 \u0E1A\u0E35\u0E41\u0E2D\u0E25\u0E40\u0E2D \u0E0B\u0E35\u0E44\u0E2D \u0E04\u0E34\u0E14\u0E2A\u0E4C + \u0E04\u0E0A.)");
+    kids.forEach((k) => {
+      out.push(`\u2022 ${k.label}${k.value ? ` ${k.value}` : ""}`);
+      if (k.sub) out.push(`  ${k.sub}`);
+    });
+  }
+  if (d.irr != null) out.push("", `\u{1F4C8} IRR (\u0E1C\u0E25\u0E15\u0E2D\u0E1A\u0E41\u0E17\u0E19\u0E40\u0E21\u0E37\u0E48\u0E2D\u0E04\u0E23\u0E1A\u0E2A\u0E31\u0E0D\u0E0D\u0E32): ${(d.irr * 100).toFixed(2)}% \u0E15\u0E48\u0E2D\u0E1B\u0E35`);
   out.push("", "\u2014\u2014\u2014\u2014\u2014\u2014\u2014\u2014");
   if (d.agent.name) out.push(d.agent.name);
   if (d.agent.phone) out.push(`\u{1F4DE} ${d.agent.phone}`);
@@ -5498,9 +5520,9 @@ function makeImgLayout() {
   };
   return L;
 }
-function renderImgLayout(L, H) {
+function renderImgLayout(L, H, width) {
   const c = document.createElement("canvas");
-  c.width = IMG_W;
+  c.width = width || IMG_W;
   c.height = Math.ceil(H);
   const g = c.getContext("2d");
   g.fillStyle = "#FFFFFF";
@@ -5535,61 +5557,130 @@ function imgKeyRow(L, y, label, value, shade) {
   return y + h;
 }
 function drawSKImage(d) {
-  const P = IMG_P, W = IMG_W;
+  const W = 1600, P = 50;
   const L = makeImgLayout();
-  let y = 36;
+  const TW = W - P * 2;
+  const colW = [120, 230, 250, 470, TW - 120 - 230 - 250 - 470];
+  const cx = (i) => P + colW.slice(0, i).reduce((a, b) => a + b, 0);
+  const border = "#E0F2FE";
+  const cell = (x, y2, w, h, color) => {
+    L.rect(x, y2, w, h, color);
+    L.rect(x, y2, w, 2, border);
+    L.rect(x, y2, 2, h, border);
+    L.rect(x + w - 2, y2, 2, h, border);
+    L.rect(x, y2 + h - 2, w, 2, border);
+  };
+  let y = 34;
   const hs = L.ops.length;
-  y += L.para(P, y, "\u0E2A\u0E23\u0E38\u0E1B\u0E02\u0E49\u0E2D\u0E40\u0E2A\u0E19\u0E2D\u0E41\u0E1A\u0E1A\u0E1B\u0E23\u0E30\u0E01\u0E31\u0E19 \xB7 \u0E01\u0E23\u0E38\u0E07\u0E40\u0E17\u0E1E\u0E1B\u0E23\u0E30\u0E01\u0E31\u0E19\u0E0A\u0E35\u0E27\u0E34\u0E15", 30, 500, "#BAE6FD", W - P * 2, 42) + 8;
-  y += L.para(P, y, `${d.productName} ${d.plan}`, 44, 600, "#FFFFFF", W - P * 2, 58) + 30;
+  y += L.para(P, y, "\u0E2A\u0E23\u0E38\u0E1B\u0E02\u0E49\u0E2D\u0E40\u0E2A\u0E19\u0E2D\u0E41\u0E1A\u0E1A\u0E1B\u0E23\u0E30\u0E01\u0E31\u0E19 \xB7 \u0E01\u0E23\u0E38\u0E07\u0E40\u0E17\u0E1E\u0E1B\u0E23\u0E30\u0E01\u0E31\u0E19\u0E0A\u0E35\u0E27\u0E34\u0E15", 28, 500, "#BAE6FD", TW, 40) + 6;
+  y += L.para(P, y, `${d.productName} ${d.plan}`, 46, 600, "#FFFFFF", TW, 60) + 4;
+  y += L.para(P, y, `${d.freqLabel} ${baht(d.perInstallment)} \xB7 ${d.isKids ? "\u0E1C\u0E39\u0E49\u0E40\u0E2D\u0E32\u0E1B\u0E23\u0E30\u0E01\u0E31\u0E19 " : ""}${genderTh(d.gender)} \u0E2D\u0E32\u0E22\u0E38 ${d.age} \u0E1B\u0E35 \xB7 \u0E0A\u0E33\u0E23\u0E30\u0E40\u0E1A\u0E35\u0E49\u0E22 ${d.pay} \u0E1B\u0E35 \xB7 \u0E04\u0E38\u0E49\u0E21\u0E04\u0E23\u0E2D\u0E07 ${d.term} \u0E1B\u0E35`, 30, 500, "#E0F2FE", TW, 42) + 26;
   L.ops.splice(hs, 0, { t: "rect", x: 0, y: 0, w: W, h: y, grad: [C.navy, C.navyDeep] });
-  y += 28;
+  y += 24;
   const g = skGreeting(d);
-  if (g.length) g.forEach((t) => {
-    y += L.para(P, y, t, 34, 600, C.ink, W - P * 2, 46);
-  });
-  y += L.para(P, y, `${d.isKids ? "\u0E1C\u0E39\u0E49\u0E40\u0E2D\u0E32\u0E1B\u0E23\u0E30\u0E01\u0E31\u0E19 (\u0E40\u0E14\u0E47\u0E01) " : ""}${d.gender === "female" ? "\u0E40\u0E1E\u0E28\u0E2B\u0E0D\u0E34\u0E07" : "\u0E40\u0E1E\u0E28\u0E0A\u0E32\u0E22"} \u0E2D\u0E32\u0E22\u0E38 ${d.age} \u0E1B\u0E35`, 30, 500, C.sub, W - P * 2, 42) + 20;
-  skSections(d).forEach(([h, rows]) => {
-    y += 10;
-    L.rect(P - 12, y, 8, 44, C.skyDeep);
-    y += L.para(P + 8, y + 2, h, 30, 600, C.blue, W - P * 2, 42) + 8;
-    rows.forEach(([k, v], i) => {
-      y = imgKeyRow(L, y, k, v, i % 2 === 0);
+  if (g.length) {
+    g.forEach((t) => {
+      y += L.para(P, y, t, 34, 600, C.ink, TW, 46);
     });
-    y += 14;
+    y += 16;
+  }
+  const headH = 104;
+  const heads = [
+    ["\u0E2D\u0E32\u0E22\u0E38", "Age"],
+    ["\u0E40\u0E1A\u0E35\u0E49\u0E22\u0E1B\u0E23\u0E30\u0E01\u0E31\u0E19", "Annual Premium"],
+    ["\u0E40\u0E07\u0E34\u0E19\u0E08\u0E48\u0E32\u0E22\u0E04\u0E37\u0E19\u0E1E\u0E34\u0E40\u0E28\u0E29", `${d.bonusPct}% (\u0E2A\u0E30\u0E2A\u0E21 \u0E08\u0E48\u0E32\u0E22\u0E08\u0E23\u0E34\u0E07\u0E15\u0E2D\u0E19\u0E04\u0E23\u0E1A/\u0E40\u0E2A\u0E35\u0E22\u0E0A\u0E35\u0E27\u0E34\u0E15)`]
+  ];
+  heads.forEach(([h, s], i) => {
+    cell(cx(i), y, colW[i], headH, "#F0F9FF");
+    L.para(cx(i) + 14, y + 14, h, 26, 600, "#334155", colW[i] - 28, 34);
+    L.para(cx(i) + 14, y + 50, s, 19, 500, "#94A3B8", colW[i] - 28, 26);
   });
-  y += 20;
-  const cols = ["\u0E1B\u0E35\u0E17\u0E35\u0E48", "\u0E2D\u0E32\u0E22\u0E38", "\u0E40\u0E1A\u0E35\u0E49\u0E22\u0E15\u0E48\u0E2D\u0E1B\u0E35", "\u0E40\u0E07\u0E34\u0E19\u0E04\u0E37\u0E19\u0E1E\u0E34\u0E40\u0E28\u0E29", "\u0E40\u0E1A\u0E35\u0E49\u0E22\u0E2A\u0E30\u0E2A\u0E21"];
-  const colW = [0.12, 0.12, 0.24, 0.24, 0.28];
-  const tx = (i) => P + 8 + colW.slice(0, i).reduce((a, b) => a + b, 0) * (W - P * 2);
-  L.rect(P - 12, y, W - P * 2 + 24, 56, C.navy);
-  cols.forEach((h, i) => L.text(tx(i), y + 13, h, 25, 600, "#FFFFFF"));
-  y += 56;
+  cell(cx(3), y, colW[3], headH, "#DBEAFE");
+  L.text(cx(3) + 16, y + 12, "\u0E17\u0E38\u0E19\u0E1B\u0E23\u0E30\u0E01\u0E31\u0E19", 26, 600, C.navy);
+  L.text(cx(3) + 16, y + 48, fmt(d.sumInsured), 40, 700, C.navy);
+  cell(cx(4), y, colW[4], headH, "#ECFDF5");
+  L.para(cx(4) + 16, y + 14, "\u0E04\u0E27\u0E32\u0E21\u0E04\u0E38\u0E49\u0E21\u0E04\u0E23\u0E2D\u0E07\u0E23\u0E30\u0E2B\u0E27\u0E48\u0E32\u0E07\u0E2A\u0E31\u0E0D\u0E0D\u0E32", 26, 600, "#065F46", colW[4] - 32, 34);
+  y += headH;
+  const bodyTop = y;
+  const sideOps = [];
+  const sideL = makeImgLayout();
+  let sy = bodyTop + 18;
+  const sx = cx(3) + 18, sw = colW[3] - 36;
+  skCoverage(d).forEach((c, i) => {
+    if (i > 0) {
+      sideL.rect(sx, sy, sw, 2, "#BAE6FD");
+      sy += 16;
+    }
+    sy += sideL.para(sx, sy, c.title, 25, 600, "#1E293B", sw, 34);
+    sy += sideL.para(sx, sy, c.formula, 23, 500, "#475569", sw, 32);
+    sy += sideL.para(sx, sy, baht(c.amount), 32, 700, c.color, sw, 44);
+    if (c.note) sy += sideL.para(sx, sy, c.note, 19, 500, "#94A3B8", sw, 26);
+    sy += 12;
+  });
+  const h1 = sy - bodyTop;
+  let fy = bodyTop + 18;
+  const fx = cx(4) + 18, fw = colW[4] - 36;
+  fy += sideL.para(fx, fy, "\u{1F381} \u0E41\u0E16\u0E21\u0E1F\u0E23\u0E35 \u2014 \u0E04\u0E38\u0E49\u0E21\u0E04\u0E23\u0E2D\u0E07\u0E2D\u0E38\u0E1A\u0E31\u0E15\u0E34\u0E40\u0E2B\u0E15\u0E38", 25, 700, "#047857", fw, 34) + 8;
+  skFree(d).forEach((f) => {
+    fy += sideL.para(fx, fy, f.label, 22, 500, "#475569", fw, 30);
+    fy += sideL.para(fx, fy, f.value, 25, 600, "#1E293B", fw, 34);
+    if (f.sub) fy += sideL.para(fx, fy, f.sub, 18, 500, "#94A3B8", fw, 25);
+    fy += 10;
+  });
+  const kids = skKids(d);
+  if (kids.length) {
+    sideL.rect(fx, fy, fw, 2, "#BAE6FD");
+    fy += 14;
+    fy += sideL.para(fx, fy, "\u{1F476} \u0E04\u0E27\u0E32\u0E21\u0E04\u0E38\u0E49\u0E21\u0E04\u0E23\u0E2D\u0E07\u0E2A\u0E33\u0E2B\u0E23\u0E31\u0E1A\u0E40\u0E14\u0E47\u0E01", 24, 700, C.blue, fw, 34);
+    fy += sideL.para(fx, fy, "(\u0E41\u0E19\u0E1A\u0E2A\u0E31\u0E0D\u0E0D\u0E32\u0E40\u0E1E\u0E34\u0E48\u0E21\u0E40\u0E15\u0E34\u0E21 \u0E1A\u0E35\u0E41\u0E2D\u0E25\u0E40\u0E2D \u0E0B\u0E35\u0E44\u0E2D \u0E04\u0E34\u0E14\u0E2A\u0E4C + \u0E04\u0E0A.)", 18, 500, "#94A3B8", fw, 25) + 6;
+    kids.forEach((k) => {
+      fy += sideL.para(fx, fy, k.label, 23, 700, C.navy, fw, 32);
+      if (k.value) fy += sideL.para(fx, fy, k.value, 22, 600, "#1E293B", fw, 30);
+      if (k.sub) fy += sideL.para(fx, fy, k.sub, 18, 500, "#94A3B8", fw, 25);
+      fy += 10;
+    });
+  }
+  const h2 = fy - bodyTop;
+  const rowH = Math.max(46, Math.ceil(Math.max(h1, h2) / d.rows.length));
+  const bodyH = rowH * d.rows.length;
   d.rows.forEach((r, idx) => {
-    L.rect(P - 12, y, W - P * 2 + 24, 44, r.isMaturity ? "#D1FAE5" : idx % 2 ? "#F8FAFC" : "#FFFFFF");
-    [r.year, r.age ?? "-", r.isPayYear ? fmt(r.premiumThisYear) : "-", r.isPayYear ? fmt(r.bonusThisYear) : "-", fmt(r.cumPremium)].forEach((v, i) => L.text(tx(i), y + 8, v, 25, 500, i === 3 ? C.blue : C.ink));
-    y += 44;
+    const ry = bodyTop + idx * rowH;
+    const bg = r.isMaturity ? "#ECFDF5" : idx % 2 === 0 ? "#F8FAFC" : "#FFFFFF";
+    [0, 1, 2].forEach((i) => cell(cx(i), ry, colW[i], rowH, bg));
+    const ty = ry + (rowH - 30) / 2;
+    L.text(cx(0) + 18, ty, r.age ?? "-", 25, 600, "#1E293B");
+    L.text(cx(1) + 18, ty, r.isPayYear ? fmt(r.premiumThisYear) : "\u2014", 25, 500, r.isPayYear ? "#1E293B" : "#CBD5E1");
+    L.text(cx(2) + 18, ty, r.isPayYear ? fmt(r.bonusThisYear) : "\u2014", 25, 500, r.isPayYear ? "#1E40AF" : "#CBD5E1");
   });
-  L.rect(P - 12, y, W - P * 2 + 24, 52, C.sky);
-  L.text(tx(0), y + 11, "\u0E23\u0E27\u0E21", 26, 600, C.navy);
-  L.text(tx(2), y + 11, fmt(d.totalPremium), 26, 600, C.navy);
-  L.text(tx(3), y + 11, fmt(d.totalBonus), 26, 600, C.blue);
-  y += 52;
-  const ms = L.ops.length;
-  let mh = 20;
-  mh += L.para(P, y + mh, "\u0E04\u0E23\u0E1A\u0E2A\u0E31\u0E0D\u0E0D\u0E32 \u0E23\u0E31\u0E1A\u0E40\u0E07\u0E34\u0E19", 30, 500, "#FFFFFF", W - P * 2, 42);
-  mh += L.para(P, y + mh, baht(d.maturity), 50, 700, "#FFFFFF", W - P * 2, 64) + 18;
-  L.ops.splice(ms, 0, { t: "rect", x: P - 12, y, w: W - P * 2 + 24, h: mh, color: C.green });
-  y += mh + 40;
+  cell(cx(3), bodyTop, colW[3], bodyH, "#F5F9FF");
+  cell(cx(4), bodyTop, colW[4], bodyH, "#FFFFFF");
+  sideL.ops.forEach((o) => L.ops.push(o));
+  y = bodyTop + bodyH;
+  const sumH = 56;
+  [0, 1, 2].forEach((i) => cell(cx(i), y, colW[i], sumH, "#E0F2FE"));
+  cell(cx(3), y, colW[3] + colW[4], sumH, "#E0F2FE");
+  L.text(cx(0) + 18, y + 13, "\u0E23\u0E27\u0E21", 25, 600, "#334155");
+  L.text(cx(1) + 18, y + 13, fmt(d.totalPremium), 25, 600, "#1E293B");
+  L.text(cx(2) + 18, y + 13, fmt(d.totalBonus), 25, 600, "#1E40AF");
+  y += sumH;
+  const matH = 76;
+  cell(cx(0), y, colW[0] + colW[1] + colW[2], matH, "#D1FAE5");
+  cell(cx(3), y, colW[3] + colW[4], matH, "#D1FAE5");
+  L.text(cx(0) + 18, y + 22, "\u0E04\u0E23\u0E1A\u0E2A\u0E31\u0E0D\u0E0D\u0E32 \u0E23\u0E31\u0E1A\u0E40\u0E07\u0E34\u0E19", 28, 700, "#064E3B");
+  L.text(cx(3) + 18, y + 16, baht(d.maturity), 38, 700, "#064E3B");
+  y += matH + 14;
+  if (d.irr != null) y += L.para(P, y, `IRR (\u0E1C\u0E25\u0E15\u0E2D\u0E1A\u0E41\u0E17\u0E19\u0E40\u0E21\u0E37\u0E48\u0E2D\u0E04\u0E23\u0E1A\u0E2A\u0E31\u0E0D\u0E0D\u0E32): ${(d.irr * 100).toFixed(2)}% \u0E15\u0E48\u0E2D\u0E1B\u0E35`, 24, 500, "#374151", TW, 34);
+  y += 30;
   const fs = L.ops.length;
-  let fh = 26;
-  fh += L.para(P, y + fh, d.agent.name || "", 36, 600, "#FFFFFF", W - P * 2, 48) + 8;
+  let fh = 24;
+  fh += L.para(P, y + fh, d.agent.name || "", 36, 600, "#FFFFFF", TW, 48) + 6;
   const contact = [d.agent.phone ? `\u{1F4DE} ${d.agent.phone}` : "", d.agent.lineId ? `LINE: ${d.agent.lineId}` : ""].filter(Boolean).join("     ");
-  if (contact) fh += L.para(P, y + fh, contact, 30, 500, "#BAE6FD", W - P * 2, 42);
-  fh += 26;
+  if (contact) fh += L.para(P, y + fh, contact, 30, 500, "#BAE6FD", TW, 42);
+  fh += 24;
   L.ops.splice(fs, 0, { t: "rect", x: 0, y, w: W, h: fh, color: C.navy });
   y += fh + 18;
-  y += L.para(P, y, SHARE_MAIN_NOTE, 25, 600, C.navyDeep, W - P * 2, 36) + 30;
-  return renderImgLayout(L, y);
+  y += L.para(P, y, SHARE_MAIN_NOTE, 25, 600, C.navyDeep, TW, 36) + 28;
+  return renderImgLayout(L, y, W);
 }
 function shareCanvasImage(canvas) {
   const dataUrl = canvas.toDataURL("image/png");
@@ -5624,6 +5715,7 @@ function ShareModal({ mode, isKids, customer, setCustomer, child, setChild, agen
   const [draft, setDraft] = useState(mode === "agent" ? Object.assign({}, agent) : null);
   const [note, setNote] = useState("");
   const [preview, setPreview] = useState("");
+  const [imageSent, setImageSent] = useState(false);
   useEffect(() => {
     preloadShareFonts();
   }, []);
@@ -5641,8 +5733,8 @@ function ShareModal({ mode, isKids, customer, setCustomer, child, setChild, agen
       onClose();
     } else {
       const r = shareCanvasImage(drawSKImage(d));
-      if (r === "downloaded") setNote("\u0E1A\u0E31\u0E19\u0E17\u0E36\u0E01\u0E23\u0E39\u0E1B\u0E25\u0E07\u0E40\u0E04\u0E23\u0E37\u0E48\u0E2D\u0E07\u0E41\u0E25\u0E49\u0E27 \u2014 \u0E40\u0E1B\u0E34\u0E14 LINE \u0E41\u0E25\u0E49\u0E27\u0E41\u0E19\u0E1A\u0E23\u0E39\u0E1B\u0E2A\u0E48\u0E07\u0E25\u0E39\u0E01\u0E04\u0E49\u0E32\u0E44\u0E14\u0E49\u0E40\u0E25\u0E22");
-      else onClose();
+      setImageSent(true);
+      setNote(r === "downloaded" ? "\u0E1A\u0E31\u0E19\u0E17\u0E36\u0E01\u0E23\u0E39\u0E1B\u0E25\u0E07\u0E40\u0E04\u0E23\u0E37\u0E48\u0E2D\u0E07\u0E41\u0E25\u0E49\u0E27 \u2014 \u0E40\u0E1B\u0E34\u0E14 LINE \u0E41\u0E25\u0E49\u0E27\u0E41\u0E19\u0E1A\u0E23\u0E39\u0E1B\u0E2A\u0E48\u0E07\u0E25\u0E39\u0E01\u0E04\u0E49\u0E32\u0E44\u0E14\u0E49\u0E40\u0E25\u0E22" : "\u0E2A\u0E48\u0E07\u0E23\u0E39\u0E1B\u0E41\u0E25\u0E49\u0E27 \u2014 \u0E2A\u0E48\u0E07\u0E04\u0E33\u0E2D\u0E18\u0E34\u0E1A\u0E32\u0E22\u0E40\u0E1B\u0E47\u0E19\u0E02\u0E49\u0E2D\u0E04\u0E27\u0E32\u0E21\u0E15\u0E48\u0E2D\u0E44\u0E14\u0E49\u0E40\u0E25\u0E22");
     }
   };
   const inCls = "w-full mt-1 rounded-xl px-3 py-2.5 text-base bg-white border border-sky-200 outline-none focus:border-blue-700";
@@ -5650,7 +5742,10 @@ function ShareModal({ mode, isKids, customer, setCustomer, child, setChild, agen
   return /* @__PURE__ */ React.createElement("div", { className: "fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 print:hidden", style: { background: "rgba(8,30,62,0.55)" }, onClick: onClose }, /* @__PURE__ */ React.createElement("div", { className: "w-full max-w-md rounded-2xl p-5 bg-white max-h-[90vh] overflow-y-auto", onClick: (e) => e.stopPropagation() }, /* @__PURE__ */ React.createElement("h3", { className: "text-xl font-bold text-blue-900 mb-3" }, mode === "agent" ? "\u2699\uFE0F \u0E02\u0E49\u0E2D\u0E21\u0E39\u0E25\u0E15\u0E31\u0E27\u0E41\u0E17\u0E19" : mode === "text" ? "\u{1F4AC} \u0E2A\u0E48\u0E07\u0E02\u0E49\u0E2D\u0E04\u0E27\u0E32\u0E21 LINE" : "\u{1F5BC}\uFE0F \u0E2A\u0E48\u0E07\u0E23\u0E39\u0E1B LINE"), mode !== "agent" && /* @__PURE__ */ React.createElement("div", { className: "mb-3 space-y-2" }, /* @__PURE__ */ React.createElement("label", { className: "block" }, /* @__PURE__ */ React.createElement("span", { className: "text-sm text-slate-500" }, isKids ? "\u0E0A\u0E37\u0E48\u0E2D\u0E1C\u0E39\u0E49\u0E1B\u0E01\u0E04\u0E23\u0E2D\u0E07 (\u0E1C\u0E39\u0E49\u0E23\u0E31\u0E1A\u0E02\u0E49\u0E2D\u0E04\u0E27\u0E32\u0E21) \u2014 \u0E44\u0E21\u0E48\u0E1A\u0E31\u0E07\u0E04\u0E31\u0E1A" : "\u0E0A\u0E37\u0E48\u0E2D\u0E25\u0E39\u0E01\u0E04\u0E49\u0E32 \u2014 \u0E44\u0E21\u0E48\u0E1A\u0E31\u0E07\u0E04\u0E31\u0E1A"), /* @__PURE__ */ React.createElement("input", { value: customer, onChange: (e) => setCustomer(e.target.value), placeholder: isKids ? "\u0E40\u0E0A\u0E48\u0E19 \u0E41\u0E21\u0E48\u0E2A\u0E49\u0E21" : "\u0E40\u0E0A\u0E48\u0E19 \u0E2A\u0E21\u0E0A\u0E32\u0E22", className: inCls })), isKids && /* @__PURE__ */ React.createElement("label", { className: "block" }, /* @__PURE__ */ React.createElement("span", { className: "text-sm text-slate-500" }, "\u0E0A\u0E37\u0E48\u0E2D\u0E40\u0E14\u0E47\u0E01 (\u0E1C\u0E39\u0E49\u0E40\u0E2D\u0E32\u0E1B\u0E23\u0E30\u0E01\u0E31\u0E19) \u2014 \u0E44\u0E21\u0E48\u0E1A\u0E31\u0E07\u0E04\u0E31\u0E1A"), /* @__PURE__ */ React.createElement("input", { value: child, onChange: (e) => setChild(e.target.value), placeholder: "\u0E40\u0E0A\u0E48\u0E19 \u0E02\u0E49\u0E32\u0E27\u0E1B\u0E31\u0E49\u0E19", className: inCls }))), draft ? /* @__PURE__ */ React.createElement("div", { className: "rounded-xl p-3 mb-3 bg-sky-50" }, [["name", "\u0E0A\u0E37\u0E48\u0E2D\u0E15\u0E31\u0E27\u0E41\u0E17\u0E19"], ["phone", "\u0E40\u0E1A\u0E2D\u0E23\u0E4C\u0E42\u0E17\u0E23"], ["lineId", "LINE ID"]].map(([k, l]) => /* @__PURE__ */ React.createElement("label", { key: k, className: "block mb-2" }, /* @__PURE__ */ React.createElement("span", { className: "text-sm text-slate-500" }, l), /* @__PURE__ */ React.createElement("input", { value: draft[k] || "", onChange: (e) => setDraft(Object.assign({}, draft, { [k]: e.target.value })), className: inCls }))), /* @__PURE__ */ React.createElement("button", { onClick: () => {
     saveAgent(draft);
     if (mode === "agent") onClose();
-  }, className: "w-full rounded-xl py-2.5 text-base font-semibold text-white bg-blue-900" }, "\u{1F4BE} \u0E1A\u0E31\u0E19\u0E17\u0E36\u0E01\u0E02\u0E49\u0E2D\u0E21\u0E39\u0E25\u0E15\u0E31\u0E27\u0E41\u0E17\u0E19")) : /* @__PURE__ */ React.createElement("div", { className: `rounded-xl p-3 mb-3 ${agent.confirmed ? "bg-sky-50" : "bg-amber-50 border border-amber-300"}` }, !agent.confirmed && /* @__PURE__ */ React.createElement("p", { className: "text-sm font-semibold text-amber-800 mb-1" }, "\u0E01\u0E23\u0E38\u0E13\u0E32\u0E15\u0E23\u0E27\u0E08\u0E2A\u0E2D\u0E1A\u0E02\u0E49\u0E2D\u0E21\u0E39\u0E25\u0E15\u0E31\u0E27\u0E41\u0E17\u0E19\u0E01\u0E48\u0E2D\u0E19\u0E2A\u0E48\u0E07\u0E04\u0E23\u0E31\u0E49\u0E07\u0E41\u0E23\u0E01"), /* @__PURE__ */ React.createElement("p", { className: "text-base font-semibold text-slate-800" }, agent.name || "-"), /* @__PURE__ */ React.createElement("p", { className: "text-sm text-slate-500" }, "\u{1F4DE} ", agent.phone || "-", " \xB7 LINE: ", agent.lineId || "-"), /* @__PURE__ */ React.createElement("div", { className: "flex gap-2 mt-2" }, !agent.confirmed && /* @__PURE__ */ React.createElement("button", { onClick: () => saveAgent(agent), className: "flex-1 rounded-xl py-2 text-sm font-semibold text-white bg-emerald-600" }, "\u2713 \u0E16\u0E39\u0E01\u0E15\u0E49\u0E2D\u0E07"), /* @__PURE__ */ React.createElement("button", { onClick: () => setDraft(Object.assign({}, agent)), className: `${btnOutline} text-blue-900 border-sky-200` }, "\u270E \u0E41\u0E01\u0E49\u0E44\u0E02"))), note && /* @__PURE__ */ React.createElement("p", { className: "text-sm text-emerald-700 mb-3" }, note), mode !== "agent" && /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("button", { disabled: !ready, onClick: send, className: "w-full rounded-xl py-3 text-lg font-bold text-white", style: { background: "#06C755", opacity: ready ? 1 : 0.4 } }, mode === "text" ? "\u{1F4AC} \u0E40\u0E1B\u0E34\u0E14 LINE \u0E40\u0E1E\u0E37\u0E48\u0E2D\u0E2A\u0E48\u0E07\u0E02\u0E49\u0E2D\u0E04\u0E27\u0E32\u0E21" : "\u{1F5BC}\uFE0F \u0E2A\u0E23\u0E49\u0E32\u0E07\u0E23\u0E39\u0E1B\u0E41\u0E25\u0E30\u0E2A\u0E48\u0E07 LINE"), /* @__PURE__ */ React.createElement("div", { className: "mt-3 rounded-xl p-3 border border-dashed border-emerald-300" }, /* @__PURE__ */ React.createElement("p", { className: "text-sm text-slate-500 mb-2" }, "\u0E2A\u0E48\u0E07\u0E1C\u0E48\u0E32\u0E19 LINE OA: \u0E04\u0E31\u0E14\u0E25\u0E2D\u0E01\u0E2B\u0E23\u0E37\u0E2D\u0E1A\u0E31\u0E19\u0E17\u0E36\u0E01\u0E44\u0E27\u0E49\u0E01\u0E48\u0E2D\u0E19 \u0E41\u0E25\u0E49\u0E27\u0E44\u0E1B\u0E27\u0E32\u0E07/\u0E41\u0E19\u0E1A\u0E43\u0E19\u0E41\u0E0A\u0E17\u0E25\u0E39\u0E01\u0E04\u0E49\u0E32"), /* @__PURE__ */ React.createElement("div", { className: "flex gap-2" }, /* @__PURE__ */ React.createElement("button", { disabled: !ready, onClick: () => {
+  }, className: "w-full rounded-xl py-2.5 text-base font-semibold text-white bg-blue-900" }, "\u{1F4BE} \u0E1A\u0E31\u0E19\u0E17\u0E36\u0E01\u0E02\u0E49\u0E2D\u0E21\u0E39\u0E25\u0E15\u0E31\u0E27\u0E41\u0E17\u0E19")) : /* @__PURE__ */ React.createElement("div", { className: `rounded-xl p-3 mb-3 ${agent.confirmed ? "bg-sky-50" : "bg-amber-50 border border-amber-300"}` }, !agent.confirmed && /* @__PURE__ */ React.createElement("p", { className: "text-sm font-semibold text-amber-800 mb-1" }, "\u0E01\u0E23\u0E38\u0E13\u0E32\u0E15\u0E23\u0E27\u0E08\u0E2A\u0E2D\u0E1A\u0E02\u0E49\u0E2D\u0E21\u0E39\u0E25\u0E15\u0E31\u0E27\u0E41\u0E17\u0E19\u0E01\u0E48\u0E2D\u0E19\u0E2A\u0E48\u0E07\u0E04\u0E23\u0E31\u0E49\u0E07\u0E41\u0E23\u0E01"), /* @__PURE__ */ React.createElement("p", { className: "text-base font-semibold text-slate-800" }, agent.name || "-"), /* @__PURE__ */ React.createElement("p", { className: "text-sm text-slate-500" }, "\u{1F4DE} ", agent.phone || "-", " \xB7 LINE: ", agent.lineId || "-"), /* @__PURE__ */ React.createElement("div", { className: "flex gap-2 mt-2" }, !agent.confirmed && /* @__PURE__ */ React.createElement("button", { onClick: () => saveAgent(agent), className: "flex-1 rounded-xl py-2 text-sm font-semibold text-white bg-emerald-600" }, "\u2713 \u0E16\u0E39\u0E01\u0E15\u0E49\u0E2D\u0E07"), /* @__PURE__ */ React.createElement("button", { onClick: () => setDraft(Object.assign({}, agent)), className: `${btnOutline} text-blue-900 border-sky-200` }, "\u270E \u0E41\u0E01\u0E49\u0E44\u0E02"))), note && /* @__PURE__ */ React.createElement("p", { className: "text-sm text-emerald-700 mb-3" }, note), imageSent && mode === "image" && /* @__PURE__ */ React.createElement("button", { onClick: () => {
+    openLineText(buildSKText(buildData()));
+    onClose();
+  }, className: "w-full mb-3 rounded-xl py-3 text-lg font-bold text-white", style: { background: "#06C755" } }, "\u{1F4AC} \u0E2A\u0E48\u0E07\u0E02\u0E49\u0E2D\u0E04\u0E27\u0E32\u0E21\u0E15\u0E48\u0E2D"), mode !== "agent" && /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("button", { disabled: !ready, onClick: send, className: "w-full rounded-xl py-3 text-lg font-bold text-white", style: { background: "#06C755", opacity: ready ? 1 : 0.4 } }, mode === "text" ? "\u{1F4AC} \u0E40\u0E1B\u0E34\u0E14 LINE \u0E40\u0E1E\u0E37\u0E48\u0E2D\u0E2A\u0E48\u0E07\u0E02\u0E49\u0E2D\u0E04\u0E27\u0E32\u0E21" : "\u{1F5BC}\uFE0F \u0E2A\u0E23\u0E49\u0E32\u0E07\u0E23\u0E39\u0E1B\u0E41\u0E25\u0E30\u0E2A\u0E48\u0E07 LINE"), /* @__PURE__ */ React.createElement("div", { className: "mt-3 rounded-xl p-3 border border-dashed border-emerald-300" }, /* @__PURE__ */ React.createElement("p", { className: "text-sm text-slate-500 mb-2" }, "\u0E2A\u0E48\u0E07\u0E1C\u0E48\u0E32\u0E19 LINE OA: \u0E04\u0E31\u0E14\u0E25\u0E2D\u0E01\u0E2B\u0E23\u0E37\u0E2D\u0E1A\u0E31\u0E19\u0E17\u0E36\u0E01\u0E44\u0E27\u0E49\u0E01\u0E48\u0E2D\u0E19 \u0E41\u0E25\u0E49\u0E27\u0E44\u0E1B\u0E27\u0E32\u0E07/\u0E41\u0E19\u0E1A\u0E43\u0E19\u0E41\u0E0A\u0E17\u0E25\u0E39\u0E01\u0E04\u0E49\u0E32"), /* @__PURE__ */ React.createElement("div", { className: "flex gap-2" }, /* @__PURE__ */ React.createElement("button", { disabled: !ready, onClick: () => {
     const ok = copyTextToClipboard(buildSKText(buildData()));
     setNote(ok ? "\u{1F4CB} \u0E04\u0E31\u0E14\u0E25\u0E2D\u0E01\u0E02\u0E49\u0E2D\u0E04\u0E27\u0E32\u0E21\u0E41\u0E25\u0E49\u0E27 \u2014 \u0E40\u0E1B\u0E34\u0E14\u0E41\u0E0A\u0E17\u0E25\u0E39\u0E01\u0E04\u0E49\u0E32\u0E43\u0E19 LINE OA \u0E41\u0E25\u0E49\u0E27\u0E01\u0E14\u0E27\u0E32\u0E07" : "\u0E04\u0E31\u0E14\u0E25\u0E2D\u0E01\u0E44\u0E21\u0E48\u0E2A\u0E33\u0E40\u0E23\u0E47\u0E08 \u0E25\u0E2D\u0E07\u0E43\u0E2B\u0E21\u0E48\u0E2D\u0E35\u0E01\u0E04\u0E23\u0E31\u0E49\u0E07");
   }, className: `${btnOutline} text-emerald-700 border-emerald-500`, style: { opacity: ready ? 1 : 0.4 } }, "\u{1F4CB} \u0E04\u0E31\u0E14\u0E25\u0E2D\u0E01\u0E02\u0E49\u0E2D\u0E04\u0E27\u0E32\u0E21"), /* @__PURE__ */ React.createElement("button", { disabled: !ready, onClick: () => {
@@ -6033,14 +6128,6 @@ function SudKoomDashboard({ onBack }) {
       style: { background: "#06C755", opacity: canShare ? 1 : 0.5 }
     },
     "\u{1F5BC}\uFE0F \u0E2A\u0E48\u0E07\u0E23\u0E39\u0E1B LINE"
-  ), /* @__PURE__ */ React.createElement(
-    "button",
-    {
-      onClick: () => window.print(),
-      className: "flex items-center gap-2 rounded-xl bg-white/15 hover:bg-white/25 text-white px-4 py-2 text-sm font-semibold transition-colors"
-    },
-    /* @__PURE__ */ React.createElement(Printer, { size: 16 }),
-    " \u0E1E\u0E34\u0E21\u0E1E\u0E4C PDF \u0E43\u0E2B\u0E49\u0E25\u0E39\u0E01\u0E04\u0E49\u0E32"
   ))), !fitScreen && /* @__PURE__ */ React.createElement("div", { className: "sm:hidden text-center text-xs text-slate-400 py-1.5 bg-sky-50 border-b border-sky-100" }, "\u2190 \u0E40\u0E25\u0E37\u0E48\u0E2D\u0E19\u0E14\u0E39\u0E15\u0E32\u0E23\u0E32\u0E07\u0E14\u0E49\u0E32\u0E19\u0E02\u0E49\u0E32\u0E07 \u2192"), /* @__PURE__ */ React.createElement(
     "div",
     {
