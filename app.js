@@ -8,7 +8,7 @@ const BRAND = {
     ink: "#000000", sub: "#404040", danger: "#B93232", warn: "#6B4508",
     label: "#000000", nameBlue: "#1668D6", mainBlue: "#0C2F63", dataBlack: "#000000",
 };
-const APP_VERSION = "v2.15.0 (2569-10-03)"; // อัปเดตเลขนี้ทุกครั้งที่มีการแก้ไข/เพิ่มแบบประกันใหม่ เพื่อให้รู้ว่าไฟล์ที่ใช้อยู่เป็นเวอร์ชันล่าสุดหรือไม่
+const APP_VERSION = "v2.16.0 (2569-10-03)"; // อัปเดตเลขนี้ทุกครั้งที่มีการแก้ไข/เพิ่มแบบประกันใหม่ เพื่อให้รู้ว่าไฟล์ที่ใช้อยู่เป็นเวอร์ชันล่าสุดหรือไม่
 const fmt = (n) => (n === null || n === undefined || isNaN(n) ? "0" : Math.round(n).toLocaleString("th-TH"));
 const baht = (n) => (n === null || n === undefined ? "-" : (typeof n === "string" ? n : fmt(n) + " บาท"));
 /* ============================== PERSISTENT STORAGE (works in Claude.ai artifact and standalone browser) ============================== */
@@ -50,7 +50,14 @@ const storageAdapter = (typeof window !== "undefined" && window.storage) ? {
 // ข้อมูลตัวแทนเก็บแยกคีย์ — ปุ่ม "ล้างค่า" ของเครื่องคำนวณจะไม่ลบ
 const AGENT_KEY = "bla-agent-info-v1";
 const DEFAULT_AGENT = { name: "ป้าเป็ด CFP®", phone: "096-595-4789", lineId: "@422cilco", confirmed: false };
-const SHARE_DISCLAIMER = "ตัวเลขเป็นการประมาณการเบื้องต้น ผลประโยชน์และเงื่อนไขเป็นไปตามกรมธรรม์";
+// หมายเหตุท้ายข้อความ/รูปที่ส่งลูกค้า: บรรทัดแรกเสมอ + บรรทัดเงื่อนไขตามแบบที่ส่ง
+const SHARE_MAIN_NOTE = "⚠️ เอกสารนี้ไม่ใช่ใบเสนอขาย เป็นเพียงการนำเสนอเบื้องต้นเท่านั้น หากลูกค้าสนใจแผนประกันนี้ จะดำเนินการจัดส่งใบเสนอราคาเต็มรูปแบบภายหลัง";
+function shareNotes(items) {
+    const notes = [SHARE_MAIN_NOTE];
+    if (items.some((it) => /ปันผล/.test(it.name || ""))) notes.push("• เงินปันผลไม่รับประกัน ขึ้นอยู่กับผลการดำเนินงานของบริษัท");
+    if (items.some((it) => /^ปรับ/.test(it.renewalNote || "") && it.renewalNote !== "ปรับตามเบี้ยที่คุ้มครอง")) notes.push("• เบี้ยประกันอาจปรับเปลี่ยนตามช่วงอายุ");
+    return notes;
+}
 // รวมแถวที่ค่าเท่ากันติดกันเป็นช่วง เช่น เงินคืนปีที่ 1-15 ปีละ 80,000
 function groupRuns(values) {
     const out = [];
@@ -100,7 +107,7 @@ function buildShareText(d) {
     if (d.agent.name) out.push(d.agent.name);
     if (d.agent.phone) out.push(`📞 ${d.agent.phone}`);
     if (d.agent.lineId) out.push(`LINE: ${d.agent.lineId}`);
-    out.push(`* ${SHARE_DISCLAIMER}`);
+    out.push("", ...(d.notes || shareNotes([])));
     return out.join("\n");
 }
 function copyTextToClipboard(text) {
@@ -220,7 +227,9 @@ function imgFooter(L, d, y) {
     h += 26;
     L.ops.splice(start, 0, { t: "rect", x: 0, y, w: W, h, color: BRAND.navy });
     y += h + 18;
-    y += L.para(P, y, `* ${SHARE_DISCLAIMER}`, 22, 500, "#808080", W - P * 2, 32);
+    (d.notes || shareNotes([])).forEach((n, i) => {
+        y += (i === 0 ? L.para(P, y, n, 25, 600, BRAND.navyDeep, W - P * 2, 36) : L.para(P, y, n, 22, 500, "#808080", W - P * 2, 32)) + 6;
+    });
     return y + 24;
 }
 // รูปตารางเงินคืน (สะสมทรัพย์) / ตารางบำนาญ
@@ -283,7 +292,7 @@ function buildQuoteText(q) {
     if (q.agent.name) out.push(q.agent.name);
     if (q.agent.phone) out.push(`📞 ${q.agent.phone}`);
     if (q.agent.lineId) out.push(`LINE: ${q.agent.lineId}`);
-    out.push(`* ${SHARE_DISCLAIMER}`);
+    out.push("", ...(q.notes || shareNotes([])));
     return out.join("\n");
 }
 const LINE_TEXT_SOFT_LIMIT = 4500;
@@ -1590,6 +1599,7 @@ function App() {
             premium: premiumRows.length ? premiumRows[0].premium : 0, payYears: premiumRows.length,
             totalPremium: premiumRows.reduce((t, r) => t + r.premium, 0),
             totalCash: rows.reduce((t, r) => t + (r.cashBaht || 0), 0), ciPerYear, agent: agentInfo,
+            notes: shareNotes([{ name: prod ? prod.name : "", renewalNote: prod ? prod.renewalNote : "" }]),
         };
     }
     function handleShareLine(id, pl) {
@@ -1604,7 +1614,7 @@ function App() {
             return { name: c.name, pay: c.premium * f, single: c.single, renewalNote: c.renewalNote, benefits: customerBenefits(c.benefits) };
         });
         return { cards, payLabel: result.payLabel, totalPay: result.totalPay, totalYear: result.totalYear, singleNote: result.singleNote,
-            customer: customerName.trim(), gender, age, agent: agentInfo };
+            customer: customerName.trim(), gender, age, agent: agentInfo, notes: shareNotes(cards) };
     }
     useEffect(() => { if (shareModal) preloadShareFonts(); else setSharePreview(""); }, [!!shareModal]);
     // ข้อความ/รูปของรายการที่กำลังจะส่ง (ใช้ทั้งปุ่มส่ง LINE และปุ่มคัดลอก/บันทึกสำหรับ LINE OA)
