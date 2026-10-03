@@ -8,7 +8,7 @@ const BRAND = {
     ink: "#000000", sub: "#404040", danger: "#B93232", warn: "#6B4508",
     label: "#000000", nameBlue: "#1668D6", mainBlue: "#0C2F63", dataBlack: "#000000",
 };
-const APP_VERSION = "v2.13.0 (2569-10-02)"; // อัปเดตเลขนี้ทุกครั้งที่มีการแก้ไข/เพิ่มแบบประกันใหม่ เพื่อให้รู้ว่าไฟล์ที่ใช้อยู่เป็นเวอร์ชันล่าสุดหรือไม่
+const APP_VERSION = "v2.15.0 (2569-10-03)"; // อัปเดตเลขนี้ทุกครั้งที่มีการแก้ไข/เพิ่มแบบประกันใหม่ เพื่อให้รู้ว่าไฟล์ที่ใช้อยู่เป็นเวอร์ชันล่าสุดหรือไม่
 const fmt = (n) => (n === null || n === undefined || isNaN(n) ? "0" : Math.round(n).toLocaleString("th-TH"));
 const baht = (n) => (n === null || n === undefined ? "-" : (typeof n === "string" ? n : fmt(n) + " บาท"));
 /* ============================== PERSISTENT STORAGE (works in Claude.ai artifact and standalone browser) ============================== */
@@ -103,91 +103,222 @@ function buildShareText(d) {
     out.push(`* ${SHARE_DISCLAIMER}`);
     return out.join("\n");
 }
+function copyTextToClipboard(text) {
+    const fallback = () => {
+        try {
+            const ta = document.createElement("textarea");
+            ta.value = text; ta.setAttribute("readonly", ""); ta.style.position = "fixed"; ta.style.opacity = "0";
+            document.body.appendChild(ta); ta.select(); ta.setSelectionRange(0, text.length);
+            const ok = document.execCommand("copy"); ta.remove(); return ok;
+        } catch (e) { return false; }
+    };
+    try {
+        if (navigator.clipboard && window.isSecureContext) { navigator.clipboard.writeText(text).catch(fallback); return true; }
+    } catch (e) { }
+    return fallback();
+}
 function openLineText(text) {
     try { if (navigator.clipboard) navigator.clipboard.writeText(text).catch(() => { }); } catch (e) { }
     window.open("https://line.me/R/share?text=" + encodeURIComponent(text), "_blank");
 }
-// วาดใบสรุปเป็นรูปด้วย Canvas (ไม่ต้องใช้ไลบรารีเสริม)
+// ===== วาดรูปด้วย Canvas — จัดตำแหน่งชิดซ้ายเองทั้งหมด (ไม่ใช้ textAlign ของเบราว์เซอร์ ซึ่งบน iPhone วางข้อความไทยผิดที่จนล้นขอบ) =====
+const IMG_W = 1080, IMG_P = 48, IMG_FONT = "'IBM Plex Sans Thai','Prompt',sans-serif";
+// กว้างของข้อความ: ใช้ค่าที่มากกว่าระหว่างที่เบราว์เซอร์วัดได้กับค่าประมาณ กันวัดผิดแล้วล้นขอบ
+function imgTextW(ctx, text, size) {
+    let m = 0;
+    try { m = ctx.measureText(text).width || 0; } catch (e) { }
+    let est = 0;
+    for (const ch of String(text)) { const cp = ch.codePointAt(0); est += (cp >= 0x0E31 && cp <= 0x0E3A && cp !== 0x0E32 && cp !== 0x0E33) || (cp >= 0x0E47 && cp <= 0x0E4E) ? 0 : cp > 0xFFFF ? size : size * 0.58; }
+    return Math.max(m, est);
+}
+function imgWrap(ctx, text, size, maxW) {
+    const out = [];
+    String(text).split("\n").forEach((para) => {
+        const chars = Array.from(para); let cur = "";
+        chars.forEach((ch) => {
+            const cp = ch.codePointAt(0);
+            const isMark = (cp >= 0x0E31 && cp <= 0x0E3A && cp !== 0x0E32 && cp !== 0x0E33) || (cp >= 0x0E47 && cp <= 0x0E4E);
+            if (!isMark && cur && imgTextW(ctx, cur + ch, size) > maxW) {
+                // พยายามตัดที่ช่องว่างล่าสุด
+                const sp = cur.lastIndexOf(" ");
+                if (sp > cur.length * 0.5) { out.push(cur.slice(0, sp)); cur = cur.slice(sp + 1) + ch; }
+                else { out.push(cur); cur = ch; }
+            }
+            else cur += ch;
+        });
+        out.push(cur);
+    });
+    return out;
+}
+// ตัวช่วยจัดหน้า: เก็บคำสั่งวาดไว้ก่อน แล้วค่อยวาดจริงเมื่อรู้ความสูงทั้งหมด
+function makeImgLayout() {
+    const probe = document.createElement("canvas").getContext("2d");
+    const ops = [];
+    const L = { y: 0, ops, probe,
+        rect(x, y, w, h, color, grad) { ops.push({ t: "rect", x, y, w, h, color, grad }); },
+        text(x, y, txt, size, weight, color) { ops.push({ t: "text", x, y, txt: String(txt), size, weight, color }); },
+        // ข้อความหลายบรรทัด คืนค่าความสูงที่ใช้
+        para(x, y, txt, size, weight, color, maxW, lh) {
+            probe.font = `${weight} ${size}px ${IMG_FONT}`;
+            const lines = imgWrap(probe, txt, size, maxW);
+            lines.forEach((t, i) => L.text(x, y + i * lh, t, size, weight, color));
+            return lines.length * lh;
+        },
+    };
+    return L;
+}
+function renderImgLayout(L, H) {
+    const c = document.createElement("canvas");
+    c.width = IMG_W; c.height = Math.ceil(H);
+    const g = c.getContext("2d");
+    g.fillStyle = "#FFFFFF"; g.fillRect(0, 0, c.width, c.height);
+    g.textBaseline = "top"; g.textAlign = "left";
+    L.ops.forEach((o) => {
+        if (o.t === "rect") {
+            if (o.grad) { const gr = g.createLinearGradient(o.x, o.y, o.x + o.w, o.y + o.h); gr.addColorStop(0, o.grad[0]); gr.addColorStop(1, o.grad[1]); g.fillStyle = gr; }
+            else g.fillStyle = o.color;
+            g.fillRect(o.x, o.y, o.w, o.h);
+        }
+        else { g.font = `${o.weight} ${o.size}px ${IMG_FONT}`; g.fillStyle = o.color; g.textAlign = "left"; g.fillText(o.txt, o.x, o.y); }
+    });
+    return c;
+}
+function imgHeader(L, subtitle, title) {
+    const P = IMG_P, W = IMG_W;
+    const start = L.ops.length;
+    let y = 36;
+    y += L.para(P, y, subtitle, 30, 500, "#BFE3F5", W - P * 2, 42) + 8;
+    y += L.para(P, y, title, 44, 600, "#FFFFFF", W - P * 2, 58) + 30;
+    L.ops.splice(start, 0, { t: "rect", x: 0, y: 0, w: W, h: y, grad: [BRAND.navy, BRAND.navyDeep] });
+    return y;
+}
+function imgCustomer(L, d, y, extra) {
+    const P = IMG_P;
+    y += 28;
+    y += L.para(P, y, d.customer ? `เรียน คุณ${d.customer}` : "ผู้เอาประกันภัย", 34, 600, BRAND.ink, IMG_W - P * 2, 46);
+    y += L.para(P, y, `${d.gender === "female" ? "เพศหญิง" : "เพศชาย"} อายุ ${d.age} ปี${extra || ""}`, 30, 500, BRAND.sub, IMG_W - P * 2, 42);
+    return y + 24;
+}
+// แถว "หัวข้อ — ค่า": หัวข้อซ้าย ค่าคอลัมน์ขวา (ชิดซ้ายในคอลัมน์ของตัวเอง) ตัดบรรทัดอัตโนมัติ
+function imgKeyRow(L, y, label, value, shade) {
+    const P = IMG_P, W = IMG_W, split = P + (W - P * 2) * 0.46, pad = 12;
+    const start = L.ops.length;
+    const h1 = L.para(P, y + pad, label, 27, 500, BRAND.sub, split - P - 16, 38);
+    const h2 = L.para(split, y + pad, value, 28, 600, BRAND.navy, W - P - split, 38);
+    const h = Math.max(h1, h2) + pad * 2;
+    if (shade) L.ops.splice(start, 0, { t: "rect", x: P - 12, y, w: W - P * 2 + 24, h, color: BRAND.bg });
+    return y + h;
+}
+function imgFooter(L, d, y) {
+    const P = IMG_P, W = IMG_W;
+    y += 30;
+    const start = L.ops.length;
+    let h = 26;
+    h += L.para(P, y + h, d.agent.name || "", 36, 600, "#FFFFFF", W - P * 2, 48) + 8;
+    const contact = [d.agent.phone ? `📞 ${d.agent.phone}` : "", d.agent.lineId ? `LINE: ${d.agent.lineId}` : ""].filter(Boolean).join("     ");
+    if (contact) h += L.para(P, y + h, contact, 30, 500, "#BFE3F5", W - P * 2, 42);
+    h += 26;
+    L.ops.splice(start, 0, { t: "rect", x: 0, y, w: W, h, color: BRAND.navy });
+    y += h + 18;
+    y += L.para(P, y, `* ${SHARE_DISCLAIMER}`, 22, 500, "#808080", W - P * 2, 32);
+    return y + 24;
+}
+// รูปตารางเงินคืน (สะสมทรัพย์) / ตารางบำนาญ
 function drawShareImage(d) {
-    const W = 1080, P = 48, FONT = "'IBM Plex Sans Thai','Prompt',sans-serif";
-    const keys = shareKeyLines(d);
+    const P = IMG_P, W = IMG_W;
+    const L = makeImgLayout();
+    let y = imgHeader(L, "สรุปข้อเสนอแบบประกัน · กรุงเทพประกันชีวิต", d.productName);
+    y = imgCustomer(L, d, y);
+    shareKeyLines(d).forEach(([ic, k, v], i) => { y = imgKeyRow(L, y, `${ic} ${k}`, v, i % 2 === 0); });
+    y += 36;
     const isSav = d.type === "savings";
     const cols = isSav ? ["ปีที่", "อายุ", "เบี้ย", "เงินคืน", "คุ้มครอง"] : ["อายุ", "เบี้ย", "บำนาญ", "เบี้ยสะสม", "บำนาญสะสม"];
-    const colW = isSav ? [0.12, 0.12, 0.24, 0.24, 0.28] : [0.12, 0.22, 0.22, 0.22, 0.22];
-    const rowH = 44, keyH = 54;
-    const c = document.createElement("canvas");
-    const measure = c.getContext("2d");
-    measure.font = `600 44px ${FONT}`;
-    const wrap = (ctx, text, maxW) => {
-        const words = Array.from(text); const lines = []; let cur = "";
-        words.forEach((ch) => { if (ctx.measureText(cur + ch).width > maxW && cur) { lines.push(cur); cur = ch; } else cur += ch; });
-        if (cur) lines.push(cur); return lines;
-    };
-    const titleLines = wrap(measure, d.productName, W - P * 2);
-    const headerH = 120 + titleLines.length * 56;
-    const H = headerH + 110 + keys.length * keyH + 40 + 56 + d.rows.length * rowH + 60 + 250;
-    c.width = W; c.height = H;
-    const g = c.getContext("2d");
-    g.fillStyle = "#FFFFFF"; g.fillRect(0, 0, W, H);
-    // หัวกระดาษ
-    const grd = g.createLinearGradient(0, 0, W, headerH); grd.addColorStop(0, BRAND.navy); grd.addColorStop(1, BRAND.navyDeep);
-    g.fillStyle = grd; g.fillRect(0, 0, W, headerH);
-    g.textBaseline = "top"; g.textAlign = "left";
-    g.fillStyle = "#BFE3F5"; g.font = `500 30px ${FONT}`; g.fillText("สรุปข้อเสนอแบบประกัน · กรุงเทพประกันชีวิต", P, 40);
-    g.fillStyle = "#FFFFFF"; g.font = `600 44px ${FONT}`;
-    titleLines.forEach((t, i) => g.fillText(t, P, 92 + i * 56));
-    let y = headerH + 30;
-    g.fillStyle = BRAND.ink; g.font = `600 34px ${FONT}`;
-    g.fillText(d.customer ? `เรียน คุณ${d.customer}` : "ผู้เอาประกันภัย", P, y);
-    g.fillStyle = BRAND.sub; g.font = `500 30px ${FONT}`;
-    g.fillText(`${d.gender === "female" ? "เพศหญิง" : "เพศชาย"} อายุ ${d.age} ปี`, P, y + 44);
-    y += 110;
-    // ตัวเลขสำคัญ
-    keys.forEach(([ic, k, v], i) => {
-        if (i % 2 === 0) { g.fillStyle = BRAND.bg; g.fillRect(P - 12, y - 6, W - P * 2 + 24, keyH); }
-        g.textAlign = "left"; g.fillStyle = BRAND.sub; g.font = `500 28px ${FONT}`; g.fillText(`${ic} ${k}`, P, y + 6);
-        g.textAlign = "right"; g.fillStyle = BRAND.navy; g.font = `600 30px ${FONT}`; g.fillText(v, W - P, y + 5);
-        y += keyH;
-    });
-    y += 40;
-    // ตาราง
-    const tx = (i) => P + colW.slice(0, i).reduce((a, b) => a + b, 0) * (W - P * 2);
-    const tw = (i) => colW[i] * (W - P * 2);
-    g.fillStyle = BRAND.navy; g.fillRect(P - 12, y, W - P * 2 + 24, 56);
-    g.fillStyle = "#FFFFFF"; g.font = `600 26px ${FONT}`; g.textAlign = "center";
-    cols.forEach((h, i) => g.fillText(h, tx(i) + tw(i) / 2, y + 13));
+    const colW = isSav ? [0.11, 0.11, 0.24, 0.25, 0.29] : [0.11, 0.21, 0.21, 0.23, 0.24];
+    const tx = (i) => P + 8 + colW.slice(0, i).reduce((a, b) => a + b, 0) * (W - P * 2);
+    L.rect(P - 12, y, W - P * 2 + 24, 56, BRAND.navy);
+    cols.forEach((h, i) => L.text(tx(i), y + 13, h, 25, 600, "#FFFFFF"));
     y += 56;
-    g.font = `500 25px ${FONT}`;
+    const rowH = 44;
     d.rows.forEach((r, idx) => {
         const hi = isSav ? !!r.note : r.age === d.breakEvenAge;
-        g.fillStyle = hi ? "#FFF6E0" : (idx % 2 ? "#F7FBFD" : "#FFFFFF"); g.fillRect(P - 12, y, W - P * 2 + 24, rowH);
+        L.rect(P - 12, y, W - P * 2 + 24, rowH, hi ? "#FFF6E0" : (idx % 2 ? "#F7FBFD" : "#FFFFFF"));
         const vals = isSav
             ? [idx + 1, r.age, r.premium > 0 ? fmt(r.premium) : "-", fmt(r.cashBaht), fmt(r.coverageBaht)]
             : [r.age, r.premium > 0 ? fmt(r.premium) : "-", r.pension > 0 ? fmt(r.pension) : "-", fmt(r.cumPremium), fmt(r.cumPension)];
-        vals.forEach((v, i) => {
-            g.fillStyle = (isSav ? i === 3 : i === 2) ? BRAND.greenDeep : BRAND.ink;
-            g.fillText(String(v), tx(i) + tw(i) / 2, y + 8);
-        });
+        vals.forEach((v, i) => L.text(tx(i), y + 8, v, 25, 500, (isSav ? i === 3 : i === 2) ? BRAND.greenDeep : BRAND.ink));
         y += rowH;
     });
     if (isSav) {
-        g.fillStyle = BRAND.bg; g.fillRect(P - 12, y, W - P * 2 + 24, 52);
-        g.font = `600 26px ${FONT}`; g.fillStyle = BRAND.navy;
-        g.fillText("รวม", tx(0) + (tw(0) + tw(1)) / 2, y + 11);
-        g.fillText(fmt(d.totalPremium), tx(2) + tw(2) / 2, y + 11);
-        g.fillStyle = BRAND.greenDeep; g.fillText(fmt(d.totalCash), tx(3) + tw(3) / 2, y + 11);
+        L.rect(P - 12, y, W - P * 2 + 24, 52, BRAND.bg);
+        L.text(tx(0), y + 11, "รวม", 26, 600, BRAND.navy);
+        L.text(tx(2), y + 11, fmt(d.totalPremium), 26, 600, BRAND.navy);
+        L.text(tx(3), y + 11, fmt(d.totalCash), 26, 600, BRAND.greenDeep);
+        y += 52;
     }
-    y += 60;
-    // ข้อมูลตัวแทน
-    g.fillStyle = BRAND.navy; g.fillRect(0, y, W, 150);
-    g.textAlign = "left"; g.fillStyle = "#FFFFFF"; g.font = `600 36px ${FONT}`;
-    g.fillText(d.agent.name || "", P, y + 24);
-    g.fillStyle = "#BFE3F5"; g.font = `500 30px ${FONT}`;
-    g.fillText([d.agent.phone ? `📞 ${d.agent.phone}` : "", d.agent.lineId ? `LINE: ${d.agent.lineId}` : ""].filter(Boolean).join("    "), P, y + 82);
-    y += 150;
-    g.fillStyle = "#808080"; g.font = `500 22px ${FONT}`;
-    wrap(g, `* ${SHARE_DISCLAIMER}`, W - P * 2).forEach((t, i) => g.fillText(t, P, y + 16 + i * 30));
-    return c;
+    y = imgFooter(L, d, y + 10);
+    return renderImgLayout(L, y);
+}
+// ===== ใบเสนอทั้งชุด (ทุกแบบที่เลือก + รายละเอียดผลประโยชน์) =====
+// ตัดบรรทัดที่เป็นหมายเหตุสำหรับตัวแทน (ไม่ควรถึงมือลูกค้า)
+const AGENT_ONLY_RE = /โปรดตรวจสอบ|ก่อนนำเสนอ|ค่าคอม|ค่านายหน้า|ค่าบำเหน็จ|FYC|เครดิตผลงาน/;
+function customerBenefits(benefits) {
+    return (benefits || []).filter((b) => Array.isArray(b) && b.length >= 2)
+        .map(([k, v]) => [String(k), typeof v === "string" || typeof v === "number" ? String(v) : ""])
+        .filter(([k, v]) => v !== "" && !AGENT_ONLY_RE.test(k) && !AGENT_ONLY_RE.test(v));
+}
+function buildQuoteText(q) {
+    const out = [];
+    if (q.customer) out.push(`เรียน คุณ${q.customer}`, "");
+    out.push("📋 สรุปแผนประกัน · กรุงเทพประกันชีวิต");
+    out.push(`👤 ${q.gender === "female" ? "เพศหญิง" : "เพศชาย"} อายุ ${q.age} ปี · ชำระ${q.payLabel}`);
+    q.cards.forEach((c, i) => {
+        out.push("", `━━ ${i + 1}) ${c.name} ━━`);
+        out.push(`💳 เบี้ย ${baht(c.pay)}${c.single ? " (ชำระครั้งเดียว)" : ` (${q.payLabel})`}${c.renewalNote ? " · " + c.renewalNote : ""}`);
+        c.benefits.forEach(([k, v]) => out.push(`• ${k}: ${v}`));
+    });
+    out.push("", `💰 รวมเบี้ย (${q.payLabel}): ${baht(q.totalPay)}`);
+    if (q.totalPay !== q.totalYear) out.push(`   เทียบเท่าเบี้ยรายปีรวม ${baht(q.totalYear)}`);
+    if (q.singleNote) out.push(q.singleNote);
+    out.push("", "————————");
+    if (q.agent.name) out.push(q.agent.name);
+    if (q.agent.phone) out.push(`📞 ${q.agent.phone}`);
+    if (q.agent.lineId) out.push(`LINE: ${q.agent.lineId}`);
+    out.push(`* ${SHARE_DISCLAIMER}`);
+    return out.join("\n");
+}
+const LINE_TEXT_SOFT_LIMIT = 4500;
+function drawQuoteImage(q) {
+    const P = IMG_P, W = IMG_W;
+    const L = makeImgLayout();
+    let y = imgHeader(L, "สรุปแผนประกัน · กรุงเทพประกันชีวิต", q.cards.length === 1 ? q.cards[0].name : `แผนประกัน ${q.cards.length} รายการ`);
+    y = imgCustomer(L, q, y, ` · ชำระ${q.payLabel}`);
+    q.cards.forEach((c, i) => {
+        y += 14;
+        const start = L.ops.length;
+        let h = 18;
+        h += L.para(P + 8, y + h, `${i + 1}) ${c.name}`, 34, 600, BRAND.nameBlue, W - P * 2 - 16, 46) + 4;
+        h += L.para(P + 8, y + h, `เบี้ย ${baht(c.pay)}${c.single ? " (ชำระครั้งเดียว)" : ` (${q.payLabel})`}${c.renewalNote ? " · " + c.renewalNote : ""}`, 30, 600, BRAND.ink, W - P * 2 - 16, 42) + 18;
+        L.ops.splice(start, 0, { t: "rect", x: P - 12, y, w: W - P * 2 + 24, h, color: "#E6F2F8" }, { t: "rect", x: P - 12, y, w: 8, h, color: BRAND.skyDeep });
+        y += h;
+        c.benefits.forEach(([k, v], j) => { y = imgKeyRow(L, y, k, v, j % 2 === 1); });
+        y += 16;
+    });
+    y += 10;
+    const start = L.ops.length;
+    let h = 22;
+    h += L.para(P, y + h, `รวมเบี้ยประกัน (${q.payLabel})`, 30, 500, "#FFFFFF", W - P * 2, 42);
+    h += L.para(P, y + h, baht(q.totalPay), 52, 700, "#FFFFFF", W - P * 2, 66);
+    if (q.totalPay !== q.totalYear) h += L.para(P, y + h, `เทียบเท่าเบี้ยรายปีรวม ${baht(q.totalYear)}`, 26, 500, "#FFFFFF", W - P * 2, 38);
+    if (q.singleNote) h += L.para(P, y + h, q.singleNote, 24, 500, "#FFFFFF", W - P * 2, 34);
+    h += 22;
+    L.ops.splice(start, 0, { t: "rect", x: P - 12, y, w: W - P * 2 + 24, h, grad: [BRAND.green, BRAND.greenDeep] });
+    y += h;
+    y = imgFooter(L, q, y + 10);
+    return renderImgLayout(L, y);
+}
+// โหลดฟอนต์ล่วงหน้า (เรียกตอนเปิดหน้าต่างส่ง) ให้รูปใช้ฟอนต์เดียวกับแอป
+function preloadShareFonts() {
+    try { if (document.fonts && document.fonts.load) { ["500", "600", "700"].forEach((w) => document.fonts.load(`${w} 30px 'IBM Plex Sans Thai'`, "ทดสอบ").catch(() => { })); } } catch (e) { }
 }
 function shareCanvasImage(canvas) {
     const dataUrl = canvas.toDataURL("image/png");
@@ -1432,6 +1563,7 @@ function App() {
     const [customerName, setCustomerName] = useState("");
     const [shareModal, setShareModal] = useState(null); // { id, mode: "text"|"image", pl } หรือ { id: null } = เปิดเฉพาะตั้งค่าตัวแทน
     const [shareNote, setShareNote] = useState("");
+    const [sharePreview, setSharePreview] = useState(""); // dataURL ของรูป สำหรับกดค้างบันทึก (ใช้กับ LINE OA)
     useEffect(() => {
         (async () => {
             const raw = await storageAdapter.get(AGENT_KEY);
@@ -1465,8 +1597,50 @@ function App() {
         setAgentDraft(agentInfo.confirmed ? null : null);
         setShareModal({ id, mode: pl.mode, pl });
     }
+    function buildQuoteData() {
+        if (!result) return null;
+        const cards = result.cards.map((c) => {
+            const f = c.factor !== undefined ? c.factor : result.factor;
+            return { name: c.name, pay: c.premium * f, single: c.single, renewalNote: c.renewalNote, benefits: customerBenefits(c.benefits) };
+        });
+        return { cards, payLabel: result.payLabel, totalPay: result.totalPay, totalYear: result.totalYear, singleNote: result.singleNote,
+            customer: customerName.trim(), gender, age, agent: agentInfo };
+    }
+    useEffect(() => { if (shareModal) preloadShareFonts(); else setSharePreview(""); }, [!!shareModal]);
+    // ข้อความ/รูปของรายการที่กำลังจะส่ง (ใช้ทั้งปุ่มส่ง LINE และปุ่มคัดลอก/บันทึกสำหรับ LINE OA)
+    function currentShareText() {
+        if (!shareModal || !shareModal.id) return "";
+        if (shareModal.id === "QUOTE") { const q = buildQuoteData(); return q ? buildQuoteText(q) : ""; }
+        return buildShareText(buildShareData(shareModal.id, shareModal.pl));
+    }
+    function currentShareCanvas() {
+        if (!shareModal || !shareModal.id) return null;
+        if (shareModal.id === "QUOTE") { const q = buildQuoteData(); return q ? drawQuoteImage(q) : null; }
+        return drawShareImage(buildShareData(shareModal.id, shareModal.pl));
+    }
+    function copyForOA() {
+        const ok = copyTextToClipboard(currentShareText());
+        setShareNote(ok ? "📋 คัดลอกข้อความแล้ว — เปิดแชทลูกค้าใน LINE OA แล้วกดวาง" : "คัดลอกไม่สำเร็จ ลองใหม่อีกครั้ง");
+    }
+    function saveImageForOA() {
+        const c = currentShareCanvas();
+        if (!c) return;
+        setSharePreview(c.toDataURL("image/png"));
+        setShareNote("");
+    }
     function doShare() {
         if (!shareModal || !shareModal.id) return;
+        if (shareModal.id === "QUOTE") {
+            const q = buildQuoteData();
+            if (!q) return;
+            if (shareModal.mode === "text") { openLineText(buildQuoteText(q)); setShareModal(null); }
+            else {
+                const r = shareCanvasImage(drawQuoteImage(q));
+                if (r === "downloaded") setShareNote("บันทึกรูปลงเครื่องแล้ว — เปิด LINE แล้วแนบรูปส่งลูกค้าได้เลย");
+                else setShareModal(null);
+            }
+            return;
+        }
         const d = buildShareData(shareModal.id, shareModal.pl);
         if (shareModal.mode === "text") {
             openLineText(buildShareText(d));
@@ -4271,6 +4445,9 @@ function App() {
                         result.factor !== 1 && result.totalPay !== result.totalYear && React.createElement("p", { className: "text-[24px] mt-1 opacity-90" },
                             "\u0E40\u0E17\u0E35\u0E22\u0E1A\u0E40\u0E17\u0E48\u0E32\u0E40\u0E1A\u0E35\u0E49\u0E22\u0E23\u0E32\u0E22\u0E1B\u0E35\u0E23\u0E27\u0E21 ",
                             baht(result.totalYear))),
+                    React.createElement("div", { className: "flex gap-2 flex-wrap" },
+                        React.createElement("button", { onClick: () => { setShareNote(""); setShareModal({ id: "QUOTE", mode: "text" }); }, className: "flex-1 min-w-[160px] rounded-xl py-3 text-[21px] font-semibold text-white", style: { background: "#06C755" } }, "💬 ส่งข้อความ LINE (ทุกแบบ)"),
+                        React.createElement("button", { onClick: () => { setShareNote(""); setShareModal({ id: "QUOTE", mode: "image" }); }, className: "flex-1 min-w-[160px] rounded-xl py-3 text-[21px] font-semibold text-white", style: { background: "#06C755" } }, "🖼️ ส่งรูป LINE (ทุกแบบ)")),
                     React.createElement(BenefitBoard, { cards: result.cards }),
                     showComm && React.createElement(CommissionPopup, { result, onClose: () => setShowComm(false) }),
                     React.createElement("div", { className: "grid sm:grid-cols-2 gap-4" }, result.cards.map((c) => (React.createElement("div", { key: c.id, className: "rounded-2xl overflow-hidden", style: { background: BRAND.card, boxShadow: "0 6px 20px rgba(11,42,85,0.08)", borderTop: `4px solid ${BRAND.sky}`, position: "relative" } },
@@ -4363,7 +4540,23 @@ function App() {
                             !agentInfo.confirmed && (React.createElement("button", { onClick: () => saveAgent(agentInfo), className: "flex-1 rounded-xl py-2 text-[19px] font-medium text-white", style: { background: BRAND.greenDeep } }, "✓ ถูกต้อง")),
                             React.createElement("button", { onClick: () => setAgentDraft(Object.assign({}, agentInfo)), className: "flex-1 rounded-xl py-2 text-[19px] font-medium", style: { background: "#FFFFFF", color: BRAND.navy, border: "1px solid #D7E8F0" } }, "✎ แก้ไข")))),
                     shareNote && (React.createElement("p", { className: "text-[19px] mb-3", style: { color: BRAND.greenDeep } }, shareNote)),
+                    shareModal.id === "QUOTE" && shareModal.mode === "text" && (() => {
+                        const q = buildQuoteData();
+                        const n = q ? buildQuoteText(q).length : 0;
+                        return n > LINE_TEXT_SOFT_LIMIT && (React.createElement("div", { className: "rounded-xl p-3 mb-3", style: { background: "#FFF6E0", border: "1px solid #F0C36D" } },
+                            React.createElement("p", { className: "text-[19px]", style: { color: BRAND.warn } }, `ข้อความยาว ${fmt(n)} ตัวอักษร LINE อาจตัดท้ายข้อความ แนะนำส่งเป็นรูปแทน`),
+                            React.createElement("button", { onClick: () => setShareModal({ id: "QUOTE", mode: "image" }), className: "mt-2 w-full rounded-xl py-2 text-[19px] font-medium", style: { background: "#FFFFFF", color: BRAND.navy, border: "1px solid #D7E8F0" } }, "🖼️ เปลี่ยนเป็นส่งรูป")));
+                    })(),
                     shareModal.id && (React.createElement("button", { disabled: !agentInfo.confirmed || !!agentDraft, onClick: doShare, className: "w-full rounded-xl py-3 text-[22px] font-semibold text-white", style: { background: "#06C755", opacity: (!agentInfo.confirmed || agentDraft) ? 0.4 : 1 } }, shareModal.mode === "text" ? "💬 เปิด LINE เพื่อส่งข้อความ" : "🖼️ สร้างรูปและส่ง LINE")),
+                    shareModal.id && (React.createElement("div", { className: "mt-3 rounded-xl p-3", style: { border: "1px dashed #9FD8B0" } },
+                        React.createElement("p", { className: "text-[18px] mb-2", style: { color: BRAND.sub } }, "ส่งผ่าน LINE OA: คัดลอกหรือบันทึกไว้ก่อน แล้วไปวาง/แนบในแชทลูกค้า"),
+                        React.createElement("div", { className: "flex gap-2" },
+                            React.createElement("button", { disabled: !agentInfo.confirmed || !!agentDraft, onClick: copyForOA, className: "flex-1 rounded-xl py-2.5 text-[19px] font-medium", style: { background: "#FFFFFF", color: "#06A045", border: "1px solid #06C755", opacity: (!agentInfo.confirmed || agentDraft) ? 0.4 : 1 } }, "📋 คัดลอกข้อความ"),
+                            React.createElement("button", { disabled: !agentInfo.confirmed || !!agentDraft, onClick: saveImageForOA, className: "flex-1 rounded-xl py-2.5 text-[19px] font-medium", style: { background: "#FFFFFF", color: "#06A045", border: "1px solid #06C755", opacity: (!agentInfo.confirmed || agentDraft) ? 0.4 : 1 } }, "💾 บันทึกรูป")),
+                        sharePreview && (React.createElement("div", { className: "mt-3" },
+                            React.createElement("p", { className: "text-[18px] mb-2 font-semibold", style: { color: BRAND.navy } }, "มือถือ: กดค้างที่รูป → บันทึกรูปภาพ · คอม: กดปุ่มดาวน์โหลดด้านล่าง"),
+                            React.createElement("img", { src: sharePreview, alt: "สรุปแบบประกัน", className: "w-full rounded-lg", style: { border: "1px solid #D7E8F0", WebkitTouchCallout: "default" } }),
+                            React.createElement("a", { href: sharePreview, download: "insurance-summary.png", className: "block text-center mt-2 rounded-xl py-2 text-[18px] font-medium", style: { background: BRAND.bg, color: BRAND.navy } }, "⬇️ ดาวน์โหลดรูป"))))),
                     React.createElement("button", { onClick: () => { setShareModal(null); setAgentDraft(null); }, className: "w-full mt-2 rounded-xl py-2.5 text-[20px] font-medium", style: { background: BRAND.bg, color: BRAND.navy } }, "✕ ปิด")))),
             React.createElement("footer", { className: "text-center text-[21px] py-6", style: { color: BRAND.sub } }, "\u0E40\u0E1E\u0E37\u0E48\u0E2D\u0E01\u0E32\u0E23\u0E19\u0E33\u0E40\u0E2A\u0E19\u0E2D\u0E40\u0E1A\u0E37\u0E49\u0E2D\u0E07\u0E15\u0E49\u0E19\u0E40\u0E17\u0E48\u0E32\u0E19\u0E31\u0E49\u0E19 \u0E44\u0E21\u0E48\u0E43\u0E0A\u0E48\u0E40\u0E2D\u0E01\u0E2A\u0E32\u0E23\u0E40\u0E2A\u0E19\u0E2D\u0E02\u0E32\u0E22\u0E2D\u0E22\u0E48\u0E32\u0E07\u0E40\u0E1B\u0E47\u0E19\u0E17\u0E32\u0E07\u0E01\u0E32\u0E23")),
         React.createElement("style", null, `
