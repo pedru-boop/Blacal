@@ -8,7 +8,7 @@ const BRAND = {
     ink: "#000000", sub: "#404040", danger: "#B93232", warn: "#6B4508",
     label: "#000000", nameBlue: "#1668D6", mainBlue: "#0C2F63", dataBlack: "#000000",
 };
-const APP_VERSION = "v2.16.0 (2569-10-03)"; // อัปเดตเลขนี้ทุกครั้งที่มีการแก้ไข/เพิ่มแบบประกันใหม่ เพื่อให้รู้ว่าไฟล์ที่ใช้อยู่เป็นเวอร์ชันล่าสุดหรือไม่
+const APP_VERSION = "v2.17.0 (2569-10-03)"; // อัปเดตเลขนี้ทุกครั้งที่มีการแก้ไข/เพิ่มแบบประกันใหม่ เพื่อให้รู้ว่าไฟล์ที่ใช้อยู่เป็นเวอร์ชันล่าสุดหรือไม่
 const fmt = (n) => (n === null || n === undefined || isNaN(n) ? "0" : Math.round(n).toLocaleString("th-TH"));
 const baht = (n) => (n === null || n === undefined ? "-" : (typeof n === "string" ? n : fmt(n) + " บาท"));
 /* ============================== PERSISTENT STORAGE (works in Claude.ai artifact and standalone browser) ============================== */
@@ -1567,6 +1567,28 @@ function App() {
     const [pensionGroupOpen, setPensionGroupOpen] = useState(false);
     const [pensionScheduleOpen, setPensionScheduleOpen] = useState({});
     const [pensionYearModal, setPensionYearModal] = useState(null); // { name, age, irr }
+    // หน้า "สุดคุ้ม / สมาร์ท คิดส์" (ลิงก์ตรง: …/#sudkhum) — ปุ่มย้อนกลับของมือถือพากลับหน้าคำนวณเบี้ยได้
+    const [page, setPage] = useState(() => (typeof window !== "undefined" && window.location && window.location.hash === "#sudkhum") ? "sudkhum" : "main");
+    const cameFromMainRef = useRef(false);
+    useEffect(() => {
+        const onHash = () => {
+            const next = window.location.hash === "#sudkhum" ? "sudkhum" : "main";
+            setPage(next);
+            if (next === "main") reloadAgent();
+        };
+        window.addEventListener("hashchange", onHash);
+        return () => window.removeEventListener("hashchange", onHash);
+    }, []);
+    useEffect(() => { try { window.scrollTo(0, 0); } catch (e) { } }, [page]);
+    function openSudkhum() { cameFromMainRef.current = true; window.location.hash = "sudkhum"; }
+    function backToMain() {
+        if (cameFromMainRef.current) { cameFromMainRef.current = false; window.history.back(); }
+        else { window.history.replaceState(null, "", window.location.pathname + window.location.search); setPage("main"); reloadAgent(); }
+    }
+    async function reloadAgent() {
+        const raw = await storageAdapter.get(AGENT_KEY);
+        if (raw) { try { setAgentInfo(Object.assign({}, DEFAULT_AGENT, JSON.parse(raw))); } catch (e) { } }
+    }
     const [agentInfo, setAgentInfo] = useState(DEFAULT_AGENT);
     const [agentDraft, setAgentDraft] = useState(null); // กำลังแก้ไขข้อมูลตัวแทน (null = ไม่ได้แก้)
     const [customerName, setCustomerName] = useState("");
@@ -4307,6 +4329,7 @@ function App() {
         setResult({ cards, totalYear, totalPay, factor: modeDef.factor, payLabel: singleCard ? "งวดแรก" : modeDef.label, singleNote: singleCard ? `รวมเบี้ย ${singleCard.name} ชำระครั้งเดียว ${baht(singleCard.premium)} · ปีต่อไปชำระเฉพาะสัญญาเพิ่มเติม` : "" });
     }
     const font = `@import url('https://fonts.googleapis.com/css2?family=Prompt:wght@400;500;600;700&family=IBM+Plex+Sans+Thai:wght@400;500;600;700&display=swap');`;
+    if (page === "sudkhum") return React.createElement(SudKoomPage, { onBack: backToMain });
     return (React.createElement("div", { style: { minHeight: "100vh", background: `linear-gradient(180deg, ${BRAND.bg} 0%, #FFFFFF 320px)`, fontFamily: "'IBM Plex Sans Thai','Prompt',sans-serif", color: BRAND.ink, fontSize: "17px", fontWeight: 500, WebkitFontSmoothing: "antialiased", textRendering: "optimizeLegibility" } },
         React.createElement("style", null, font),
         React.createElement("div", { id: "app-root-content" },
@@ -4382,7 +4405,10 @@ function App() {
                         React.createElement("h2", { className: "text-[24px] font-bold px-1", style: { color: BRAND.mainBlue } }, "\uD83D\uDCB0 \u0E1B\u0E23\u0E30\u0E01\u0E31\u0E19\u0E2A\u0E30\u0E2A\u0E21\u0E17\u0E23\u0E31\u0E1E\u0E22\u0E4C"),
                         React.createElement("button", { onClick: () => setSavingsGroupOpen(false), className: "text-[19px] font-medium px-2 py-1", style: { color: BRAND.sub } }, "\u2715 \u0E1B\u0E34\u0E14")),
                     React.createElement("p", { className: "text-[16px] mb-3 px-1", style: { color: BRAND.sub } }, "\u0E41\u0E15\u0E30\u0E40\u0E25\u0E37\u0E2D\u0E01\u0E44\u0E14\u0E49\u0E17\u0E31\u0E19\u0E17\u0E35 1 \u0E41\u0E1A\u0E1A \u2014 \u0E01\u0E14\u0E15\u0E31\u0E27\u0E43\u0E2B\u0E21\u0E48\u0E08\u0E30\u0E2A\u0E25\u0E31\u0E1A\u0E41\u0E17\u0E19\u0E15\u0E31\u0E27\u0E40\u0E14\u0E34\u0E21\u0E43\u0E2B\u0E49\u0E2D\u0E31\u0E15\u0E42\u0E19\u0E21\u0E31\u0E15\u0E34 (\u0E17\u0E38\u0E19\u0E1B\u0E23\u0E30\u0E01\u0E31\u0E19\u0E2B\u0E25\u0E31\u0E01\u0E40\u0E25\u0E37\u0E2D\u0E01\u0E44\u0E14\u0E49 1 \u0E41\u0E1A\u0E1A\u0E40\u0E17\u0E48\u0E32\u0E19\u0E31\u0E49\u0E19)"),
-                    React.createElement("div", { className: "grid grid-cols-2 sm:grid-cols-3 gap-1.5 sm:gap-2" }, sortByRecommended(PRODUCTS.filter((p) => SAVINGS_IDS.includes(p.id))).map((p) => (React.createElement(CompactChip, { key: p.id, product: p, checked: !!selected[p.id], picked: false, disabled: productDisabled(p), recommended: false, onCheckboxClick: () => toggle(p.id), onNameClick: () => openEditor(p.id) })))),
+                    React.createElement("div", { className: "grid grid-cols-2 sm:grid-cols-3 gap-1.5 sm:gap-2" }, sortByRecommended(PRODUCTS.filter((p) => SAVINGS_IDS.includes(p.id))).map((p) => (React.createElement(CompactChip, { key: p.id, product: p, checked: !!selected[p.id], picked: false, disabled: productDisabled(p), recommended: false, onCheckboxClick: () => toggle(p.id), onNameClick: () => openEditor(p.id) }))),
+                        React.createElement("button", { onClick: openSudkhum, className: "rounded-xl px-2.5 py-2 text-left flex flex-col justify-center", style: { background: `linear-gradient(120deg, ${BRAND.navy}, ${BRAND.navyDeep})`, color: "#fff", minHeight: 64 } },
+                            React.createElement("span", { className: "text-[18px] font-bold leading-tight" }, "💎 สุดคุ้ม / สมาร์ท คิดส์"),
+                            React.createElement("span", { className: "text-[14px] leading-tight", style: { color: "#BFE3F5" } }, "เปิดหน้าคำนวณผลประโยชน์ ›"))),
                     React.createElement("button", { onClick: () => setCompareOpen((o) => !o), className: "w-full text-[21px] font-semibold px-4 py-2.5 rounded-xl mt-3", style: { background: "#fff", color: BRAND.warn, border: `1.5px solid ${BRAND.warn}` } }, compareOpen ? "▴ ซ่อนตารางเทียบทุกแบบ" : "▾ เทียบทุกแบบ (IRR)"),
                     compareOpen && (React.createElement("div", { className: "mt-2" },
                         React.createElement(PlanRow, { label: "\u0E17\u0E38\u0E19\u0E1B\u0E23\u0E30\u0E01\u0E31\u0E19\u0E17\u0E35\u0E48\u0E43\u0E0A\u0E49\u0E40\u0E1B\u0E23\u0E35\u0E22\u0E1A\u0E40\u0E17\u0E35\u0E22\u0E1A (\u0E1A\u0E32\u0E17)" },
@@ -4941,6 +4967,1127 @@ function ProductRow({ product, checked, onToggle, age, live, pending, children, 
             baht(live.premium),
             " / \u0E1B\u0E35"))));
 }
+
+/* ============================== สุดคุ้ม / สมาร์ท คิดส์ (ฝังจากแอปสุดคุ้ม v1.2 — ขอบเขตแยก ไม่ชนชื่อกับแอปหลัก) ============================== */
+const SudKoomPage = (function () {
+const { useState, useMemo, useEffect, useRef, useLayoutEffect } = React;
+const Icon = ({ children, size = 20, className = "" }) => /* @__PURE__ */ React.createElement(
+  "svg",
+  {
+    width: size,
+    height: size,
+    viewBox: "0 0 24 24",
+    fill: "none",
+    stroke: "currentColor",
+    strokeWidth: "2",
+    strokeLinecap: "round",
+    strokeLinejoin: "round",
+    className
+  },
+  children
+);
+const Shield = (p) => /* @__PURE__ */ React.createElement(Icon, { ...p }, /* @__PURE__ */ React.createElement("path", { d: "M12 2 4 5v6c0 5.5 3.8 9.7 8 11 4.2-1.3 8-5.5 8-11V5l-8-3Z" }));
+const Info = (p) => /* @__PURE__ */ React.createElement(Icon, { ...p }, /* @__PURE__ */ React.createElement("circle", { cx: "12", cy: "12", r: "10" }), /* @__PURE__ */ React.createElement("line", { x1: "12", y1: "16", x2: "12", y2: "12" }), /* @__PURE__ */ React.createElement("line", { x1: "12", y1: "8", x2: "12.01", y2: "8" }));
+const ChevronDown = (p) => /* @__PURE__ */ React.createElement(Icon, { ...p }, /* @__PURE__ */ React.createElement("polyline", { points: "6 9 12 15 18 9" }));
+const Gift = (p) => /* @__PURE__ */ React.createElement(Icon, { ...p }, /* @__PURE__ */ React.createElement("rect", { x: "3", y: "8", width: "18", height: "4", rx: "1" }), /* @__PURE__ */ React.createElement("path", { d: "M12 8v13" }), /* @__PURE__ */ React.createElement("path", { d: "M19 12v7a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2v-7" }), /* @__PURE__ */ React.createElement("path", { d: "M7.5 8a2.5 2.5 0 0 1 0-5C11 3 12 8 12 8" }), /* @__PURE__ */ React.createElement("path", { d: "M16.5 8a2.5 2.5 0 0 0 0-5C13 3 12 8 12 8" }));
+const Printer = (p) => /* @__PURE__ */ React.createElement(Icon, { ...p }, /* @__PURE__ */ React.createElement("polyline", { points: "6 9 6 2 18 2 18 9" }), /* @__PURE__ */ React.createElement("path", { d: "M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2" }), /* @__PURE__ */ React.createElement("rect", { x: "6", y: "14", width: "12", height: "8" }));
+const Baby = (p) => /* @__PURE__ */ React.createElement(Icon, { ...p }, /* @__PURE__ */ React.createElement("path", { d: "M9 12h.01" }), /* @__PURE__ */ React.createElement("path", { d: "M15 12h.01" }), /* @__PURE__ */ React.createElement("path", { d: "M10 16c.5.3 1.2.5 2 .5s1.5-.2 2-.5" }), /* @__PURE__ */ React.createElement("path", { d: "M19 6.3a9 9 0 0 1 1.8 3.9 2 2 0 0 1 0 3.6 9 9 0 0 1-17.6 0 2 2 0 0 1 0-3.6A9 9 0 0 1 12 3c2 0 3.5 1.1 3.5 2.5s-1.5 2.5-2 2.5" }));
+const User = (p) => /* @__PURE__ */ React.createElement(Icon, { ...p }, /* @__PURE__ */ React.createElement("circle", { cx: "12", cy: "8", r: "4" }), /* @__PURE__ */ React.createElement("path", { d: "M4 21c0-4 4-7 8-7s8 3 8 7" }));
+const Pencil = (p) => /* @__PURE__ */ React.createElement(Icon, { ...p }, /* @__PURE__ */ React.createElement("path", { d: "M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" }), /* @__PURE__ */ React.createElement("path", { d: "M15 5l4 4" }));
+const PRODUCTS = {
+  adult: {
+    label: "\u0E1C\u0E39\u0E49\u0E43\u0E2B\u0E0D\u0E48 (\u0E2A\u0E38\u0E14\u0E04\u0E38\u0E49\u0E21)",
+    productName: "\u0E01\u0E23\u0E38\u0E07\u0E40\u0E17\u0E1E \u0E2A\u0E38\u0E14\u0E04\u0E38\u0E49\u0E21",
+    minAge: 15,
+    maxAge: 65,
+    plans: {
+      "15/9": {
+        term: 15,
+        pay: 9,
+        bonus: 0.15,
+        rows: {
+          15: [74.62, 87.91],
+          16: [74.83, 88.84],
+          17: [75.04, 89.66],
+          18: [75.25, 90.4],
+          19: [75.46, 91.07],
+          20: [75.68, 91.71],
+          21: [75.92, 92.35],
+          22: [76.19, 93.03],
+          23: [76.48, 93.76],
+          24: [76.8, 94.58],
+          25: [77.18, 95.5],
+          26: [77.6, 96.55],
+          27: [78.09, 97.75],
+          28: [78.65, 99.11],
+          29: [79.28, 100.64],
+          30: [80.01, 102.37],
+          31: [80.82, 104.3],
+          32: [81.74, 106.44],
+          33: [82.77, 108.8],
+          34: [83.91, 111.41],
+          35: [85.17, 114.27],
+          36: [86.57, 117.41],
+          37: [88.12, 120.86],
+          38: [89.82, 124.64],
+          39: [91.72, 128.8],
+          40: [93.82, 133.36],
+          41: [96.17, 138.38],
+          42: [98.79, 143.85],
+          43: [101.72, 149.96],
+          44: [105.01, 156.75],
+          45: [108.7, 164.29],
+          46: [112.81, 172.71],
+          47: [117.54, 182.15],
+          48: [122.9, 192.76],
+          49: [129.03, 204.74],
+          50: [136.05, 218.34],
+          51: [144.15, 233.84],
+          52: [153.54, 251.61],
+          53: [164.48, 272.08],
+          54: [177.29, 295.81],
+          55: [192.35, 323.48],
+          56: [210.14, 355.98],
+          57: [231.24, 394.38],
+          58: [256.35, 440.1],
+          59: [286.33, 494.97],
+          60: [322.26, 561.45],
+          61: [365.53, 642.94],
+          62: [417.94, 744.26],
+          63: [481.95, 872.61],
+          64: [560.95, 1039.13],
+          65: [659.82, 1262.2]
+        }
+      },
+      "18/12": {
+        term: 18,
+        pay: 12,
+        bonus: 0.18,
+        rows: {
+          15: [46.26, 54.83],
+          16: [46.39, 55.4],
+          17: [46.54, 55.94],
+          18: [46.69, 56.44],
+          19: [46.84, 56.92],
+          20: [47.01, 57.39],
+          21: [47.2, 57.87],
+          22: [47.41, 58.38],
+          23: [47.64, 58.94],
+          24: [47.9, 59.56],
+          25: [48.2, 60.25],
+          26: [48.53, 61.03],
+          27: [48.91, 61.91],
+          28: [49.33, 62.9],
+          29: [49.81, 64.02],
+          30: [50.34, 65.27],
+          31: [50.94, 66.66],
+          32: [51.6, 68.2],
+          33: [52.34, 69.89],
+          34: [53.17, 71.74],
+          35: [54.08, 73.77],
+          36: [55.1, 76],
+          37: [56.24, 78.43],
+          38: [57.5, 81.1],
+          39: [58.91, 84.04],
+          40: [60.49, 87.22],
+          41: [62.26, 90.8],
+          42: [64.23, 94.76],
+          43: [66.43, 99.18],
+          44: [68.9, 104.1],
+          45: [71.71, 109.6],
+          46: [74.9, 115.78],
+          47: [78.53, 122.73],
+          48: [82.69, 130.56],
+          49: [87.47, 139.44],
+          50: [93.01, 149.52],
+          51: [99.45, 161.02],
+          52: [106.96, 174.21],
+          53: [115.75, 189.41],
+          54: [126.05, 207.01],
+          55: [138.13, 227.48],
+          56: [152.32, 251.4],
+          57: [168.98, 279.49],
+          58: [188.58, 312.67],
+          59: [211.65, 352.08],
+          60: [238.9, 399.26],
+          61: [271.21, 456.3],
+          62: [309.77, 526.11],
+          63: [356.14, 612.93],
+          64: [412.51, 723.13],
+          65: [481.96, 866.78]
+        }
+      },
+      "21/15": {
+        term: 21,
+        pay: 15,
+        bonus: 0.21,
+        rows: {
+          15: [32.52, 38.81],
+          16: [32.63, 39.24],
+          17: [32.75, 39.65],
+          18: [32.88, 40.04],
+          19: [33.01, 40.42],
+          20: [33.16, 40.81],
+          21: [33.33, 41.21],
+          22: [33.51, 41.64],
+          23: [33.72, 42.12],
+          24: [33.95, 42.64],
+          25: [34.2, 43.22],
+          26: [34.49, 43.87],
+          27: [34.8, 44.6],
+          28: [35.16, 45.42],
+          29: [35.55, 46.34],
+          30: [36, 47.36],
+          31: [36.49, 48.49],
+          32: [37.04, 49.73],
+          33: [37.65, 51.09],
+          34: [38.34, 52.57],
+          35: [39.11, 54.2],
+          36: [39.97, 55.99],
+          37: [40.93, 57.95],
+          38: [42.01, 60.08],
+          39: [43.21, 62.47],
+          40: [44.56, 65.12],
+          41: [46.04, 68.07],
+          42: [47.74, 71.36],
+          43: [49.66, 75.03],
+          44: [51.83, 79.14],
+          45: [54.3, 83.76],
+          46: [57.12, 88.95],
+          47: [60.37, 94.8],
+          48: [64.12, 101.41],
+          49: [68.47, 108.91],
+          50: [73.52, 117.45],
+          51: [79.4, 127.19],
+          52: [86.24, 138.34],
+          53: [94.19, 151.15],
+          54: [103.43, 165.92],
+          55: [114.14, 182.97],
+          56: [126.55, 202.74],
+          57: [140.93, 225.73],
+          58: [157.59, 252.58],
+          59: [176.94, 284.1],
+          60: [199.51, 321.38],
+          61: [225.95, 365.87],
+          62: [257.13, 419.56],
+          63: [294.24, 485.28],
+          64: [338.84, 567.2],
+          65: [393.15, 671.64]
+        }
+      }
+    }
+  },
+  kids: {
+    label: "\u0E40\u0E14\u0E47\u0E01 (\u0E2A\u0E21\u0E32\u0E23\u0E4C\u0E17 \u0E04\u0E34\u0E14\u0E2A\u0E4C)",
+    productName: "\u0E01\u0E23\u0E38\u0E07\u0E40\u0E17\u0E1E \u0E2A\u0E21\u0E32\u0E23\u0E4C\u0E17 \u0E04\u0E34\u0E14\u0E2A\u0E4C",
+    minAge: 0,
+    maxAge: 14,
+    plans: {
+      "15/9": {
+        term: 15,
+        pay: 9,
+        bonus: 0.15,
+        rows: {
+          0: [73.13, 74.29],
+          1: [72.16, 73.29],
+          2: [72.22, 73.77],
+          3: [72.3, 74.38],
+          4: [72.41, 75.12],
+          5: [72.54, 75.97],
+          6: [72.69, 76.92],
+          7: [72.87, 77.98],
+          8: [73.07, 79.13],
+          9: [73.29, 80.36],
+          10: [73.51, 81.7],
+          11: [73.73, 83.08],
+          12: [73.96, 84.42],
+          13: [74.18, 85.7],
+          14: [74.4, 86.86]
+        }
+      },
+      "18/12": {
+        term: 18,
+        pay: 12,
+        bonus: 0.18,
+        rows: {
+          0: [45.19, 46.44],
+          1: [44.69, 46.09],
+          2: [44.74, 46.48],
+          3: [44.81, 46.93],
+          4: [44.88, 47.42],
+          5: [44.97, 47.96],
+          6: [45.07, 48.54],
+          7: [45.18, 49.16],
+          8: [45.31, 49.82],
+          9: [45.44, 50.52],
+          10: [45.57, 51.27],
+          11: [45.71, 52.04],
+          12: [45.84, 52.8],
+          13: [45.98, 53.52],
+          14: [46.12, 54.2]
+        }
+      },
+      "21/15": {
+        term: 21,
+        pay: 15,
+        bonus: 0.21,
+        rows: {
+          0: [31.71, 33.07],
+          1: [31.38, 32.87],
+          2: [31.42, 33.16],
+          3: [31.47, 33.47],
+          4: [31.53, 33.81],
+          5: [31.59, 34.17],
+          6: [31.67, 34.56],
+          7: [31.74, 34.97],
+          8: [31.83, 35.4],
+          9: [31.92, 35.85],
+          10: [32.02, 36.35],
+          11: [32.11, 36.86],
+          12: [32.21, 37.38],
+          13: [32.31, 37.88],
+          14: [32.41, 38.36]
+        }
+      }
+    }
+  }
+};
+const KOR_CHOR_RATES = {
+  female: {
+    "20-30": { 2: 0.1, 3: 0.2, 4: 0.31, 5: 0.41, 6: 0.51, 7: 0.61, 8: 0.71, 9: 0.81, 10: 0.91, 11: 1.01, 12: 1.11, 13: 1.21, 14: 1.31, 15: 1.41, 16: 1.51, 17: 1.62, 18: 1.72, 19: 1.83, 20: 1.94, 21: 2.05 },
+    "31-35": { 2: 0.13, 3: 0.25, 4: 0.38, 5: 0.51, 6: 0.64, 7: 0.77, 8: 0.91, 9: 1.05, 10: 1.19, 11: 1.33, 12: 1.48, 13: 1.64, 14: 1.8, 15: 1.96, 16: 2.13, 17: 2.31, 18: 2.49, 19: 2.68, 20: 2.87, 21: 3.08 },
+    "36-40": { 2: 0.16, 3: 0.33, 4: 0.5, 5: 0.68, 6: 0.86, 7: 1.04, 8: 1.24, 9: 1.44, 10: 1.65, 11: 1.87, 12: 2.09, 13: 2.33, 14: 2.57, 15: 2.83, 16: 3.09, 17: 3.37, 18: 3.66, 19: 3.96, 20: 4.27, 21: 4.6 },
+    "41-45": { 2: 0.24, 3: 0.48, 4: 0.74, 5: 1.01, 6: 1.29, 7: 1.58, 8: 1.88, 9: 2.2, 10: 2.53, 11: 2.88, 12: 3.24, 13: 3.62, 14: 4.01, 15: 4.43, 16: 4.86, 17: 5.31, 18: 5.76, 19: 6.23, 20: 6.69, 21: 6.84 },
+    "46-50": { 2: 0.38, 3: 0.77, 4: 1.17, 5: 1.61, 6: 2.06, 7: 2.53, 8: 3.03, 9: 3.55, 10: 4.1, 11: 4.67, 12: 5.26, 13: 5.86, 14: 6.47, 15: 7.08, 16: 7.36, 17: 7.61, 18: 7.84, 19: 8.05 },
+    "51-55": { 2: 0.61, 3: 1.26, 4: 1.94, 5: 2.66, 6: 3.41, 7: 4.18, 8: 4.97, 9: 5.75, 10: 6.53, 11: 7.04, 12: 7.51, 13: 7.94, 14: 8.33 }
+  },
+  male: {
+    "20-30": { 2: 0.36, 3: 0.72, 4: 1.07, 5: 1.42, 6: 1.76, 7: 2.1, 8: 2.43, 9: 2.75, 10: 3.07, 11: 3.38, 12: 3.69, 13: 3.99, 14: 4.29, 15: 4.58, 16: 4.87, 17: 5.15, 18: 5.43, 19: 5.7, 20: 5.98, 21: 6.25 },
+    "31-35": { 2: 0.38, 3: 0.75, 4: 1.11, 5: 1.47, 6: 1.83, 7: 2.18, 8: 2.53, 9: 2.88, 10: 3.22, 11: 3.56, 12: 3.9, 13: 4.25, 14: 4.6, 15: 4.94, 16: 5.3, 17: 5.66, 18: 6.02, 19: 6.39, 20: 6.76, 21: 7.15 },
+    "36-40": { 2: 0.39, 3: 0.79, 4: 1.19, 5: 1.58, 6: 1.98, 7: 2.38, 8: 2.78, 9: 3.2, 10: 3.62, 11: 4.05, 12: 4.49, 13: 4.93, 14: 5.39, 15: 5.85, 16: 6.33, 17: 6.82, 18: 7.31, 19: 7.82, 20: 8.34, 21: 8.87 },
+    "41-45": { 2: 0.48, 3: 0.97, 4: 1.47, 5: 1.98, 6: 2.5, 7: 3.05, 8: 3.6, 9: 4.17, 10: 4.76, 11: 5.36, 12: 5.98, 13: 6.61, 14: 7.26, 15: 7.93, 16: 8.61, 17: 9.31, 18: 10.01, 19: 10.73, 20: 11.45, 21: 11.75 },
+    "46-50": { 2: 0.67, 3: 1.36, 4: 2.07, 5: 2.8, 6: 3.56, 7: 4.34, 8: 5.14, 9: 5.97, 10: 6.82, 11: 7.69, 12: 8.59, 13: 9.5, 14: 10.43, 15: 11.36, 16: 11.86, 17: 12.32, 18: 12.76, 19: 13.16 },
+    "51-55": { 2: 0.96, 3: 1.96, 4: 2.99, 5: 4.06, 6: 5.17, 7: 6.31, 8: 7.47, 9: 8.64, 10: 9.81, 11: 10.63, 12: 11.4, 13: 12.13, 14: 12.81 }
+  }
+};
+function korChorAgeBracket(age) {
+  if (age <= 30) return "20-30";
+  if (age <= 35) return "31-35";
+  if (age <= 40) return "36-40";
+  if (age <= 45) return "41-45";
+  if (age <= 50) return "46-50";
+  return "51-55";
+}
+const FREQ = {
+  annual: { label: "\u0E23\u0E32\u0E22\u0E1B\u0E35", perYear: 1, min: 2400 },
+  semi: { label: "\u0E23\u0E32\u0E22 6 \u0E40\u0E14\u0E37\u0E2D\u0E19", perYear: 2, min: 1200 },
+  quarter: { label: "\u0E23\u0E32\u0E22 3 \u0E40\u0E14\u0E37\u0E2D\u0E19", perYear: 4, min: 600 },
+  monthly: { label: "\u0E23\u0E32\u0E22\u0E40\u0E14\u0E37\u0E2D\u0E19", perYear: 12, min: 200 }
+};
+const ROUNDING_EDGE = 0.49;
+const APP_VERSION = "\u0E2A\u0E38\u0E14\u0E04\u0E38\u0E49\u0E21 v1.2 \xB7 2026-10-03";
+const fmt = (n) => Math.round(n || 0).toLocaleString("en-US", { maximumFractionDigits: 0 });
+function NumberField({ value, onChange, className }) {
+  return /* @__PURE__ */ React.createElement(
+    "input",
+    {
+      type: "text",
+      inputMode: "numeric",
+      value: value === "" ? "" : Number(value).toLocaleString("en-US"),
+      onFocus: (e) => e.target.select(),
+      onChange: (e) => {
+        const raw = e.target.value.replace(/,/g, "").replace(/[^0-9]/g, "");
+        onChange(raw);
+      },
+      className
+    }
+  );
+}
+function calcIRR(cashflows) {
+  function npv(rate) {
+    return cashflows.reduce((sum, cf, t) => sum + cf / Math.pow(1 + rate, t), 0);
+  }
+  let low = -0.5, high = 1;
+  let npvLow = npv(low), npvHigh = npv(high);
+  if (npvLow * npvHigh > 0) return null;
+  for (let i = 0; i < 100; i++) {
+    const mid = (low + high) / 2;
+    const npvMid = npv(mid);
+    if (Math.abs(npvMid) < 1e-7) return mid;
+    if (npvLow < 0 ? npvMid < 0 : npvMid > 0) {
+      low = mid;
+      npvLow = npvMid;
+    } else {
+      high = mid;
+    }
+  }
+  return (low + high) / 2;
+}
+const AGENT_KEY = "bla-agent-info-v1";
+const DEFAULT_AGENT = { name: "\u0E1B\u0E49\u0E32\u0E40\u0E1B\u0E47\u0E14 CFP\xAE", phone: "096-595-4789", lineId: "@422cilco", confirmed: false };
+const SAVE_KEY = "sudkhum-state-v1";
+const SHARE_MAIN_NOTE = "\u26A0\uFE0F \u0E40\u0E2D\u0E01\u0E2A\u0E32\u0E23\u0E19\u0E35\u0E49\u0E44\u0E21\u0E48\u0E43\u0E0A\u0E48\u0E43\u0E1A\u0E40\u0E2A\u0E19\u0E2D\u0E02\u0E32\u0E22 \u0E40\u0E1B\u0E47\u0E19\u0E40\u0E1E\u0E35\u0E22\u0E07\u0E01\u0E32\u0E23\u0E19\u0E33\u0E40\u0E2A\u0E19\u0E2D\u0E40\u0E1A\u0E37\u0E49\u0E2D\u0E07\u0E15\u0E49\u0E19\u0E40\u0E17\u0E48\u0E32\u0E19\u0E31\u0E49\u0E19 \u0E2B\u0E32\u0E01\u0E25\u0E39\u0E01\u0E04\u0E49\u0E32\u0E2A\u0E19\u0E43\u0E08\u0E41\u0E1C\u0E19\u0E1B\u0E23\u0E30\u0E01\u0E31\u0E19\u0E19\u0E35\u0E49 \u0E08\u0E30\u0E14\u0E33\u0E40\u0E19\u0E34\u0E19\u0E01\u0E32\u0E23\u0E08\u0E31\u0E14\u0E2A\u0E48\u0E07\u0E43\u0E1A\u0E40\u0E2A\u0E19\u0E2D\u0E23\u0E32\u0E04\u0E32\u0E40\u0E15\u0E47\u0E21\u0E23\u0E39\u0E1B\u0E41\u0E1A\u0E1A\u0E20\u0E32\u0E22\u0E2B\u0E25\u0E31\u0E07";
+const C = { navy: "#1e3a8a", navyDeep: "#172554", sky: "#e0f2fe", skyDeep: "#0284c7", green: "#059669", ink: "#0f172a", sub: "#475569", bg: "#f0f9ff", blue: "#1d4ed8" };
+function lsGet(k) {
+  try {
+    return localStorage.getItem(k);
+  } catch (e) {
+    return null;
+  }
+}
+function lsSet(k, v) {
+  try {
+    localStorage.setItem(k, v);
+  } catch (e) {
+  }
+}
+function loadSaved() {
+  try {
+    return JSON.parse(lsGet(SAVE_KEY) || "{}") || {};
+  } catch (e) {
+    return {};
+  }
+}
+function loadAgent() {
+  try {
+    const raw = lsGet(AGENT_KEY);
+    return raw ? Object.assign({}, DEFAULT_AGENT, JSON.parse(raw)) : DEFAULT_AGENT;
+  } catch (e) {
+    return DEFAULT_AGENT;
+  }
+}
+const baht = (n) => fmt(n) + " \u0E1A\u0E32\u0E17";
+function copyTextToClipboard(text) {
+  const fallback = () => {
+    try {
+      const ta = document.createElement("textarea");
+      ta.value = text;
+      ta.setAttribute("readonly", "");
+      ta.style.position = "fixed";
+      ta.style.opacity = "0";
+      document.body.appendChild(ta);
+      ta.select();
+      ta.setSelectionRange(0, text.length);
+      const ok = document.execCommand("copy");
+      ta.remove();
+      return ok;
+    } catch (e) {
+      return false;
+    }
+  };
+  try {
+    if (navigator.clipboard && window.isSecureContext) {
+      navigator.clipboard.writeText(text).catch(fallback);
+      return true;
+    }
+  } catch (e) {
+  }
+  return fallback();
+}
+function openLineText(text) {
+  try {
+    if (navigator.clipboard) navigator.clipboard.writeText(text).catch(() => {
+    });
+  } catch (e) {
+  }
+  window.open("https://line.me/R/share?text=" + encodeURIComponent(text), "_blank");
+}
+function skSections(d) {
+  const s = [];
+  s.push(["\u0E2A\u0E23\u0E38\u0E1B\u0E41\u0E1C\u0E19", [
+    ["\u0E17\u0E38\u0E19\u0E1B\u0E23\u0E30\u0E01\u0E31\u0E19", baht(d.sumInsured)],
+    ["\u0E40\u0E1A\u0E35\u0E49\u0E22\u0E1B\u0E23\u0E30\u0E01\u0E31\u0E19", `${d.freqLabel} ${baht(d.perInstallment)}${d.perYear > 1 ? ` (\u0E1B\u0E35\u0E25\u0E30 ${baht(d.annual)})` : ""}`],
+    ["\u0E23\u0E30\u0E22\u0E30\u0E40\u0E27\u0E25\u0E32", `\u0E0A\u0E33\u0E23\u0E30\u0E40\u0E1A\u0E35\u0E49\u0E22 ${d.pay} \u0E1B\u0E35 \xB7 \u0E04\u0E38\u0E49\u0E21\u0E04\u0E23\u0E2D\u0E07 ${d.term} \u0E1B\u0E35`],
+    ["\u0E23\u0E27\u0E21\u0E40\u0E1A\u0E35\u0E49\u0E22\u0E17\u0E31\u0E49\u0E07\u0E2B\u0E21\u0E14", baht(d.totalPremium)],
+    [`\u0E40\u0E07\u0E34\u0E19\u0E04\u0E37\u0E19\u0E1E\u0E34\u0E40\u0E28\u0E29 ${d.bonusPct}% \u0E02\u0E2D\u0E07\u0E40\u0E1A\u0E35\u0E49\u0E22`, baht(d.totalBonus)],
+    ["\u0E04\u0E23\u0E1A\u0E2A\u0E31\u0E0D\u0E0D\u0E32\u0E23\u0E31\u0E1A", baht(d.maturity)]
+  ].concat(d.irr != null ? [["\u0E1C\u0E25\u0E15\u0E2D\u0E1A\u0E41\u0E17\u0E19\u0E40\u0E21\u0E37\u0E48\u0E2D\u0E04\u0E23\u0E1A\u0E2A\u0E31\u0E0D\u0E0D\u0E32 (IRR)", `${(d.irr * 100).toFixed(2)}% \u0E15\u0E48\u0E2D\u0E1B\u0E35`]] : [])]);
+  s.push(["\u0E04\u0E27\u0E32\u0E21\u0E04\u0E38\u0E49\u0E21\u0E04\u0E23\u0E2D\u0E07\u0E23\u0E30\u0E2B\u0E27\u0E48\u0E32\u0E07\u0E2A\u0E31\u0E0D\u0E0D\u0E32", [
+    ["\u0E40\u0E2A\u0E35\u0E22\u0E0A\u0E35\u0E27\u0E34\u0E15\u0E17\u0E31\u0E48\u0E27\u0E44\u0E1B", `${baht(d.deathGeneral)} (\u0E17\u0E38\u0E19 + \u0E40\u0E1A\u0E35\u0E49\u0E22\u0E2A\u0E30\u0E2A\u0E21 + \u0E40\u0E07\u0E34\u0E19\u0E04\u0E37\u0E19\u0E1E\u0E34\u0E40\u0E28\u0E29 \xB7 \u0E2A\u0E39\u0E07\u0E2A\u0E38\u0E14\u0E40\u0E21\u0E37\u0E48\u0E2D\u0E0A\u0E33\u0E23\u0E30\u0E40\u0E1A\u0E35\u0E49\u0E22\u0E04\u0E23\u0E1A)`],
+    ["\u0E40\u0E2A\u0E35\u0E22\u0E0A\u0E35\u0E27\u0E34\u0E15\u0E08\u0E32\u0E01\u0E2D\u0E38\u0E1A\u0E31\u0E15\u0E34\u0E40\u0E2B\u0E15\u0E38", `${baht(d.deathAccident)} (\u0E17\u0E38\u0E19 x 2 + \u0E40\u0E1A\u0E35\u0E49\u0E22\u0E2A\u0E30\u0E2A\u0E21 + \u0E40\u0E07\u0E34\u0E19\u0E04\u0E37\u0E19\u0E1E\u0E34\u0E40\u0E28\u0E29 \xB7 \u0E2A\u0E39\u0E07\u0E2A\u0E38\u0E14\u0E40\u0E21\u0E37\u0E48\u0E2D\u0E0A\u0E33\u0E23\u0E30\u0E40\u0E1A\u0E35\u0E49\u0E22\u0E04\u0E23\u0E1A)`]
+  ]]);
+  s.push(["\u0E41\u0E16\u0E21\u0E1F\u0E23\u0E35 \u0E04\u0E38\u0E49\u0E21\u0E04\u0E23\u0E2D\u0E07\u0E2D\u0E38\u0E1A\u0E31\u0E15\u0E34\u0E40\u0E2B\u0E15\u0E38", [
+    ["\u0E04\u0E48\u0E32\u0E23\u0E31\u0E01\u0E29\u0E32\u0E1E\u0E22\u0E32\u0E1A\u0E32\u0E25\u0E08\u0E32\u0E01\u0E2D\u0E38\u0E1A\u0E31\u0E15\u0E34\u0E40\u0E2B\u0E15\u0E38 (\u0E15\u0E32\u0E21\u0E08\u0E23\u0E34\u0E07)", `\u0E44\u0E21\u0E48\u0E40\u0E01\u0E34\u0E19 ${baht(d.medicalCap)} \u0E15\u0E48\u0E2D\u0E04\u0E23\u0E31\u0E49\u0E07 (5 \u0E40\u0E17\u0E48\u0E32\u0E02\u0E2D\u0E07\u0E40\u0E1A\u0E35\u0E49\u0E22\u0E23\u0E32\u0E22\u0E40\u0E14\u0E37\u0E2D\u0E19)`],
+    ["\u0E2A\u0E39\u0E0D\u0E40\u0E2A\u0E35\u0E22\u0E21\u0E37\u0E2D/\u0E40\u0E17\u0E49\u0E32 2 \u0E02\u0E49\u0E32\u0E07 \u0E2B\u0E23\u0E37\u0E2D\u0E2A\u0E32\u0E22\u0E15\u0E32 (100%)", baht(d.acc100)],
+    ["\u0E2A\u0E39\u0E0D\u0E40\u0E2A\u0E35\u0E22\u0E21\u0E37\u0E2D/\u0E40\u0E17\u0E49\u0E32/\u0E2A\u0E32\u0E22\u0E15\u0E32 1 \u0E02\u0E49\u0E32\u0E07 (60%)", baht(d.acc60)],
+    ["\u0E19\u0E34\u0E49\u0E27\u0E2B\u0E31\u0E27\u0E41\u0E21\u0E48\u0E21\u0E37\u0E2D + \u0E19\u0E34\u0E49\u0E27\u0E0A\u0E35\u0E49\u0E02\u0E49\u0E32\u0E07\u0E40\u0E14\u0E35\u0E22\u0E27\u0E01\u0E31\u0E19 (25%)", baht(d.acc25)]
+  ]]);
+  if (d.isKids) {
+    const kids = [["\u0E42\u0E23\u0E04\u0E23\u0E49\u0E32\u0E22\u0E41\u0E23\u0E07 4 \u0E42\u0E23\u0E04\u0E02\u0E2D\u0E07\u0E40\u0E14\u0E47\u0E01 (50% \u0E02\u0E2D\u0E07\u0E17\u0E38\u0E19)", `${baht(d.ci4)} \xB7 \u0E44\u0E02\u0E49\u0E23\u0E39\u0E21\u0E32\u0E15\u0E34\u0E01\u0E17\u0E35\u0E48\u0E21\u0E35\u0E1C\u0E25\u0E15\u0E48\u0E2D\u0E2B\u0E31\u0E27\u0E43\u0E08, \u0E04\u0E32\u0E27\u0E32\u0E0B\u0E32\u0E01\u0E34\u0E17\u0E35\u0E48\u0E21\u0E35\u0E20\u0E32\u0E27\u0E30\u0E41\u0E17\u0E23\u0E01\u0E0B\u0E49\u0E2D\u0E19\u0E2B\u0E31\u0E27\u0E43\u0E08, \u0E40\u0E1A\u0E32\u0E2B\u0E27\u0E32\u0E19, \u0E20\u0E32\u0E27\u0E30\u0E19\u0E49\u0E33\u0E04\u0E31\u0E48\u0E07\u0E43\u0E19\u0E2A\u0E21\u0E2D\u0E07\u0E17\u0E35\u0E48\u0E15\u0E49\u0E2D\u0E07\u0E43\u0E2A\u0E48\u0E17\u0E48\u0E2D\u0E23\u0E30\u0E1A\u0E32\u0E22 \xB7 \u0E04\u0E38\u0E49\u0E21\u0E04\u0E23\u0E2D\u0E07\u0E16\u0E36\u0E07\u0E19\u0E49\u0E2D\u0E07\u0E2D\u0E32\u0E22\u0E38\u0E04\u0E23\u0E1A 21 \u0E1B\u0E35 \u0E2B\u0E23\u0E37\u0E2D\u0E2B\u0E21\u0E14\u0E23\u0E30\u0E22\u0E30\u0E0A\u0E33\u0E23\u0E30\u0E40\u0E1A\u0E35\u0E49\u0E22 \u0E41\u0E25\u0E49\u0E27\u0E41\u0E15\u0E48\u0E16\u0E36\u0E07\u0E01\u0E48\u0E2D\u0E19`]];
+    if (d.korChorPerInstallment != null) kids.push(["\u0E04\u0E38\u0E49\u0E21\u0E04\u0E23\u0E2D\u0E07\u0E1C\u0E39\u0E49\u0E0A\u0E33\u0E23\u0E30\u0E40\u0E1A\u0E35\u0E49\u0E22 (\u0E04\u0E0A.) \u2014 \u0E40\u0E1A\u0E35\u0E49\u0E22\u0E40\u0E1E\u0E34\u0E48\u0E21", `${d.freqLabel} ${baht(d.korChorPerInstallment)} (\u0E1B\u0E35\u0E25\u0E30 ${baht(d.korChorAnnual)})`]);
+    kids.push(["\u0E1C\u0E39\u0E49\u0E1B\u0E01\u0E04\u0E23\u0E2D\u0E07\u0E17\u0E38\u0E1E\u0E1E\u0E25\u0E20\u0E32\u0E1E\u0E16\u0E32\u0E27\u0E23\u0E2A\u0E34\u0E49\u0E19\u0E40\u0E0A\u0E34\u0E07\u0E2B\u0E23\u0E37\u0E2D\u0E40\u0E2A\u0E35\u0E22\u0E0A\u0E35\u0E27\u0E34\u0E15", `\u0E22\u0E01\u0E40\u0E27\u0E49\u0E19\u0E40\u0E1A\u0E35\u0E49\u0E22\u0E01\u0E23\u0E21\u0E18\u0E23\u0E23\u0E21\u0E4C\u0E2B\u0E25\u0E31\u0E01 + \u0E08\u0E48\u0E32\u0E22\u0E40\u0E1E\u0E34\u0E48\u0E21 ${baht(d.payer50)} (50% \u0E02\u0E2D\u0E07\u0E17\u0E38\u0E19) \xB7 \u0E04\u0E38\u0E49\u0E21\u0E04\u0E23\u0E2D\u0E07\u0E16\u0E36\u0E07\u0E19\u0E49\u0E2D\u0E07\u0E2D\u0E32\u0E22\u0E38\u0E04\u0E23\u0E1A 21 \u0E1B\u0E35 \u0E2B\u0E23\u0E37\u0E2D\u0E1C\u0E39\u0E49\u0E1B\u0E01\u0E04\u0E23\u0E2D\u0E07\u0E2D\u0E32\u0E22\u0E38\u0E04\u0E23\u0E1A 65 \u0E1B\u0E35 \u0E2B\u0E23\u0E37\u0E2D\u0E2B\u0E21\u0E14\u0E23\u0E30\u0E22\u0E30\u0E0A\u0E33\u0E23\u0E30\u0E40\u0E1A\u0E35\u0E49\u0E22 \u0E41\u0E25\u0E49\u0E27\u0E41\u0E15\u0E48\u0E16\u0E36\u0E07\u0E01\u0E48\u0E2D\u0E19`]);
+    s.push(["\u0E2A\u0E33\u0E2B\u0E23\u0E31\u0E1A\u0E40\u0E14\u0E47\u0E01 (\u0E41\u0E19\u0E1A \u0E0B\u0E35\u0E44\u0E2D \u0E04\u0E34\u0E14\u0E2A\u0E4C + \u0E04\u0E0A.)", kids]);
+  }
+  return s;
+}
+function skGreeting(d) {
+  const out = [];
+  if (d.customer) out.push(`\u0E40\u0E23\u0E35\u0E22\u0E19 \u0E04\u0E38\u0E13${d.customer}`);
+  if (d.isKids && d.child) out.push(`\u0E2A\u0E33\u0E2B\u0E23\u0E31\u0E1A\u0E19\u0E49\u0E2D\u0E07${d.child}`);
+  return out;
+}
+function buildSKText(d) {
+  const out = [];
+  const g = skGreeting(d);
+  if (g.length) out.push(...g, "");
+  out.push(`\u{1F4CB} ${d.productName} ${d.plan}`);
+  out.push(`\u{1F464} ${d.isKids ? "\u0E1C\u0E39\u0E49\u0E40\u0E2D\u0E32\u0E1B\u0E23\u0E30\u0E01\u0E31\u0E19 (\u0E40\u0E14\u0E47\u0E01) " : ""}${d.gender === "female" ? "\u0E40\u0E1E\u0E28\u0E2B\u0E0D\u0E34\u0E07" : "\u0E40\u0E1E\u0E28\u0E0A\u0E32\u0E22"} \u0E2D\u0E32\u0E22\u0E38 ${d.age} \u0E1B\u0E35`);
+  skSections(d).forEach(([h, rows]) => {
+    out.push("", `\u2501\u2501 ${h} \u2501\u2501`);
+    rows.forEach(([k, v]) => out.push(`\u2022 ${k}: ${v}`));
+  });
+  out.push("", "\u2014\u2014\u2014\u2014\u2014\u2014\u2014\u2014");
+  if (d.agent.name) out.push(d.agent.name);
+  if (d.agent.phone) out.push(`\u{1F4DE} ${d.agent.phone}`);
+  if (d.agent.lineId) out.push(`LINE: ${d.agent.lineId}`);
+  out.push("", SHARE_MAIN_NOTE);
+  return out.join("\n");
+}
+const IMG_W = 1080, IMG_P = 48, IMG_FONT = "'IBM Plex Sans Thai','Prompt',sans-serif";
+const isThaiMark = (cp) => cp >= 3633 && cp <= 3642 && cp !== 3634 && cp !== 3635 || cp >= 3655 && cp <= 3662;
+function imgTextW(ctx, text, size) {
+  let m = 0;
+  try {
+    m = ctx.measureText(text).width || 0;
+  } catch (e) {
+  }
+  let est = 0;
+  for (const ch of String(text)) {
+    const cp = ch.codePointAt(0);
+    est += isThaiMark(cp) ? 0 : cp > 65535 ? size : size * 0.58;
+  }
+  return Math.max(m, est);
+}
+function imgWrap(ctx, text, size, maxW) {
+  const out = [];
+  String(text).split("\n").forEach((para) => {
+    let cur = "";
+    Array.from(para).forEach((ch) => {
+      if (!isThaiMark(ch.codePointAt(0)) && cur && imgTextW(ctx, cur + ch, size) > maxW) {
+        const sp = cur.lastIndexOf(" ");
+        if (sp > cur.length * 0.5) {
+          out.push(cur.slice(0, sp));
+          cur = cur.slice(sp + 1) + ch;
+        } else {
+          out.push(cur);
+          cur = ch;
+        }
+      } else cur += ch;
+    });
+    out.push(cur);
+  });
+  return out;
+}
+function makeImgLayout() {
+  const probe = document.createElement("canvas").getContext("2d");
+  const ops = [];
+  const L = {
+    ops,
+    rect(x, y, w, h, color, grad) {
+      ops.push({ t: "rect", x, y, w, h, color, grad });
+    },
+    text(x, y, txt, size, weight, color) {
+      ops.push({ t: "text", x, y, txt: String(txt), size, weight, color });
+    },
+    para(x, y, txt, size, weight, color, maxW, lh) {
+      probe.font = `${weight} ${size}px ${IMG_FONT}`;
+      const lines = imgWrap(probe, txt, size, maxW);
+      lines.forEach((t, i) => L.text(x, y + i * lh, t, size, weight, color));
+      return lines.length * lh;
+    }
+  };
+  return L;
+}
+function renderImgLayout(L, H) {
+  const c = document.createElement("canvas");
+  c.width = IMG_W;
+  c.height = Math.ceil(H);
+  const g = c.getContext("2d");
+  g.fillStyle = "#FFFFFF";
+  g.fillRect(0, 0, c.width, c.height);
+  g.textBaseline = "top";
+  g.textAlign = "left";
+  L.ops.forEach((o) => {
+    if (o.t === "rect") {
+      if (o.grad) {
+        const gr = g.createLinearGradient(o.x, o.y, o.x + o.w, o.y + o.h);
+        gr.addColorStop(0, o.grad[0]);
+        gr.addColorStop(1, o.grad[1]);
+        g.fillStyle = gr;
+      } else g.fillStyle = o.color;
+      g.fillRect(o.x, o.y, o.w, o.h);
+    } else {
+      g.font = `${o.weight} ${o.size}px ${IMG_FONT}`;
+      g.fillStyle = o.color;
+      g.textAlign = "left";
+      g.fillText(o.txt, o.x, o.y);
+    }
+  });
+  return c;
+}
+function imgKeyRow(L, y, label, value, shade) {
+  const P = IMG_P, W = IMG_W, split = P + (W - P * 2) * 0.46, pad = 12;
+  const start = L.ops.length;
+  const h1 = L.para(P, y + pad, label, 27, 500, C.sub, split - P - 16, 38);
+  const h2 = L.para(split, y + pad, value, 28, 600, C.navy, W - P - split, 38);
+  const h = Math.max(h1, h2) + pad * 2;
+  if (shade) L.ops.splice(start, 0, { t: "rect", x: P - 12, y, w: W - P * 2 + 24, h, color: C.bg });
+  return y + h;
+}
+function drawSKImage(d) {
+  const P = IMG_P, W = IMG_W;
+  const L = makeImgLayout();
+  let y = 36;
+  const hs = L.ops.length;
+  y += L.para(P, y, "\u0E2A\u0E23\u0E38\u0E1B\u0E02\u0E49\u0E2D\u0E40\u0E2A\u0E19\u0E2D\u0E41\u0E1A\u0E1A\u0E1B\u0E23\u0E30\u0E01\u0E31\u0E19 \xB7 \u0E01\u0E23\u0E38\u0E07\u0E40\u0E17\u0E1E\u0E1B\u0E23\u0E30\u0E01\u0E31\u0E19\u0E0A\u0E35\u0E27\u0E34\u0E15", 30, 500, "#BAE6FD", W - P * 2, 42) + 8;
+  y += L.para(P, y, `${d.productName} ${d.plan}`, 44, 600, "#FFFFFF", W - P * 2, 58) + 30;
+  L.ops.splice(hs, 0, { t: "rect", x: 0, y: 0, w: W, h: y, grad: [C.navy, C.navyDeep] });
+  y += 28;
+  const g = skGreeting(d);
+  if (g.length) g.forEach((t) => {
+    y += L.para(P, y, t, 34, 600, C.ink, W - P * 2, 46);
+  });
+  y += L.para(P, y, `${d.isKids ? "\u0E1C\u0E39\u0E49\u0E40\u0E2D\u0E32\u0E1B\u0E23\u0E30\u0E01\u0E31\u0E19 (\u0E40\u0E14\u0E47\u0E01) " : ""}${d.gender === "female" ? "\u0E40\u0E1E\u0E28\u0E2B\u0E0D\u0E34\u0E07" : "\u0E40\u0E1E\u0E28\u0E0A\u0E32\u0E22"} \u0E2D\u0E32\u0E22\u0E38 ${d.age} \u0E1B\u0E35`, 30, 500, C.sub, W - P * 2, 42) + 20;
+  skSections(d).forEach(([h, rows]) => {
+    y += 10;
+    L.rect(P - 12, y, 8, 44, C.skyDeep);
+    y += L.para(P + 8, y + 2, h, 30, 600, C.blue, W - P * 2, 42) + 8;
+    rows.forEach(([k, v], i) => {
+      y = imgKeyRow(L, y, k, v, i % 2 === 0);
+    });
+    y += 14;
+  });
+  y += 20;
+  const cols = ["\u0E1B\u0E35\u0E17\u0E35\u0E48", "\u0E2D\u0E32\u0E22\u0E38", "\u0E40\u0E1A\u0E35\u0E49\u0E22\u0E15\u0E48\u0E2D\u0E1B\u0E35", "\u0E40\u0E07\u0E34\u0E19\u0E04\u0E37\u0E19\u0E1E\u0E34\u0E40\u0E28\u0E29", "\u0E40\u0E1A\u0E35\u0E49\u0E22\u0E2A\u0E30\u0E2A\u0E21"];
+  const colW = [0.12, 0.12, 0.24, 0.24, 0.28];
+  const tx = (i) => P + 8 + colW.slice(0, i).reduce((a, b) => a + b, 0) * (W - P * 2);
+  L.rect(P - 12, y, W - P * 2 + 24, 56, C.navy);
+  cols.forEach((h, i) => L.text(tx(i), y + 13, h, 25, 600, "#FFFFFF"));
+  y += 56;
+  d.rows.forEach((r, idx) => {
+    L.rect(P - 12, y, W - P * 2 + 24, 44, r.isMaturity ? "#D1FAE5" : idx % 2 ? "#F8FAFC" : "#FFFFFF");
+    [r.year, r.age ?? "-", r.isPayYear ? fmt(r.premiumThisYear) : "-", r.isPayYear ? fmt(r.bonusThisYear) : "-", fmt(r.cumPremium)].forEach((v, i) => L.text(tx(i), y + 8, v, 25, 500, i === 3 ? C.blue : C.ink));
+    y += 44;
+  });
+  L.rect(P - 12, y, W - P * 2 + 24, 52, C.sky);
+  L.text(tx(0), y + 11, "\u0E23\u0E27\u0E21", 26, 600, C.navy);
+  L.text(tx(2), y + 11, fmt(d.totalPremium), 26, 600, C.navy);
+  L.text(tx(3), y + 11, fmt(d.totalBonus), 26, 600, C.blue);
+  y += 52;
+  const ms = L.ops.length;
+  let mh = 20;
+  mh += L.para(P, y + mh, "\u0E04\u0E23\u0E1A\u0E2A\u0E31\u0E0D\u0E0D\u0E32 \u0E23\u0E31\u0E1A\u0E40\u0E07\u0E34\u0E19", 30, 500, "#FFFFFF", W - P * 2, 42);
+  mh += L.para(P, y + mh, baht(d.maturity), 50, 700, "#FFFFFF", W - P * 2, 64) + 18;
+  L.ops.splice(ms, 0, { t: "rect", x: P - 12, y, w: W - P * 2 + 24, h: mh, color: C.green });
+  y += mh + 40;
+  const fs = L.ops.length;
+  let fh = 26;
+  fh += L.para(P, y + fh, d.agent.name || "", 36, 600, "#FFFFFF", W - P * 2, 48) + 8;
+  const contact = [d.agent.phone ? `\u{1F4DE} ${d.agent.phone}` : "", d.agent.lineId ? `LINE: ${d.agent.lineId}` : ""].filter(Boolean).join("     ");
+  if (contact) fh += L.para(P, y + fh, contact, 30, 500, "#BAE6FD", W - P * 2, 42);
+  fh += 26;
+  L.ops.splice(fs, 0, { t: "rect", x: 0, y, w: W, h: fh, color: C.navy });
+  y += fh + 18;
+  y += L.para(P, y, SHARE_MAIN_NOTE, 25, 600, C.navyDeep, W - P * 2, 36) + 30;
+  return renderImgLayout(L, y);
+}
+function shareCanvasImage(canvas) {
+  const dataUrl = canvas.toDataURL("image/png");
+  const bin = atob(dataUrl.split(",")[1]);
+  const arr = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
+  const file = new File([arr], "sudkhum-summary.png", { type: "image/png" });
+  if (navigator.canShare && navigator.canShare({ files: [file] })) {
+    navigator.share({ files: [file] }).catch(() => {
+    });
+    return "shared";
+  }
+  const a = document.createElement("a");
+  a.href = dataUrl;
+  a.download = "sudkhum-summary.png";
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  return "downloaded";
+}
+function preloadShareFonts() {
+  try {
+    if (document.fonts && document.fonts.load) ["500", "600", "700"].forEach((w) => document.fonts.load(`${w} 30px 'IBM Plex Sans Thai'`, "\u0E17\u0E14\u0E2A\u0E2D\u0E1A").catch(() => {
+    }));
+  } catch (e) {
+  }
+}
+const SAVED = loadSaved();
+const DEFAULTS = { productKey: "adult", productAuto: true, plan: "15/9", gender: "male", age: "23", mode: "premium", freqKey: "monthly", premiumInput: "2000", sumInsuredInput: "256000", guardianGender: "male", guardianAge: "35" };
+const init = (k) => SAVED[k] !== void 0 ? SAVED[k] : DEFAULTS[k];
+function ShareModal({ mode, isKids, customer, setCustomer, child, setChild, agent, setAgent, onClose, buildData }) {
+  const [draft, setDraft] = useState(mode === "agent" ? Object.assign({}, agent) : null);
+  const [note, setNote] = useState("");
+  const [preview, setPreview] = useState("");
+  useEffect(() => {
+    preloadShareFonts();
+  }, []);
+  const ready = agent.confirmed && !draft;
+  const saveAgent = (info) => {
+    const next = Object.assign({}, info, { confirmed: true });
+    setAgent(next);
+    lsSet(AGENT_KEY, JSON.stringify(next));
+    setDraft(null);
+  };
+  const send = () => {
+    const d = buildData();
+    if (mode === "text") {
+      openLineText(buildSKText(d));
+      onClose();
+    } else {
+      const r = shareCanvasImage(drawSKImage(d));
+      if (r === "downloaded") setNote("\u0E1A\u0E31\u0E19\u0E17\u0E36\u0E01\u0E23\u0E39\u0E1B\u0E25\u0E07\u0E40\u0E04\u0E23\u0E37\u0E48\u0E2D\u0E07\u0E41\u0E25\u0E49\u0E27 \u2014 \u0E40\u0E1B\u0E34\u0E14 LINE \u0E41\u0E25\u0E49\u0E27\u0E41\u0E19\u0E1A\u0E23\u0E39\u0E1B\u0E2A\u0E48\u0E07\u0E25\u0E39\u0E01\u0E04\u0E49\u0E32\u0E44\u0E14\u0E49\u0E40\u0E25\u0E22");
+      else onClose();
+    }
+  };
+  const inCls = "w-full mt-1 rounded-xl px-3 py-2.5 text-base bg-white border border-sky-200 outline-none focus:border-blue-700";
+  const btnOutline = "flex-1 rounded-xl py-2.5 text-sm font-semibold bg-white border";
+  return /* @__PURE__ */ React.createElement("div", { className: "fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 print:hidden", style: { background: "rgba(8,30,62,0.55)" }, onClick: onClose }, /* @__PURE__ */ React.createElement("div", { className: "w-full max-w-md rounded-2xl p-5 bg-white max-h-[90vh] overflow-y-auto", onClick: (e) => e.stopPropagation() }, /* @__PURE__ */ React.createElement("h3", { className: "text-xl font-bold text-blue-900 mb-3" }, mode === "agent" ? "\u2699\uFE0F \u0E02\u0E49\u0E2D\u0E21\u0E39\u0E25\u0E15\u0E31\u0E27\u0E41\u0E17\u0E19" : mode === "text" ? "\u{1F4AC} \u0E2A\u0E48\u0E07\u0E02\u0E49\u0E2D\u0E04\u0E27\u0E32\u0E21 LINE" : "\u{1F5BC}\uFE0F \u0E2A\u0E48\u0E07\u0E23\u0E39\u0E1B LINE"), mode !== "agent" && /* @__PURE__ */ React.createElement("div", { className: "mb-3 space-y-2" }, /* @__PURE__ */ React.createElement("label", { className: "block" }, /* @__PURE__ */ React.createElement("span", { className: "text-sm text-slate-500" }, isKids ? "\u0E0A\u0E37\u0E48\u0E2D\u0E1C\u0E39\u0E49\u0E1B\u0E01\u0E04\u0E23\u0E2D\u0E07 (\u0E1C\u0E39\u0E49\u0E23\u0E31\u0E1A\u0E02\u0E49\u0E2D\u0E04\u0E27\u0E32\u0E21) \u2014 \u0E44\u0E21\u0E48\u0E1A\u0E31\u0E07\u0E04\u0E31\u0E1A" : "\u0E0A\u0E37\u0E48\u0E2D\u0E25\u0E39\u0E01\u0E04\u0E49\u0E32 \u2014 \u0E44\u0E21\u0E48\u0E1A\u0E31\u0E07\u0E04\u0E31\u0E1A"), /* @__PURE__ */ React.createElement("input", { value: customer, onChange: (e) => setCustomer(e.target.value), placeholder: isKids ? "\u0E40\u0E0A\u0E48\u0E19 \u0E41\u0E21\u0E48\u0E2A\u0E49\u0E21" : "\u0E40\u0E0A\u0E48\u0E19 \u0E2A\u0E21\u0E0A\u0E32\u0E22", className: inCls })), isKids && /* @__PURE__ */ React.createElement("label", { className: "block" }, /* @__PURE__ */ React.createElement("span", { className: "text-sm text-slate-500" }, "\u0E0A\u0E37\u0E48\u0E2D\u0E40\u0E14\u0E47\u0E01 (\u0E1C\u0E39\u0E49\u0E40\u0E2D\u0E32\u0E1B\u0E23\u0E30\u0E01\u0E31\u0E19) \u2014 \u0E44\u0E21\u0E48\u0E1A\u0E31\u0E07\u0E04\u0E31\u0E1A"), /* @__PURE__ */ React.createElement("input", { value: child, onChange: (e) => setChild(e.target.value), placeholder: "\u0E40\u0E0A\u0E48\u0E19 \u0E02\u0E49\u0E32\u0E27\u0E1B\u0E31\u0E49\u0E19", className: inCls }))), draft ? /* @__PURE__ */ React.createElement("div", { className: "rounded-xl p-3 mb-3 bg-sky-50" }, [["name", "\u0E0A\u0E37\u0E48\u0E2D\u0E15\u0E31\u0E27\u0E41\u0E17\u0E19"], ["phone", "\u0E40\u0E1A\u0E2D\u0E23\u0E4C\u0E42\u0E17\u0E23"], ["lineId", "LINE ID"]].map(([k, l]) => /* @__PURE__ */ React.createElement("label", { key: k, className: "block mb-2" }, /* @__PURE__ */ React.createElement("span", { className: "text-sm text-slate-500" }, l), /* @__PURE__ */ React.createElement("input", { value: draft[k] || "", onChange: (e) => setDraft(Object.assign({}, draft, { [k]: e.target.value })), className: inCls }))), /* @__PURE__ */ React.createElement("button", { onClick: () => {
+    saveAgent(draft);
+    if (mode === "agent") onClose();
+  }, className: "w-full rounded-xl py-2.5 text-base font-semibold text-white bg-blue-900" }, "\u{1F4BE} \u0E1A\u0E31\u0E19\u0E17\u0E36\u0E01\u0E02\u0E49\u0E2D\u0E21\u0E39\u0E25\u0E15\u0E31\u0E27\u0E41\u0E17\u0E19")) : /* @__PURE__ */ React.createElement("div", { className: `rounded-xl p-3 mb-3 ${agent.confirmed ? "bg-sky-50" : "bg-amber-50 border border-amber-300"}` }, !agent.confirmed && /* @__PURE__ */ React.createElement("p", { className: "text-sm font-semibold text-amber-800 mb-1" }, "\u0E01\u0E23\u0E38\u0E13\u0E32\u0E15\u0E23\u0E27\u0E08\u0E2A\u0E2D\u0E1A\u0E02\u0E49\u0E2D\u0E21\u0E39\u0E25\u0E15\u0E31\u0E27\u0E41\u0E17\u0E19\u0E01\u0E48\u0E2D\u0E19\u0E2A\u0E48\u0E07\u0E04\u0E23\u0E31\u0E49\u0E07\u0E41\u0E23\u0E01"), /* @__PURE__ */ React.createElement("p", { className: "text-base font-semibold text-slate-800" }, agent.name || "-"), /* @__PURE__ */ React.createElement("p", { className: "text-sm text-slate-500" }, "\u{1F4DE} ", agent.phone || "-", " \xB7 LINE: ", agent.lineId || "-"), /* @__PURE__ */ React.createElement("div", { className: "flex gap-2 mt-2" }, !agent.confirmed && /* @__PURE__ */ React.createElement("button", { onClick: () => saveAgent(agent), className: "flex-1 rounded-xl py-2 text-sm font-semibold text-white bg-emerald-600" }, "\u2713 \u0E16\u0E39\u0E01\u0E15\u0E49\u0E2D\u0E07"), /* @__PURE__ */ React.createElement("button", { onClick: () => setDraft(Object.assign({}, agent)), className: `${btnOutline} text-blue-900 border-sky-200` }, "\u270E \u0E41\u0E01\u0E49\u0E44\u0E02"))), note && /* @__PURE__ */ React.createElement("p", { className: "text-sm text-emerald-700 mb-3" }, note), mode !== "agent" && /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("button", { disabled: !ready, onClick: send, className: "w-full rounded-xl py-3 text-lg font-bold text-white", style: { background: "#06C755", opacity: ready ? 1 : 0.4 } }, mode === "text" ? "\u{1F4AC} \u0E40\u0E1B\u0E34\u0E14 LINE \u0E40\u0E1E\u0E37\u0E48\u0E2D\u0E2A\u0E48\u0E07\u0E02\u0E49\u0E2D\u0E04\u0E27\u0E32\u0E21" : "\u{1F5BC}\uFE0F \u0E2A\u0E23\u0E49\u0E32\u0E07\u0E23\u0E39\u0E1B\u0E41\u0E25\u0E30\u0E2A\u0E48\u0E07 LINE"), /* @__PURE__ */ React.createElement("div", { className: "mt-3 rounded-xl p-3 border border-dashed border-emerald-300" }, /* @__PURE__ */ React.createElement("p", { className: "text-sm text-slate-500 mb-2" }, "\u0E2A\u0E48\u0E07\u0E1C\u0E48\u0E32\u0E19 LINE OA: \u0E04\u0E31\u0E14\u0E25\u0E2D\u0E01\u0E2B\u0E23\u0E37\u0E2D\u0E1A\u0E31\u0E19\u0E17\u0E36\u0E01\u0E44\u0E27\u0E49\u0E01\u0E48\u0E2D\u0E19 \u0E41\u0E25\u0E49\u0E27\u0E44\u0E1B\u0E27\u0E32\u0E07/\u0E41\u0E19\u0E1A\u0E43\u0E19\u0E41\u0E0A\u0E17\u0E25\u0E39\u0E01\u0E04\u0E49\u0E32"), /* @__PURE__ */ React.createElement("div", { className: "flex gap-2" }, /* @__PURE__ */ React.createElement("button", { disabled: !ready, onClick: () => {
+    const ok = copyTextToClipboard(buildSKText(buildData()));
+    setNote(ok ? "\u{1F4CB} \u0E04\u0E31\u0E14\u0E25\u0E2D\u0E01\u0E02\u0E49\u0E2D\u0E04\u0E27\u0E32\u0E21\u0E41\u0E25\u0E49\u0E27 \u2014 \u0E40\u0E1B\u0E34\u0E14\u0E41\u0E0A\u0E17\u0E25\u0E39\u0E01\u0E04\u0E49\u0E32\u0E43\u0E19 LINE OA \u0E41\u0E25\u0E49\u0E27\u0E01\u0E14\u0E27\u0E32\u0E07" : "\u0E04\u0E31\u0E14\u0E25\u0E2D\u0E01\u0E44\u0E21\u0E48\u0E2A\u0E33\u0E40\u0E23\u0E47\u0E08 \u0E25\u0E2D\u0E07\u0E43\u0E2B\u0E21\u0E48\u0E2D\u0E35\u0E01\u0E04\u0E23\u0E31\u0E49\u0E07");
+  }, className: `${btnOutline} text-emerald-700 border-emerald-500`, style: { opacity: ready ? 1 : 0.4 } }, "\u{1F4CB} \u0E04\u0E31\u0E14\u0E25\u0E2D\u0E01\u0E02\u0E49\u0E2D\u0E04\u0E27\u0E32\u0E21"), /* @__PURE__ */ React.createElement("button", { disabled: !ready, onClick: () => {
+    setPreview(drawSKImage(buildData()).toDataURL("image/png"));
+    setNote("");
+  }, className: `${btnOutline} text-emerald-700 border-emerald-500`, style: { opacity: ready ? 1 : 0.4 } }, "\u{1F4BE} \u0E1A\u0E31\u0E19\u0E17\u0E36\u0E01\u0E23\u0E39\u0E1B")), preview && /* @__PURE__ */ React.createElement("div", { className: "mt-3" }, /* @__PURE__ */ React.createElement("p", { className: "text-sm font-semibold text-blue-900 mb-2" }, "\u0E21\u0E37\u0E2D\u0E16\u0E37\u0E2D: \u0E01\u0E14\u0E04\u0E49\u0E32\u0E07\u0E17\u0E35\u0E48\u0E23\u0E39\u0E1B \u2192 \u0E1A\u0E31\u0E19\u0E17\u0E36\u0E01\u0E23\u0E39\u0E1B\u0E20\u0E32\u0E1E \xB7 \u0E04\u0E2D\u0E21: \u0E01\u0E14\u0E1B\u0E38\u0E48\u0E21\u0E14\u0E32\u0E27\u0E19\u0E4C\u0E42\u0E2B\u0E25\u0E14\u0E14\u0E49\u0E32\u0E19\u0E25\u0E48\u0E32\u0E07"), /* @__PURE__ */ React.createElement("img", { src: preview, alt: "\u0E2A\u0E23\u0E38\u0E1B\u0E41\u0E1A\u0E1A\u0E1B\u0E23\u0E30\u0E01\u0E31\u0E19", className: "w-full rounded-lg border border-sky-200", style: { WebkitTouchCallout: "default" } }), /* @__PURE__ */ React.createElement("a", { href: preview, download: "sudkhum-summary.png", className: "block text-center mt-2 rounded-xl py-2 text-sm font-semibold bg-sky-50 text-blue-900" }, "\u2B07\uFE0F \u0E14\u0E32\u0E27\u0E19\u0E4C\u0E42\u0E2B\u0E25\u0E14\u0E23\u0E39\u0E1B")))), /* @__PURE__ */ React.createElement("button", { onClick: onClose, className: "w-full mt-2 rounded-xl py-2.5 text-base font-semibold bg-sky-50 text-blue-900" }, "\u2715 \u0E1B\u0E34\u0E14")));
+}
+function SudKoomDashboard({ onBack }) {
+  const [productKey, setProductKey] = useState(init("productKey"));
+  const [productAuto, setProductAuto] = useState(init("productAuto"));
+  const [plan, setPlan] = useState(init("plan"));
+  const [gender, setGender] = useState(init("gender"));
+  const [age, setAge] = useState(init("age"));
+  const [mode, setMode] = useState(init("mode"));
+  const [freqKey, setFreqKey] = useState(init("freqKey"));
+  const [premiumInput, setPremiumInput] = useState(init("premiumInput"));
+  const [sumInsuredInput, setSumInsuredInput] = useState(init("sumInsuredInput"));
+  const [fitScreen, setFitScreen] = useState(false);
+  const [guardianGender, setGuardianGender] = useState(init("guardianGender"));
+  const [guardianAge, setGuardianAge] = useState(init("guardianAge"));
+  const [scale, setScale] = useState(1);
+  const [scaledHeight, setScaledHeight] = useState(null);
+  const outerRef = useRef(null);
+  const tableWrapRef = useRef(null);
+  const canvasRef = useRef(null);
+  const drawStateRef = useRef({ drawing: false });
+  const [drawMode, setDrawMode] = useState(false);
+  const [agent, setAgent] = useState(loadAgent);
+  const [customer, setCustomer] = useState("");
+  const [child, setChild] = useState("");
+  const [shareMode, setShareMode] = useState(null);
+  useEffect(() => {
+    lsSet(SAVE_KEY, JSON.stringify({ productKey, productAuto, plan, gender, age, mode, freqKey, premiumInput, sumInsuredInput, guardianGender, guardianAge }));
+  }, [productKey, productAuto, plan, gender, age, mode, freqKey, premiumInput, sumInsuredInput, guardianGender, guardianAge]);
+  function resetAll() {
+    setProductKey(DEFAULTS.productKey);
+    setProductAuto(DEFAULTS.productAuto);
+    setPlan(DEFAULTS.plan);
+    setGender(DEFAULTS.gender);
+    setAge(DEFAULTS.age);
+    setMode(DEFAULTS.mode);
+    setFreqKey(DEFAULTS.freqKey);
+    setPremiumInput(DEFAULTS.premiumInput);
+    setSumInsuredInput(DEFAULTS.sumInsuredInput);
+    setGuardianGender(DEFAULTS.guardianGender);
+    setGuardianAge(DEFAULTS.guardianAge);
+    setCustomer("");
+    setChild("");
+  }
+  const product = PRODUCTS[productKey];
+  const planMeta = product.plans[plan];
+  const genderIdx = gender === "female" ? 0 : 1;
+  const ageNum = Number(age);
+  const ageOutOfRange = age !== "" && (isNaN(ageNum) || ageNum < product.minAge || ageNum > product.maxAge);
+  const rate = planMeta.rows[ageNum]?.[genderIdx];
+  const freq = FREQ[freqKey];
+  useEffect(() => {
+    if (age === "") return;
+    if (isNaN(ageNum)) return;
+    if (ageNum < product.minAge || ageNum > product.maxAge) {
+      setAge(String(productKey === "kids" ? 5 : 23));
+    }
+  }, [productKey]);
+  useEffect(() => {
+    if (!productAuto) return;
+    if (age === "") return;
+    const n = Number(age);
+    if (isNaN(n)) return;
+    if (n >= 0 && n <= 14 && productKey !== "kids") {
+      setProductKey("kids");
+    } else if (n >= 15 && n <= 65 && productKey !== "adult") {
+      setProductKey("adult");
+    }
+  }, [age, productAuto]);
+  const lastValidCalcRef = useRef({ annualPremiumDisplay: 0, sumInsured: 0, belowMin: false });
+  const rawCalc = useMemo(() => {
+    if (!rate) return null;
+    if (mode === "premium") {
+      const perInstallment = Number(premiumInput) || 0;
+      const annualDisplay = perInstallment * freq.perYear;
+      const annualForSI = (perInstallment + ROUNDING_EDGE) * freq.perYear;
+      const si = Math.floor(annualForSI * 1e3 / rate);
+      return { annualPremiumDisplay: annualDisplay, sumInsured: si, belowMin: perInstallment < freq.min };
+    } else {
+      const si = Number(sumInsuredInput) || 0;
+      const annual = si * rate / 1e3;
+      const perInstallment = annual / freq.perYear;
+      return { annualPremiumDisplay: annual, sumInsured: si, belowMin: perInstallment < freq.min };
+    }
+  }, [mode, premiumInput, sumInsuredInput, rate, freq]);
+  useEffect(() => {
+    if (rawCalc) lastValidCalcRef.current = rawCalc;
+  }, [rawCalc]);
+  const { annualPremiumDisplay, sumInsured, belowMin } = rawCalc || lastValidCalcRef.current;
+  const perInstallmentDisplay = mode === "premium" ? Number(premiumInput) || 0 : annualPremiumDisplay / freq.perYear;
+  const rows = useMemo(() => {
+    const out = [];
+    let cumPremium = 0;
+    let cumBonus = 0;
+    for (let i = 1; i <= planMeta.term; i++) {
+      const isPayYear = i <= planMeta.pay;
+      const premiumThisYear = isPayYear ? annualPremiumDisplay : 0;
+      const bonusThisYear = isPayYear ? annualPremiumDisplay * planMeta.bonus : 0;
+      cumPremium += premiumThisYear;
+      cumBonus += bonusThisYear;
+      out.push({
+        year: i,
+        age: isNaN(ageNum) ? null : ageNum + i - 1,
+        isPayYear,
+        premiumThisYear,
+        cumPremium,
+        bonusThisYear,
+        cumBonus,
+        isMaturity: i === planMeta.term
+      });
+    }
+    return out;
+  }, [planMeta, annualPremiumDisplay, ageNum]);
+  const totals = rows[rows.length - 1] || { cumPremium: 0, cumBonus: 0 };
+  useLayoutEffect(() => {
+    function recompute() {
+      if (!fitScreen || !tableWrapRef.current || !outerRef.current) {
+        setScale(1);
+        setScaledHeight(null);
+        return;
+      }
+      const naturalWidth = tableWrapRef.current.scrollWidth;
+      const containerWidth = outerRef.current.clientWidth;
+      if (!naturalWidth || !containerWidth) return;
+      const s = Math.min(1, containerWidth / naturalWidth);
+      setScale(s);
+      setScaledHeight(tableWrapRef.current.scrollHeight * s);
+    }
+    recompute();
+    window.addEventListener("resize", recompute);
+    return () => window.removeEventListener("resize", recompute);
+  }, [fitScreen, rows, plan, productKey]);
+  const maturityPayout = (totals.cumPremium || 0) + (totals.cumBonus || 0);
+  const irr = useMemo(() => {
+    if (!annualPremiumDisplay || !maturityPayout) return null;
+    const cashflows = new Array(planMeta.term + 1).fill(0);
+    rows.forEach((r, idx) => {
+      if (r.isPayYear) cashflows[idx] -= r.premiumThisYear;
+    });
+    cashflows[planMeta.term] += maturityPayout;
+    return calcIRR(cashflows);
+  }, [rows, planMeta, annualPremiumDisplay, maturityPayout]);
+  const deathBenefitGeneral = sumInsured + maturityPayout;
+  const deathBenefitAccident = sumInsured * 2 + maturityPayout;
+  const monthlyPremiumForMedical = annualPremiumDisplay / 12;
+  const medicalCap = monthlyPremiumForMedical * 5;
+  const accident100 = sumInsured;
+  const accident60 = sumInsured * 0.6;
+  const accident25 = sumInsured * 0.25;
+  const criticalIllness4 = sumInsured * 0.5;
+  const payerProtection50 = sumInsured * 0.5;
+  const isKids = productKey === "kids";
+  const guardianAgeNum = Number(guardianAge);
+  const guardianAgeOutOfRange = isKids && guardianAge !== "" && (isNaN(guardianAgeNum) || guardianAgeNum < 20 || guardianAgeNum > 55);
+  const korChorPeriodRaw = isKids && !isNaN(ageNum) && !isNaN(guardianAgeNum) && !guardianAgeOutOfRange ? Math.min(planMeta.pay, 21 - ageNum, 65 - guardianAgeNum) : null;
+  const korChorPeriod = korChorPeriodRaw !== null ? Math.max(2, Math.min(21, korChorPeriodRaw)) : null;
+  const korChorBracket = isKids && !isNaN(guardianAgeNum) && !guardianAgeOutOfRange ? korChorAgeBracket(guardianAgeNum) : null;
+  const korChorRate = korChorPeriod && korChorBracket ? KOR_CHOR_RATES[guardianGender][korChorBracket]?.[korChorPeriod] : null;
+  const korChorPremiumAnnual = korChorRate != null ? annualPremiumDisplay * korChorRate / 100 : null;
+  const korChorPremiumPerInstallment = korChorPremiumAnnual != null ? korChorPremiumAnnual / freq.perYear : null;
+  useLayoutEffect(() => {
+    if (!drawMode || !canvasRef.current || !outerRef.current) return;
+    const canvas = canvasRef.current;
+    const rect = outerRef.current.getBoundingClientRect();
+    const dpr = window.devicePixelRatio || 1;
+    canvas.width = rect.width * dpr;
+    canvas.height = rect.height * dpr;
+    canvas.style.width = `${rect.width}px`;
+    canvas.style.height = `${rect.height}px`;
+    const ctx = canvas.getContext("2d");
+    ctx.scale(dpr, dpr);
+    ctx.lineCap = "round";
+    ctx.lineJoin = "round";
+    ctx.strokeStyle = "#dc2626";
+    ctx.lineWidth = 2.5;
+  }, [drawMode, fitScreen, scale, scaledHeight, rows, plan, productKey]);
+  function getCanvasPos(e) {
+    const rect = canvasRef.current.getBoundingClientRect();
+    return { x: e.clientX - rect.left, y: e.clientY - rect.top };
+  }
+  function handlePointerDown(e) {
+    e.preventDefault();
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    canvas.setPointerCapture(e.pointerId);
+    const ctx = canvas.getContext("2d");
+    const { x, y } = getCanvasPos(e);
+    ctx.beginPath();
+    ctx.moveTo(x, y);
+    drawStateRef.current.drawing = true;
+  }
+  function handlePointerMove(e) {
+    if (!drawStateRef.current.drawing) return;
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+    const { x, y } = getCanvasPos(e);
+    ctx.lineTo(x, y);
+    ctx.stroke();
+  }
+  function handlePointerUp() {
+    drawStateRef.current.drawing = false;
+  }
+  function clearDrawing() {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+  }
+  function buildShareData() {
+    return {
+      productName: product.productName,
+      plan,
+      isKids,
+      gender,
+      age,
+      customer: customer.trim(),
+      child: child.trim(),
+      agent,
+      sumInsured,
+      perInstallment: perInstallmentDisplay,
+      annual: annualPremiumDisplay,
+      perYear: freq.perYear,
+      freqLabel: freq.label,
+      pay: planMeta.pay,
+      term: planMeta.term,
+      bonusPct: (planMeta.bonus * 100).toFixed(0),
+      totalPremium: totals.cumPremium || 0,
+      totalBonus: totals.cumBonus || 0,
+      maturity: maturityPayout,
+      irr,
+      deathGeneral: deathBenefitGeneral,
+      deathAccident: deathBenefitAccident,
+      medicalCap,
+      acc100: accident100,
+      acc60: accident60,
+      acc25: accident25,
+      ci4: criticalIllness4,
+      payer50: payerProtection50,
+      korChorPerInstallment: korChorPremiumPerInstallment,
+      korChorAnnual: korChorPremiumAnnual,
+      rows
+    };
+  }
+  const canShare = !!rate && !ageOutOfRange && sumInsured > 0;
+  const pillBase = "rounded-xl py-2.5 sm:py-3 text-sm sm:text-base font-semibold transition-colors";
+  const pillOn = "bg-blue-900 text-white";
+  const pillOff = "bg-sky-50 text-slate-500 border border-sky-200";
+  const inputCls = "w-full rounded-xl bg-sky-50 border border-sky-200 px-4 py-3 text-base text-slate-800 outline-none focus:border-blue-700";
+  return /* @__PURE__ */ React.createElement("div", { className: "min-h-screen w-full bg-sky-50 text-slate-800 print:bg-white", style: { fontFamily: "'IBM Plex Sans Thai','Prompt',sans-serif" } }, /* @__PURE__ */ React.createElement("div", { className: "max-w-5xl mx-auto px-3 sm:px-4 md:px-6 py-4 sm:py-6 pb-16 print:px-0 print:py-0" }, /* @__PURE__ */ React.createElement("div", { className: "mb-6 print:hidden" }, onBack && /* @__PURE__ */ React.createElement("button", { onClick: onBack, className: "mb-3 inline-flex items-center gap-1.5 rounded-xl bg-blue-900 text-white px-4 py-2 text-sm sm:text-base font-semibold shadow-sm" }, "\u2190 \u0E01\u0E25\u0E31\u0E1A\u0E2B\u0E19\u0E49\u0E32\u0E04\u0E33\u0E19\u0E27\u0E13\u0E40\u0E1A\u0E35\u0E49\u0E22"), /* @__PURE__ */ React.createElement("div", { className: "flex items-center justify-between gap-3" }, /* @__PURE__ */ React.createElement("div", { className: "flex items-center gap-3" }, /* @__PURE__ */ React.createElement(
+    "img",
+    {
+      src: "data:image/png;base64,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",
+      alt: "\u0E42\u0E25\u0E42\u0E01\u0E49\u0E41\u0E2D\u0E1B",
+      className: "w-10 h-10 sm:w-12 sm:h-12 rounded-2xl shadow-md shrink-0 object-cover"
+    }
+  ), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { className: "text-xs sm:text-sm tracking-[0.15em] sm:tracking-[0.2em] text-blue-800 uppercase font-semibold" }, "\u0E01\u0E23\u0E38\u0E07\u0E40\u0E17\u0E1E\u0E1B\u0E23\u0E30\u0E01\u0E31\u0E19\u0E0A\u0E35\u0E27\u0E34\u0E15"), /* @__PURE__ */ React.createElement("h1", { className: "text-lg sm:text-2xl font-bold leading-tight text-slate-900" }, product.productName, " \u2014 \u0E15\u0E31\u0E27\u0E0A\u0E48\u0E27\u0E22\u0E04\u0E33\u0E19\u0E27\u0E13\u0E1C\u0E25\u0E1B\u0E23\u0E30\u0E42\u0E22\u0E0A\u0E19\u0E4C"))), /* @__PURE__ */ React.createElement("div", { className: "flex flex-col items-end gap-1.5 shrink-0" }, /* @__PURE__ */ React.createElement("div", { className: "text-[10px] sm:text-xs font-mono text-slate-400 bg-slate-100 px-2 py-1 rounded-lg" }, APP_VERSION), /* @__PURE__ */ React.createElement("div", { className: "flex gap-1.5" }, /* @__PURE__ */ React.createElement("button", { onClick: () => setShareMode("agent"), className: "text-xs sm:text-sm font-semibold text-blue-900 bg-white border border-sky-200 px-2.5 py-1 rounded-lg" }, "\u2699\uFE0F \u0E02\u0E49\u0E2D\u0E21\u0E39\u0E25\u0E15\u0E31\u0E27\u0E41\u0E17\u0E19"), /* @__PURE__ */ React.createElement("button", { onClick: () => {
+    if (window.confirm("\u0E25\u0E49\u0E32\u0E07\u0E04\u0E48\u0E32\u0E17\u0E35\u0E48\u0E01\u0E23\u0E2D\u0E01\u0E17\u0E31\u0E49\u0E07\u0E2B\u0E21\u0E14\u0E01\u0E25\u0E31\u0E1A\u0E40\u0E1B\u0E47\u0E19\u0E04\u0E48\u0E32\u0E40\u0E23\u0E34\u0E48\u0E21\u0E15\u0E49\u0E19?")) resetAll();
+  }, className: "text-xs sm:text-sm font-semibold text-slate-500 bg-white border border-sky-200 px-2.5 py-1 rounded-lg" }, "\u21BA \u0E25\u0E49\u0E32\u0E07\u0E04\u0E48\u0E32")))), /* @__PURE__ */ React.createElement("div", { className: "mt-3 text-xs sm:text-sm text-blue-900 bg-gradient-to-r from-amber-50 to-yellow-50 border border-amber-200 rounded-xl px-3 py-2 font-medium" }, "\u0E41\u0E2D\u0E1B\u0E19\u0E35\u0E49\u0E08\u0E31\u0E14\u0E17\u0E33\u0E02\u0E36\u0E49\u0E19\u0E40\u0E1E\u0E37\u0E48\u0E2D\u0E19\u0E33\u0E40\u0E2A\u0E19\u0E2D\u0E41\u0E25\u0E30\u0E2D\u0E18\u0E34\u0E1A\u0E32\u0E22\u0E1C\u0E25\u0E1B\u0E23\u0E30\u0E42\u0E22\u0E0A\u0E19\u0E4C \u0E2A\u0E33\u0E2B\u0E23\u0E31\u0E1A\u0E17\u0E35\u0E21\u0E07\u0E32\u0E19\u0E1B\u0E49\u0E32\u0E40\u0E1B\u0E47\u0E14\u0E40\u0E17\u0E48\u0E32\u0E19\u0E31\u0E49\u0E19")), /* @__PURE__ */ React.createElement("div", { className: "bg-white rounded-2xl p-4 sm:p-5 mb-5 border border-sky-100 shadow-sm print:hidden" }, /* @__PURE__ */ React.createElement("div", { className: "mb-5" }, /* @__PURE__ */ React.createElement("div", { className: "text-sm text-slate-500 mb-2 font-medium flex items-center gap-2" }, "\u0E01\u0E25\u0E38\u0E48\u0E21\u0E1C\u0E25\u0E34\u0E15\u0E20\u0E31\u0E13\u0E11\u0E4C", productAuto && /* @__PURE__ */ React.createElement("span", { className: "text-xs font-normal text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full" }, "\u0E40\u0E25\u0E37\u0E2D\u0E01\u0E2D\u0E31\u0E15\u0E42\u0E19\u0E21\u0E31\u0E15\u0E34\u0E15\u0E32\u0E21\u0E2D\u0E32\u0E22\u0E38")), /* @__PURE__ */ React.createElement("div", { className: "grid grid-cols-2 gap-2" }, /* @__PURE__ */ React.createElement(
+    "button",
+    {
+      onClick: () => {
+        setProductKey("adult");
+        setProductAuto(false);
+      },
+      className: `${pillBase} flex items-center justify-center gap-2 ${productKey === "adult" ? pillOn : pillOff}`
+    },
+    /* @__PURE__ */ React.createElement(User, { size: 18 }),
+    " \u0E1C\u0E39\u0E49\u0E43\u0E2B\u0E0D\u0E48 (\u0E2A\u0E38\u0E14\u0E04\u0E38\u0E49\u0E21)"
+  ), /* @__PURE__ */ React.createElement(
+    "button",
+    {
+      onClick: () => {
+        setProductKey("kids");
+        setProductAuto(false);
+      },
+      className: `${pillBase} flex items-center justify-center gap-2 ${productKey === "kids" ? pillOn : pillOff}`
+    },
+    /* @__PURE__ */ React.createElement(Baby, { size: 18 }),
+    " \u0E40\u0E14\u0E47\u0E01 (\u0E2A\u0E21\u0E32\u0E23\u0E4C\u0E17 \u0E04\u0E34\u0E14\u0E2A\u0E4C)"
+  )), !productAuto && /* @__PURE__ */ React.createElement(
+    "button",
+    {
+      onClick: () => setProductAuto(true),
+      className: "mt-2 text-xs text-blue-700 font-medium underline"
+    },
+    "\u0E01\u0E25\u0E31\u0E1A\u0E44\u0E1B\u0E40\u0E25\u0E37\u0E2D\u0E01\u0E2D\u0E31\u0E15\u0E42\u0E19\u0E21\u0E31\u0E15\u0E34\u0E15\u0E32\u0E21\u0E2D\u0E32\u0E22\u0E38"
+  )), /* @__PURE__ */ React.createElement("div", { className: "mb-5" }, /* @__PURE__ */ React.createElement("div", { className: "text-sm text-slate-500 mb-2 font-medium" }, "\u0E41\u0E1A\u0E1A\u0E1B\u0E23\u0E30\u0E01\u0E31\u0E19"), /* @__PURE__ */ React.createElement("div", { className: "grid grid-cols-3 gap-2" }, Object.keys(product.plans).map((p) => /* @__PURE__ */ React.createElement("button", { key: p, onClick: () => setPlan(p), className: `${pillBase} ${plan === p ? pillOn : pillOff}` }, p))), /* @__PURE__ */ React.createElement("div", { className: "text-sm text-slate-400 mt-2" }, "\u0E23\u0E30\u0E22\u0E30\u0E40\u0E27\u0E25\u0E32\u0E40\u0E2D\u0E32\u0E1B\u0E23\u0E30\u0E01\u0E31\u0E19 ", planMeta.term, " \u0E1B\u0E35 \xB7 \u0E0A\u0E33\u0E23\u0E30\u0E40\u0E1A\u0E35\u0E49\u0E22 ", planMeta.pay, " \u0E1B\u0E35 \xB7 \u0E40\u0E07\u0E34\u0E19\u0E04\u0E37\u0E19\u0E1E\u0E34\u0E40\u0E28\u0E29 ", (planMeta.bonus * 100).toFixed(0), "%")), /* @__PURE__ */ React.createElement("div", { className: "grid grid-cols-2 gap-3 mb-2" }, /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { className: "text-sm text-slate-500 mb-2 font-medium" }, "\u0E40\u0E1E\u0E28"), /* @__PURE__ */ React.createElement("div", { className: "grid grid-cols-2 gap-2" }, /* @__PURE__ */ React.createElement("button", { onClick: () => setGender("male"), className: `${pillBase} ${gender === "male" ? pillOn : pillOff}` }, "\u0E0A\u0E32\u0E22"), /* @__PURE__ */ React.createElement("button", { onClick: () => setGender("female"), className: `${pillBase} ${gender === "female" ? pillOn : pillOff}` }, "\u0E2B\u0E0D\u0E34\u0E07"))), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { className: "text-sm text-slate-500 mb-2 font-medium" }, "\u0E2D\u0E32\u0E22\u0E38 (", product.minAge, "\u2013", product.maxAge, " \u0E1B\u0E35)"), /* @__PURE__ */ React.createElement(
+    NumberField,
+    {
+      value: age,
+      onChange: (raw) => setAge(raw),
+      className: `${inputCls} ${ageOutOfRange ? "border-orange-400 focus:border-orange-500" : ""}`
+    }
+  ))), ageOutOfRange && /* @__PURE__ */ React.createElement("div", { className: "mb-4 text-sm text-orange-600 flex gap-1.5" }, /* @__PURE__ */ React.createElement(Info, { size: 16, className: "shrink-0 mt-0.5" }), product.productName, " \u0E23\u0E31\u0E1A\u0E1B\u0E23\u0E30\u0E01\u0E31\u0E19\u0E20\u0E31\u0E22\u0E17\u0E35\u0E48\u0E2D\u0E32\u0E22\u0E38 ", product.minAge, "\u2013", product.maxAge, " \u0E1B\u0E35\u0E40\u0E17\u0E48\u0E32\u0E19\u0E31\u0E49\u0E19 \u0E01\u0E23\u0E38\u0E13\u0E32\u0E01\u0E23\u0E2D\u0E01\u0E2D\u0E32\u0E22\u0E38\u0E43\u0E19\u0E0A\u0E48\u0E27\u0E07\u0E19\u0E35\u0E49\u0E40\u0E1E\u0E37\u0E48\u0E2D\u0E04\u0E33\u0E19\u0E27\u0E13\u0E1C\u0E25\u0E1B\u0E23\u0E30\u0E42\u0E22\u0E0A\u0E19\u0E4C"), isKids && /* @__PURE__ */ React.createElement("div", { className: "mb-5 pt-4 border-t border-sky-100" }, /* @__PURE__ */ React.createElement("div", { className: "text-sm text-slate-500 mb-2 font-medium" }, "\u0E02\u0E49\u0E2D\u0E21\u0E39\u0E25\u0E1C\u0E39\u0E49\u0E1B\u0E01\u0E04\u0E23\u0E2D\u0E07 (\u0E1C\u0E39\u0E49\u0E0A\u0E33\u0E23\u0E30\u0E40\u0E1A\u0E35\u0E49\u0E22) \u2014 \u0E2A\u0E33\u0E2B\u0E23\u0E31\u0E1A\u0E04\u0E33\u0E19\u0E27\u0E13\u0E40\u0E1A\u0E35\u0E49\u0E22 \u0E04\u0E0A."), /* @__PURE__ */ React.createElement("div", { className: "grid grid-cols-2 gap-3" }, /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { className: "text-sm text-slate-500 mb-2 font-medium" }, "\u0E40\u0E1E\u0E28\u0E1C\u0E39\u0E49\u0E1B\u0E01\u0E04\u0E23\u0E2D\u0E07"), /* @__PURE__ */ React.createElement("div", { className: "grid grid-cols-2 gap-2" }, /* @__PURE__ */ React.createElement("button", { onClick: () => setGuardianGender("male"), className: `${pillBase} ${guardianGender === "male" ? pillOn : pillOff}` }, "\u0E0A\u0E32\u0E22"), /* @__PURE__ */ React.createElement("button", { onClick: () => setGuardianGender("female"), className: `${pillBase} ${guardianGender === "female" ? pillOn : pillOff}` }, "\u0E2B\u0E0D\u0E34\u0E07"))), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { className: "text-sm text-slate-500 mb-2 font-medium" }, "\u0E2D\u0E32\u0E22\u0E38\u0E1C\u0E39\u0E49\u0E1B\u0E01\u0E04\u0E23\u0E2D\u0E07 (20\u201355 \u0E1B\u0E35)"), /* @__PURE__ */ React.createElement(
+    NumberField,
+    {
+      value: guardianAge,
+      onChange: (raw) => setGuardianAge(raw),
+      className: `${inputCls} ${guardianAgeOutOfRange ? "border-orange-400 focus:border-orange-500" : ""}`
+    }
+  ))), guardianAgeOutOfRange && /* @__PURE__ */ React.createElement("div", { className: "mt-3 text-sm text-orange-600 flex gap-1.5" }, /* @__PURE__ */ React.createElement(Info, { size: 16, className: "shrink-0 mt-0.5" }), "\u0E2A\u0E31\u0E0D\u0E0D\u0E32\u0E40\u0E1E\u0E34\u0E48\u0E21\u0E40\u0E15\u0E34\u0E21 \u0E04\u0E0A. \u0E23\u0E31\u0E1A\u0E1C\u0E39\u0E49\u0E1B\u0E01\u0E04\u0E23\u0E2D\u0E07(\u0E1C\u0E39\u0E49\u0E0A\u0E33\u0E23\u0E30\u0E40\u0E1A\u0E35\u0E49\u0E22)\u0E2D\u0E32\u0E22\u0E38 20\u201355 \u0E1B\u0E35\u0E40\u0E17\u0E48\u0E32\u0E19\u0E31\u0E49\u0E19")), /* @__PURE__ */ React.createElement("div", { className: "mb-4" }, /* @__PURE__ */ React.createElement("div", { className: "text-sm text-slate-500 mb-2 font-medium" }, "\u0E01\u0E33\u0E2B\u0E19\u0E14\u0E08\u0E32\u0E01"), /* @__PURE__ */ React.createElement("div", { className: "grid grid-cols-2 gap-2" }, /* @__PURE__ */ React.createElement(
+    "button",
+    {
+      onClick: () => {
+        setPremiumInput(String(Math.round(perInstallmentDisplay)));
+        setMode("premium");
+      },
+      className: `${pillBase} ${mode === "premium" ? pillOn : pillOff}`
+    },
+    "\u0E40\u0E1A\u0E35\u0E49\u0E22\u0E1B\u0E23\u0E30\u0E01\u0E31\u0E19\u0E20\u0E31\u0E22"
+  ), /* @__PURE__ */ React.createElement(
+    "button",
+    {
+      onClick: () => {
+        setSumInsuredInput(String(Math.round(sumInsured)));
+        setMode("sumInsured");
+      },
+      className: `${pillBase} ${mode === "sumInsured" ? pillOn : pillOff}`
+    },
+    "\u0E17\u0E38\u0E19\u0E1B\u0E23\u0E30\u0E01\u0E31\u0E19\u0E17\u0E35\u0E48\u0E15\u0E49\u0E2D\u0E07\u0E01\u0E32\u0E23"
+  ))), /* @__PURE__ */ React.createElement("div", { className: "grid grid-cols-2 gap-3" }, /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { className: "text-sm text-slate-500 mb-2 font-medium" }, "\u0E07\u0E27\u0E14\u0E0A\u0E33\u0E23\u0E30\u0E40\u0E1A\u0E35\u0E49\u0E22"), /* @__PURE__ */ React.createElement("div", { className: "relative" }, /* @__PURE__ */ React.createElement(
+    "select",
+    {
+      value: freqKey,
+      onChange: (e) => setFreqKey(e.target.value),
+      className: "w-full appearance-none rounded-xl bg-sky-50 border border-sky-200 px-4 py-3 text-base text-slate-800 outline-none focus:border-blue-700"
+    },
+    Object.entries(FREQ).map(([k, v]) => /* @__PURE__ */ React.createElement("option", { key: k, value: k }, v.label))
+  ), /* @__PURE__ */ React.createElement(ChevronDown, { size: 18, className: "absolute right-3 top-3.5 text-slate-400 pointer-events-none" }))), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { className: "text-sm text-slate-500 mb-2 font-medium" }, mode === "premium" ? "\u0E40\u0E1A\u0E35\u0E49\u0E22\u0E15\u0E48\u0E2D\u0E07\u0E27\u0E14 (\u0E1A\u0E32\u0E17)" : "\u0E17\u0E38\u0E19\u0E1B\u0E23\u0E30\u0E01\u0E31\u0E19\u0E17\u0E35\u0E48\u0E15\u0E49\u0E2D\u0E07\u0E01\u0E32\u0E23 (\u0E1A\u0E32\u0E17)"), /* @__PURE__ */ React.createElement(
+    NumberField,
+    {
+      value: mode === "premium" ? premiumInput : sumInsuredInput,
+      onChange: (raw) => mode === "premium" ? setPremiumInput(raw) : setSumInsuredInput(raw),
+      className: inputCls
+    }
+  ))), belowMin && /* @__PURE__ */ React.createElement("div", { className: "mt-3 text-sm text-orange-600 flex gap-1.5" }, /* @__PURE__ */ React.createElement(Info, { size: 16, className: "shrink-0 mt-0.5" }), "\u0E40\u0E1A\u0E35\u0E49\u0E22\u0E15\u0E48\u0E2D\u0E07\u0E27\u0E14 (", fmt(perInstallmentDisplay), " \u0E1A\u0E32\u0E17) \u0E15\u0E48\u0E33\u0E01\u0E27\u0E48\u0E32\u0E40\u0E1A\u0E35\u0E49\u0E22\u0E02\u0E31\u0E49\u0E19\u0E15\u0E48\u0E33\u0E02\u0E2D\u0E07\u0E07\u0E27\u0E14", freq.label, " (", fmt(freq.min), " \u0E1A\u0E32\u0E17)")), /* @__PURE__ */ React.createElement("div", { className: "hidden print:block mb-4 pb-3 border-b-2 border-blue-900" }, /* @__PURE__ */ React.createElement("div", { className: "text-sm text-blue-800 uppercase tracking-wide font-semibold" }, "\u0E01\u0E23\u0E38\u0E07\u0E40\u0E17\u0E1E\u0E1B\u0E23\u0E30\u0E01\u0E31\u0E19\u0E0A\u0E35\u0E27\u0E34\u0E15 \xB7 ", product.productName, " ", plan), /* @__PURE__ */ React.createElement("div", { className: "text-lg font-bold text-slate-900" }, gender === "male" ? "\u0E0A\u0E32\u0E22" : "\u0E2B\u0E0D\u0E34\u0E07", " \u0E2D\u0E32\u0E22\u0E38 ", age, " \u0E1B\u0E35 \xB7 ", freq.label, " ", fmt(perInstallmentDisplay), " \u0E1A\u0E32\u0E17 \xB7 \u0E17\u0E38\u0E19\u0E1B\u0E23\u0E30\u0E01\u0E31\u0E19 ", fmt(sumInsured), " \u0E1A\u0E32\u0E17")), /* @__PURE__ */ React.createElement("div", { className: "bg-white rounded-2xl border border-sky-100 shadow-md overflow-hidden print:shadow-none print:border-slate-300" }, /* @__PURE__ */ React.createElement("div", { className: "flex flex-wrap items-center justify-between gap-3 px-5 py-4 bg-gradient-to-r from-blue-900 to-blue-800 print:hidden" }, /* @__PURE__ */ React.createElement("div", { className: "text-white" }, /* @__PURE__ */ React.createElement("div", { className: "text-sm text-sky-200 uppercase tracking-wide" }, "\u0E41\u0E1C\u0E19 ", product.productName, " ", plan), /* @__PURE__ */ React.createElement("div", { className: "text-xl font-bold" }, freq.label, " ", fmt(perInstallmentDisplay), " \u0E1A\u0E32\u0E17")), /* @__PURE__ */ React.createElement("div", { className: "flex items-center gap-2 flex-wrap justify-end" }, /* @__PURE__ */ React.createElement("div", { className: "text-sky-100 text-base font-medium" }, gender === "male" ? "\u0E0A\u0E32\u0E22" : "\u0E2B\u0E0D\u0E34\u0E07", " \u0E2D\u0E32\u0E22\u0E38 ", age, " \u0E1B\u0E35"), /* @__PURE__ */ React.createElement(
+    "button",
+    {
+      onClick: () => setFitScreen((v) => !v),
+      className: `flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold transition-colors ${fitScreen ? "bg-white text-blue-900" : "bg-white/15 hover:bg-white/25 text-white"}`
+    },
+    fitScreen ? "\u0E02\u0E19\u0E32\u0E14\u0E40\u0E15\u0E47\u0E21 (\u0E40\u0E25\u0E37\u0E48\u0E2D\u0E19\u0E14\u0E39)" : "\u0E22\u0E48\u0E2D\u0E43\u0E2B\u0E49\u0E1E\u0E2D\u0E14\u0E35\u0E08\u0E2D"
+  ), /* @__PURE__ */ React.createElement(
+    "button",
+    {
+      onClick: () => setDrawMode((v) => !v),
+      className: `flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold transition-colors ${drawMode ? "bg-white text-blue-900" : "bg-white/15 hover:bg-white/25 text-white"}`
+    },
+    /* @__PURE__ */ React.createElement(Pencil, { size: 16 }),
+    " ",
+    drawMode ? "\u0E1B\u0E34\u0E14\u0E42\u0E2B\u0E21\u0E14\u0E27\u0E32\u0E14" : "\u0E42\u0E2B\u0E21\u0E14\u0E27\u0E32\u0E14"
+  ), drawMode && /* @__PURE__ */ React.createElement(
+    "button",
+    {
+      onClick: clearDrawing,
+      className: "flex items-center gap-2 rounded-xl bg-white/15 hover:bg-white/25 text-white px-4 py-2 text-sm font-semibold transition-colors"
+    },
+    "\u0E25\u0E49\u0E32\u0E07\u0E25\u0E32\u0E22\u0E40\u0E2A\u0E49\u0E19"
+  ), /* @__PURE__ */ React.createElement(
+    "button",
+    {
+      disabled: !canShare,
+      onClick: () => setShareMode("text"),
+      className: "flex items-center gap-2 rounded-xl text-white px-4 py-2 text-sm font-semibold",
+      style: { background: "#06C755", opacity: canShare ? 1 : 0.5 }
+    },
+    "\u{1F4AC} \u0E2A\u0E48\u0E07\u0E02\u0E49\u0E2D\u0E04\u0E27\u0E32\u0E21 LINE"
+  ), /* @__PURE__ */ React.createElement(
+    "button",
+    {
+      disabled: !canShare,
+      onClick: () => setShareMode("image"),
+      className: "flex items-center gap-2 rounded-xl text-white px-4 py-2 text-sm font-semibold",
+      style: { background: "#06C755", opacity: canShare ? 1 : 0.5 }
+    },
+    "\u{1F5BC}\uFE0F \u0E2A\u0E48\u0E07\u0E23\u0E39\u0E1B LINE"
+  ), /* @__PURE__ */ React.createElement(
+    "button",
+    {
+      onClick: () => window.print(),
+      className: "flex items-center gap-2 rounded-xl bg-white/15 hover:bg-white/25 text-white px-4 py-2 text-sm font-semibold transition-colors"
+    },
+    /* @__PURE__ */ React.createElement(Printer, { size: 16 }),
+    " \u0E1E\u0E34\u0E21\u0E1E\u0E4C PDF \u0E43\u0E2B\u0E49\u0E25\u0E39\u0E01\u0E04\u0E49\u0E32"
+  ))), !fitScreen && /* @__PURE__ */ React.createElement("div", { className: "sm:hidden text-center text-xs text-slate-400 py-1.5 bg-sky-50 border-b border-sky-100" }, "\u2190 \u0E40\u0E25\u0E37\u0E48\u0E2D\u0E19\u0E14\u0E39\u0E15\u0E32\u0E23\u0E32\u0E07\u0E14\u0E49\u0E32\u0E19\u0E02\u0E49\u0E32\u0E07 \u2192"), /* @__PURE__ */ React.createElement(
+    "div",
+    {
+      ref: outerRef,
+      className: `relative ${fitScreen ? "overflow-hidden" : "overflow-x-auto"}`,
+      style: fitScreen && scaledHeight ? { height: `${scaledHeight}px` } : void 0
+    },
+    /* @__PURE__ */ React.createElement(
+      "div",
+      {
+        ref: tableWrapRef,
+        style: fitScreen ? { transform: `scale(${scale})`, transformOrigin: "top left", width: `${100 / scale}%` } : void 0
+      },
+      /* @__PURE__ */ React.createElement("table", { className: "w-full text-sm border-collapse min-w-[760px]" }, /* @__PURE__ */ React.createElement("thead", null, /* @__PURE__ */ React.createElement("tr", null, /* @__PURE__ */ React.createElement("th", { className: "border border-sky-100 bg-sky-50 px-3 py-3 text-slate-700 font-semibold w-16 text-base text-center" }, "\u0E2D\u0E32\u0E22\u0E38", /* @__PURE__ */ React.createElement("br", null), /* @__PURE__ */ React.createElement("span", { className: "font-normal text-xs text-slate-400" }, "Age")), /* @__PURE__ */ React.createElement("th", { className: "border border-sky-100 bg-sky-50 px-3 py-3 text-slate-700 font-semibold w-32 text-base text-center" }, "\u0E40\u0E1A\u0E35\u0E49\u0E22\u0E1B\u0E23\u0E30\u0E01\u0E31\u0E19\u0E2A\u0E30\u0E2A\u0E21", /* @__PURE__ */ React.createElement("br", null), /* @__PURE__ */ React.createElement("span", { className: "font-normal text-xs text-slate-400" }, "Annual Premium")), /* @__PURE__ */ React.createElement("th", { className: "border border-sky-100 bg-sky-50 px-3 py-3 text-slate-700 font-semibold w-32 text-base text-center" }, "\u0E40\u0E07\u0E34\u0E19\u0E08\u0E48\u0E32\u0E22\u0E04\u0E37\u0E19\u0E1E\u0E34\u0E40\u0E28\u0E29", /* @__PURE__ */ React.createElement("br", null), /* @__PURE__ */ React.createElement("span", { className: "font-normal text-xs text-slate-400" }, (planMeta.bonus * 100).toFixed(0), "% (\u0E2A\u0E30\u0E2A\u0E21 \u0E08\u0E48\u0E32\u0E22\u0E08\u0E23\u0E34\u0E07\u0E15\u0E2D\u0E19\u0E04\u0E23\u0E1A/\u0E40\u0E2A\u0E35\u0E22\u0E0A\u0E35\u0E27\u0E34\u0E15)")), /* @__PURE__ */ React.createElement("th", { className: "border border-sky-100 bg-blue-100 px-4 py-3 text-blue-900 font-semibold w-48 text-base text-center" }, "\u0E17\u0E38\u0E19\u0E1B\u0E23\u0E30\u0E01\u0E31\u0E19", /* @__PURE__ */ React.createElement("div", { className: "text-xl font-bold mt-1" }, fmt(sumInsured))), /* @__PURE__ */ React.createElement("th", { className: "border border-sky-100 bg-emerald-50 px-4 py-3 text-emerald-900 font-semibold text-left text-base" }, "\u0E04\u0E27\u0E32\u0E21\u0E04\u0E38\u0E49\u0E21\u0E04\u0E23\u0E2D\u0E07\u0E23\u0E30\u0E2B\u0E27\u0E48\u0E32\u0E07\u0E2A\u0E31\u0E0D\u0E0D\u0E32"))), /* @__PURE__ */ React.createElement("tbody", null, rows.map((r, idx) => /* @__PURE__ */ React.createElement("tr", { key: r.year, className: r.isMaturity ? "bg-emerald-50/70" : idx % 2 === 0 ? "bg-slate-50/50" : "" }, /* @__PURE__ */ React.createElement("td", { className: "border border-sky-100 px-3 py-2.5 text-center font-semibold text-slate-800 text-base" }, r.age ?? "\u2014"), /* @__PURE__ */ React.createElement("td", { className: "border border-sky-100 px-3 py-2.5 text-center text-slate-800 text-base" }, r.isPayYear ? fmt(r.premiumThisYear) : /* @__PURE__ */ React.createElement("span", { className: "text-slate-300" }, "\u2014")), /* @__PURE__ */ React.createElement("td", { className: "border border-sky-100 px-3 py-2.5 text-center text-blue-800 font-medium text-base" }, r.isPayYear ? fmt(r.bonusThisYear) : /* @__PURE__ */ React.createElement("span", { className: "text-slate-300" }, "\u2014")), idx === 0 && /* @__PURE__ */ React.createElement("td", { rowSpan: rows.length, className: "border border-sky-100 px-4 py-3 align-top bg-blue-50/30" }, /* @__PURE__ */ React.createElement("div", { className: "text-sm text-slate-600 leading-relaxed space-y-3" }, /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("span", { className: "font-semibold text-slate-800" }, "1. \u0E21\u0E35\u0E0A\u0E35\u0E27\u0E34\u0E15\u0E2D\u0E22\u0E39\u0E48\u0E04\u0E23\u0E1A\u0E2A\u0E31\u0E0D\u0E0D\u0E32"), /* @__PURE__ */ React.createElement("br", null), "\u0E23\u0E31\u0E1A\u0E40\u0E1A\u0E35\u0E49\u0E22\u0E2A\u0E30\u0E2A\u0E21 + \u0E40\u0E07\u0E34\u0E19\u0E04\u0E37\u0E19\u0E1E\u0E34\u0E40\u0E28\u0E29", /* @__PURE__ */ React.createElement("br", null), /* @__PURE__ */ React.createElement("span", { className: "font-bold text-blue-800 text-lg" }, fmt(maturityPayout), " \u0E1A\u0E32\u0E17")), /* @__PURE__ */ React.createElement("div", { className: "h-px bg-sky-200" }), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("span", { className: "font-semibold text-slate-800" }, "2. \u0E40\u0E2A\u0E35\u0E22\u0E0A\u0E35\u0E27\u0E34\u0E15\u0E17\u0E31\u0E48\u0E27\u0E44\u0E1B"), /* @__PURE__ */ React.createElement("br", null), "\u0E17\u0E38\u0E19\u0E1B\u0E23\u0E30\u0E01\u0E31\u0E19 + \u0E40\u0E1A\u0E35\u0E49\u0E22\u0E2A\u0E30\u0E2A\u0E21 + \u0E40\u0E07\u0E34\u0E19\u0E04\u0E37\u0E19\u0E1E\u0E34\u0E40\u0E28\u0E29", /* @__PURE__ */ React.createElement("br", null), /* @__PURE__ */ React.createElement("span", { className: "font-bold text-emerald-700 text-lg" }, fmt(deathBenefitGeneral), " \u0E1A\u0E32\u0E17"), /* @__PURE__ */ React.createElement("br", null), /* @__PURE__ */ React.createElement("span", { className: "text-xs text-slate-400" }, "(\u0E2A\u0E39\u0E07\u0E2A\u0E38\u0E14\u0E40\u0E21\u0E37\u0E48\u0E2D\u0E0A\u0E33\u0E23\u0E30\u0E40\u0E1A\u0E35\u0E49\u0E22\u0E1B\u0E23\u0E30\u0E01\u0E31\u0E19\u0E04\u0E23\u0E1A)")), /* @__PURE__ */ React.createElement("div", { className: "h-px bg-sky-200" }), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("span", { className: "font-semibold text-slate-800" }, "3. \u0E40\u0E2A\u0E35\u0E22\u0E0A\u0E35\u0E27\u0E34\u0E15\u0E08\u0E32\u0E01\u0E2D\u0E38\u0E1A\u0E31\u0E15\u0E34\u0E40\u0E2B\u0E15\u0E38"), /* @__PURE__ */ React.createElement("br", null), "\u0E17\u0E38\u0E19\u0E1B\u0E23\u0E30\u0E01\u0E31\u0E19 x 2 + \u0E40\u0E1A\u0E35\u0E49\u0E22\u0E2A\u0E30\u0E2A\u0E21 + \u0E40\u0E07\u0E34\u0E19\u0E04\u0E37\u0E19\u0E1E\u0E34\u0E40\u0E28\u0E29", /* @__PURE__ */ React.createElement("br", null), /* @__PURE__ */ React.createElement("span", { className: "font-bold text-emerald-700 text-lg" }, fmt(deathBenefitAccident), " \u0E1A\u0E32\u0E17"), /* @__PURE__ */ React.createElement("br", null), /* @__PURE__ */ React.createElement("span", { className: "text-xs text-slate-400" }, "(\u0E2A\u0E39\u0E07\u0E2A\u0E38\u0E14\u0E40\u0E21\u0E37\u0E48\u0E2D\u0E0A\u0E33\u0E23\u0E30\u0E40\u0E1A\u0E35\u0E49\u0E22\u0E1B\u0E23\u0E30\u0E01\u0E31\u0E19\u0E04\u0E23\u0E1A)")))), idx === 0 && /* @__PURE__ */ React.createElement("td", { rowSpan: rows.length, className: "border border-sky-100 px-4 py-3 align-top" }, /* @__PURE__ */ React.createElement("div", { className: "flex items-center gap-1.5 text-emerald-700 text-sm font-bold mb-3" }, /* @__PURE__ */ React.createElement(Gift, { size: 16 }), " \u0E41\u0E16\u0E21\u0E1F\u0E23\u0E35 \u2014 \u0E04\u0E38\u0E49\u0E21\u0E04\u0E23\u0E2D\u0E07\u0E2D\u0E38\u0E1A\u0E31\u0E15\u0E34\u0E40\u0E2B\u0E15\u0E38"), /* @__PURE__ */ React.createElement("ul", { className: "space-y-3 text-sm text-slate-600" }, /* @__PURE__ */ React.createElement("li", null, "\u0E04\u0E48\u0E32\u0E23\u0E31\u0E01\u0E29\u0E32\u0E1E\u0E22\u0E32\u0E1A\u0E32\u0E25\u0E08\u0E32\u0E01\u0E2D\u0E38\u0E1A\u0E31\u0E15\u0E34\u0E40\u0E2B\u0E15\u0E38 (\u0E15\u0E32\u0E21\u0E08\u0E23\u0E34\u0E07)", /* @__PURE__ */ React.createElement("br", null), /* @__PURE__ */ React.createElement("span", { className: "font-semibold text-slate-800 text-base" }, "\u0E44\u0E21\u0E48\u0E40\u0E01\u0E34\u0E19 ", fmt(medicalCap), " \u0E1A\u0E32\u0E17"), /* @__PURE__ */ React.createElement("div", { className: "text-xs text-slate-400" }, "\u0E2A\u0E39\u0E07\u0E2A\u0E38\u0E14 5 \u0E40\u0E17\u0E48\u0E32\u0E02\u0E2D\u0E07\u0E40\u0E1A\u0E35\u0E49\u0E22\u0E23\u0E32\u0E22\u0E40\u0E14\u0E37\u0E2D\u0E19 \u0E15\u0E48\u0E2D\u0E04\u0E23\u0E31\u0E49\u0E07")), /* @__PURE__ */ React.createElement("li", null, "\u0E2A\u0E39\u0E0D\u0E40\u0E2A\u0E35\u0E22\u0E21\u0E37\u0E2D/\u0E40\u0E17\u0E49\u0E32 2 \u0E02\u0E49\u0E32\u0E07 \u0E2B\u0E23\u0E37\u0E2D\u0E2A\u0E32\u0E22\u0E15\u0E32 (100%)", /* @__PURE__ */ React.createElement("br", null), /* @__PURE__ */ React.createElement("span", { className: "font-semibold text-slate-800 text-base" }, fmt(accident100), " \u0E1A\u0E32\u0E17")), /* @__PURE__ */ React.createElement("li", null, "\u0E2A\u0E39\u0E0D\u0E40\u0E2A\u0E35\u0E22\u0E21\u0E37\u0E2D/\u0E40\u0E17\u0E49\u0E32/\u0E2A\u0E32\u0E22\u0E15\u0E32 1 \u0E02\u0E49\u0E32\u0E07 (60%)", /* @__PURE__ */ React.createElement("br", null), /* @__PURE__ */ React.createElement("span", { className: "font-semibold text-slate-800 text-base" }, fmt(accident60), " \u0E1A\u0E32\u0E17")), /* @__PURE__ */ React.createElement("li", null, "\u0E19\u0E34\u0E49\u0E27\u0E2B\u0E31\u0E27\u0E41\u0E21\u0E48\u0E21\u0E37\u0E2D+\u0E19\u0E34\u0E49\u0E27\u0E0A\u0E35\u0E49\u0E02\u0E49\u0E32\u0E07\u0E40\u0E14\u0E35\u0E22\u0E27\u0E01\u0E31\u0E19 (25%)", /* @__PURE__ */ React.createElement("br", null), /* @__PURE__ */ React.createElement("span", { className: "font-semibold text-slate-800 text-base" }, fmt(accident25), " \u0E1A\u0E32\u0E17")), isKids && /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("li", { className: "pt-2 border-t border-sky-100" }, /* @__PURE__ */ React.createElement("div", { className: "flex items-center gap-1.5 text-blue-800 font-bold mb-1" }, /* @__PURE__ */ React.createElement(Baby, { size: 14 }), " \u0E04\u0E27\u0E32\u0E21\u0E04\u0E38\u0E49\u0E21\u0E04\u0E23\u0E2D\u0E07\u0E2A\u0E33\u0E2B\u0E23\u0E31\u0E1A\u0E40\u0E14\u0E47\u0E01"), /* @__PURE__ */ React.createElement("span", { className: "text-xs text-slate-400" }, "(\u0E41\u0E19\u0E1A\u0E2A\u0E31\u0E0D\u0E0D\u0E32\u0E40\u0E1E\u0E34\u0E48\u0E21\u0E40\u0E15\u0E34\u0E21 \u0E1A\u0E35\u0E41\u0E2D\u0E25\u0E40\u0E2D \u0E0B\u0E35\u0E44\u0E2D \u0E04\u0E34\u0E14\u0E2A\u0E4C + \u0E04\u0E0A.)")), /* @__PURE__ */ React.createElement("li", null, /* @__PURE__ */ React.createElement("span", { className: "font-bold text-blue-900 text-base" }, "\u0E04\u0E38\u0E49\u0E21\u0E04\u0E23\u0E2D\u0E07\u0E42\u0E23\u0E04\u0E23\u0E49\u0E32\u0E22\u0E41\u0E23\u0E07 4 \u0E42\u0E23\u0E04\u0E02\u0E2D\u0E07\u0E40\u0E14\u0E47\u0E01"), /* @__PURE__ */ React.createElement("br", null), /* @__PURE__ */ React.createElement("span", { className: "font-semibold text-slate-800 text-base" }, fmt(criticalIllness4), " \u0E1A\u0E32\u0E17 (50% \u0E02\u0E2D\u0E07\u0E17\u0E38\u0E19\u0E1B\u0E23\u0E30\u0E01\u0E31\u0E19)"), /* @__PURE__ */ React.createElement("br", null), /* @__PURE__ */ React.createElement("span", { className: "text-xs text-slate-400" }, "\u0E44\u0E02\u0E49\u0E23\u0E39\u0E21\u0E32\u0E15\u0E34\u0E01\u0E17\u0E35\u0E48\u0E21\u0E35\u0E1C\u0E25\u0E15\u0E48\u0E2D\u0E2B\u0E31\u0E27\u0E43\u0E08, \u0E04\u0E32\u0E27\u0E32\u0E0B\u0E32\u0E01\u0E34\u0E17\u0E35\u0E48\u0E21\u0E35\u0E20\u0E32\u0E27\u0E30\u0E41\u0E17\u0E23\u0E01\u0E0B\u0E49\u0E2D\u0E19\u0E2B\u0E31\u0E27\u0E43\u0E08, \u0E40\u0E1A\u0E32\u0E2B\u0E27\u0E32\u0E19, \u0E20\u0E32\u0E27\u0E30\u0E19\u0E49\u0E33\u0E04\u0E31\u0E48\u0E07\u0E43\u0E19\u0E2A\u0E21\u0E2D\u0E07\u0E17\u0E35\u0E48\u0E15\u0E49\u0E2D\u0E07\u0E43\u0E2A\u0E48\u0E17\u0E48\u0E2D\u0E23\u0E30\u0E1A\u0E32\u0E22 \u2014 \u0E08\u0E30\u0E04\u0E38\u0E49\u0E21\u0E04\u0E23\u0E2D\u0E07\u0E44\u0E1B\u0E08\u0E19\u0E19\u0E49\u0E2D\u0E07 (\u0E1C\u0E39\u0E49\u0E40\u0E2D\u0E32\u0E1B\u0E23\u0E30\u0E01\u0E31\u0E19\u0E20\u0E31\u0E22) \u0E21\u0E35\u0E2D\u0E32\u0E22\u0E38\u0E04\u0E23\u0E1A 21 \u0E1B\u0E35 \u0E2B\u0E23\u0E37\u0E2D\u0E08\u0E19\u0E01\u0E27\u0E48\u0E32\u0E08\u0E30\u0E2B\u0E21\u0E14\u0E23\u0E30\u0E22\u0E30\u0E40\u0E27\u0E25\u0E32\u0E0A\u0E33\u0E23\u0E30\u0E40\u0E1A\u0E35\u0E49\u0E22\u0E1B\u0E23\u0E30\u0E01\u0E31\u0E19\u0E20\u0E31\u0E22 (\u0E41\u0E25\u0E49\u0E27\u0E41\u0E15\u0E48\u0E27\u0E48\u0E32\u0E40\u0E27\u0E25\u0E32\u0E44\u0E2B\u0E19\u0E08\u0E30\u0E16\u0E36\u0E07\u0E01\u0E48\u0E2D\u0E19\u0E01\u0E31\u0E19)")), /* @__PURE__ */ React.createElement("li", null, /* @__PURE__ */ React.createElement("span", { className: "font-bold text-blue-900 text-base" }, "\u0E04\u0E38\u0E49\u0E21\u0E04\u0E23\u0E2D\u0E07\u0E1C\u0E39\u0E49\u0E0A\u0E33\u0E23\u0E30\u0E40\u0E1A\u0E35\u0E49\u0E22 (\u0E04\u0E0A.)"), /* @__PURE__ */ React.createElement("br", null), korChorPremiumPerInstallment != null ? /* @__PURE__ */ React.createElement("span", { className: "font-semibold text-slate-800 text-base" }, "\u0E40\u0E1A\u0E35\u0E49\u0E22\u0E40\u0E1E\u0E34\u0E48\u0E21 ", freq.label, " ", fmt(korChorPremiumPerInstallment), " \u0E1A\u0E32\u0E17", /* @__PURE__ */ React.createElement("span", { className: "block text-xs font-normal text-slate-400" }, "(\u0E23\u0E27\u0E21\u0E17\u0E31\u0E49\u0E07\u0E1B\u0E35 ", fmt(korChorPremiumAnnual), " \u0E1A\u0E32\u0E17 \u0E08\u0E48\u0E32\u0E22\u0E1E\u0E23\u0E49\u0E2D\u0E21\u0E07\u0E27\u0E14\u0E40\u0E14\u0E35\u0E22\u0E27\u0E01\u0E31\u0E1A\u0E40\u0E1A\u0E35\u0E49\u0E22\u0E2B\u0E25\u0E31\u0E01)")) : /* @__PURE__ */ React.createElement("span", { className: "text-xs text-orange-500" }, "\u0E01\u0E23\u0E2D\u0E01\u0E2D\u0E32\u0E22\u0E38\u0E1C\u0E39\u0E49\u0E1B\u0E01\u0E04\u0E23\u0E2D\u0E07 (20\u201355 \u0E1B\u0E35) \u0E40\u0E1E\u0E37\u0E48\u0E2D\u0E04\u0E33\u0E19\u0E27\u0E13\u0E40\u0E1A\u0E35\u0E49\u0E22\u0E2A\u0E48\u0E27\u0E19\u0E19\u0E35\u0E49"), /* @__PURE__ */ React.createElement("br", null), /* @__PURE__ */ React.createElement("span", { className: "text-xs text-slate-400" }, "\u0E2B\u0E32\u0E01\u0E1C\u0E39\u0E49\u0E1B\u0E01\u0E04\u0E23\u0E2D\u0E07(\u0E1C\u0E39\u0E49\u0E0A\u0E33\u0E23\u0E30\u0E40\u0E1A\u0E35\u0E49\u0E22)\u0E17\u0E38\u0E1E\u0E1E\u0E25\u0E20\u0E32\u0E1E\u0E16\u0E32\u0E27\u0E23\u0E2A\u0E34\u0E49\u0E19\u0E40\u0E0A\u0E34\u0E07\u0E2B\u0E23\u0E37\u0E2D\u0E40\u0E2A\u0E35\u0E22\u0E0A\u0E35\u0E27\u0E34\u0E15 \u0E1A\u0E23\u0E34\u0E29\u0E31\u0E17\u0E22\u0E01\u0E40\u0E27\u0E49\u0E19\u0E01\u0E32\u0E23\u0E0A\u0E33\u0E23\u0E30\u0E40\u0E1A\u0E35\u0E49\u0E22\u0E02\u0E2D\u0E07\u0E01\u0E23\u0E21\u0E18\u0E23\u0E23\u0E21\u0E4C\u0E2B\u0E25\u0E31\u0E01\u0E43\u0E2B\u0E49 \u0E1E\u0E23\u0E49\u0E2D\u0E21\u0E08\u0E48\u0E32\u0E22\u0E40\u0E1E\u0E34\u0E48\u0E21\u0E2D\u0E35\u0E01"), /* @__PURE__ */ React.createElement("br", null), /* @__PURE__ */ React.createElement("span", { className: "font-semibold text-slate-800 text-base" }, fmt(payerProtection50), " \u0E1A\u0E32\u0E17 (50% \u0E02\u0E2D\u0E07\u0E17\u0E38\u0E19\u0E1B\u0E23\u0E30\u0E01\u0E31\u0E19)"), /* @__PURE__ */ React.createElement("br", null), /* @__PURE__ */ React.createElement("span", { className: "text-xs text-slate-400" }, "\u0E04\u0E38\u0E49\u0E21\u0E04\u0E23\u0E2D\u0E07\u0E08\u0E19\u0E19\u0E49\u0E2D\u0E07\u0E2D\u0E32\u0E22\u0E38\u0E04\u0E23\u0E1A 21 \u0E1B\u0E35 \u0E2B\u0E23\u0E37\u0E2D\u0E1C\u0E39\u0E49\u0E1B\u0E01\u0E04\u0E23\u0E2D\u0E07\u0E2D\u0E32\u0E22\u0E38\u0E04\u0E23\u0E1A 65 \u0E1B\u0E35 \u0E2B\u0E23\u0E37\u0E2D\u0E2B\u0E21\u0E14\u0E23\u0E30\u0E22\u0E30\u0E40\u0E27\u0E25\u0E32\u0E0A\u0E33\u0E23\u0E30\u0E40\u0E1A\u0E35\u0E49\u0E22\u0E02\u0E2D\u0E07\u0E01\u0E23\u0E21\u0E18\u0E23\u0E23\u0E21\u0E4C\u0E2B\u0E25\u0E31\u0E01 \u0E41\u0E25\u0E49\u0E27\u0E41\u0E15\u0E48\u0E23\u0E30\u0E22\u0E30\u0E43\u0E14\u0E16\u0E36\u0E07\u0E01\u0E48\u0E2D\u0E19")))))))), /* @__PURE__ */ React.createElement("tfoot", null, /* @__PURE__ */ React.createElement("tr", { className: "bg-sky-100 font-semibold" }, /* @__PURE__ */ React.createElement("td", { className: "border border-sky-100 px-3 py-3 text-center text-slate-700 text-base" }, "\u0E23\u0E27\u0E21"), /* @__PURE__ */ React.createElement("td", { className: "border border-sky-100 px-3 py-3 text-center text-slate-800 text-base" }, fmt(totals.cumPremium)), /* @__PURE__ */ React.createElement("td", { className: "border border-sky-100 px-3 py-3 text-center text-blue-800 text-base" }, fmt(totals.cumBonus)), /* @__PURE__ */ React.createElement("td", { className: "border border-sky-100", colSpan: 2 })), /* @__PURE__ */ React.createElement("tr", { className: "bg-emerald-100 font-bold" }, /* @__PURE__ */ React.createElement("td", { className: "border border-sky-100 px-3 py-4 text-center text-emerald-900 text-base", colSpan: 3 }, "\u0E04\u0E23\u0E1A\u0E2A\u0E31\u0E0D\u0E0D\u0E32 \u0E23\u0E31\u0E1A\u0E40\u0E07\u0E34\u0E19"), /* @__PURE__ */ React.createElement("td", { className: "border border-sky-100 px-3 py-4 text-center text-emerald-900 text-xl", colSpan: 2 }, fmt(maturityPayout), " \u0E1A\u0E32\u0E17")))),
+      /* @__PURE__ */ React.createElement("div", { className: "px-4 py-2 text-right text-sm text-gray-700 font-medium border-t border-sky-100" }, irr != null ? `IRR (\u0E1C\u0E25\u0E15\u0E2D\u0E1A\u0E41\u0E17\u0E19\u0E40\u0E21\u0E37\u0E48\u0E2D\u0E04\u0E23\u0E1A\u0E2A\u0E31\u0E0D\u0E0D\u0E32): ${(irr * 100).toFixed(2)}% \u0E15\u0E48\u0E2D\u0E1B\u0E35` : "IRR: \u0E04\u0E33\u0E19\u0E27\u0E13\u0E44\u0E21\u0E48\u0E44\u0E14\u0E49")
+    ),
+    drawMode && /* @__PURE__ */ React.createElement(
+      "canvas",
+      {
+        ref: canvasRef,
+        className: "absolute inset-0 z-20",
+        style: { touchAction: "none" },
+        onPointerDown: handlePointerDown,
+        onPointerMove: handlePointerMove,
+        onPointerUp: handlePointerUp,
+        onPointerLeave: handlePointerUp
+      }
+    )
+  )), /* @__PURE__ */ React.createElement("div", { className: "text-sm text-slate-400 mt-4 leading-relaxed flex gap-2 print:hidden" }, /* @__PURE__ */ React.createElement(Info, { size: 16, className: "shrink-0 mt-0.5" }), "\u0E15\u0E31\u0E27\u0E40\u0E25\u0E02\u0E04\u0E33\u0E19\u0E27\u0E13\u0E08\u0E32\u0E01\u0E2D\u0E31\u0E15\u0E23\u0E32\u0E40\u0E1A\u0E35\u0E49\u0E22\u0E1B\u0E23\u0E30\u0E01\u0E31\u0E19\u0E20\u0E31\u0E22\u0E17\u0E32\u0E07\u0E01\u0E32\u0E23\u0E02\u0E2D\u0E07\u0E1A\u0E23\u0E34\u0E29\u0E31\u0E17\u0E41\u0E25\u0E30\u0E40\u0E1B\u0E47\u0E19\u0E04\u0E48\u0E32\u0E1B\u0E23\u0E30\u0E21\u0E32\u0E13\u0E40\u0E1E\u0E37\u0E48\u0E2D\u0E1B\u0E23\u0E30\u0E01\u0E2D\u0E1A\u0E01\u0E32\u0E23\u0E19\u0E33\u0E40\u0E2A\u0E19\u0E2D\u0E40\u0E17\u0E48\u0E32\u0E19\u0E31\u0E49\u0E19 \u0E40\u0E07\u0E34\u0E19\u0E04\u0E37\u0E19\u0E1E\u0E34\u0E40\u0E28\u0E29\u0E41\u0E25\u0E30\u0E1C\u0E25\u0E1B\u0E23\u0E30\u0E42\u0E22\u0E0A\u0E19\u0E4C\u0E01\u0E23\u0E13\u0E35\u0E40\u0E2A\u0E35\u0E22\u0E0A\u0E35\u0E27\u0E34\u0E15\u0E08\u0E48\u0E32\u0E22\u0E08\u0E23\u0E34\u0E07\u0E15\u0E32\u0E21\u0E40\u0E07\u0E37\u0E48\u0E2D\u0E19\u0E44\u0E02\u0E01\u0E23\u0E21\u0E18\u0E23\u0E23\u0E21\u0E4C \u0E42\u0E23\u0E04\u0E23\u0E49\u0E32\u0E22\u0E41\u0E23\u0E07 4 \u0E42\u0E23\u0E04\u0E41\u0E25\u0E30\u0E04\u0E38\u0E49\u0E21\u0E04\u0E23\u0E2D\u0E07\u0E1C\u0E39\u0E49\u0E0A\u0E33\u0E23\u0E30\u0E40\u0E1A\u0E35\u0E49\u0E22 (\u0E04\u0E0A.) \u0E2A\u0E33\u0E2B\u0E23\u0E31\u0E1A\u0E40\u0E14\u0E47\u0E01\u0E40\u0E1B\u0E47\u0E19\u0E1C\u0E25\u0E1B\u0E23\u0E30\u0E42\u0E22\u0E0A\u0E19\u0E4C\u0E08\u0E32\u0E01\u0E2A\u0E31\u0E0D\u0E0D\u0E32\u0E40\u0E1E\u0E34\u0E48\u0E21\u0E40\u0E15\u0E34\u0E21\u0E17\u0E35\u0E48\u0E15\u0E49\u0E2D\u0E07\u0E0B\u0E37\u0E49\u0E2D\u0E41\u0E19\u0E1A \u0E40\u0E1A\u0E35\u0E49\u0E22 \u0E04\u0E0A. \u0E04\u0E33\u0E19\u0E27\u0E13\u0E08\u0E32\u0E01\u0E40\u0E1A\u0E35\u0E49\u0E22\u0E01\u0E23\u0E21\u0E18\u0E23\u0E23\u0E21\u0E4C\u0E2B\u0E25\u0E31\u0E01\u0E40\u0E1E\u0E35\u0E22\u0E07\u0E2D\u0E22\u0E48\u0E32\u0E07\u0E40\u0E14\u0E35\u0E22\u0E27 \u0E2B\u0E32\u0E01\u0E41\u0E19\u0E1A\u0E2A\u0E31\u0E0D\u0E0D\u0E32\u0E40\u0E1E\u0E34\u0E48\u0E21\u0E40\u0E15\u0E34\u0E21\u0E2D\u0E37\u0E48\u0E19 (\u0E40\u0E0A\u0E48\u0E19 \u0E0B\u0E35\u0E44\u0E2D \u0E04\u0E34\u0E14\u0E2A\u0E4C) \u0E40\u0E1A\u0E35\u0E49\u0E22\u0E08\u0E23\u0E34\u0E07\u0E08\u0E30\u0E2A\u0E39\u0E07\u0E01\u0E27\u0E48\u0E32\u0E19\u0E35\u0E49\u0E40\u0E25\u0E47\u0E01\u0E19\u0E49\u0E2D\u0E22\u0E40\u0E19\u0E37\u0E48\u0E2D\u0E07\u0E08\u0E32\u0E01\u0E10\u0E32\u0E19\u0E40\u0E1A\u0E35\u0E49\u0E22\u0E17\u0E35\u0E48\u0E43\u0E0A\u0E49\u0E04\u0E33\u0E19\u0E27\u0E13 \u0E04\u0E0A. \u0E08\u0E30\u0E23\u0E27\u0E21\u0E40\u0E1A\u0E35\u0E49\u0E22\u0E02\u0E2D\u0E07\u0E2A\u0E31\u0E0D\u0E0D\u0E32\u0E40\u0E1E\u0E34\u0E48\u0E21\u0E40\u0E15\u0E34\u0E21\u0E19\u0E31\u0E49\u0E19\u0E14\u0E49\u0E27\u0E22 \u0E42\u0E1B\u0E23\u0E14\u0E22\u0E37\u0E19\u0E22\u0E31\u0E19\u0E15\u0E31\u0E27\u0E40\u0E25\u0E02\u0E01\u0E31\u0E1A\u0E43\u0E1A\u0E40\u0E2A\u0E19\u0E2D\u0E23\u0E32\u0E04\u0E32\u0E08\u0E23\u0E34\u0E07\u0E01\u0E48\u0E2D\u0E19\u0E19\u0E33\u0E40\u0E2A\u0E19\u0E2D\u0E25\u0E39\u0E01\u0E04\u0E49\u0E32")), shareMode && /* @__PURE__ */ React.createElement(
+    ShareModal,
+    {
+      mode: shareMode,
+      isKids,
+      customer,
+      setCustomer,
+      child,
+      setChild,
+      agent,
+      setAgent,
+      onClose: () => setShareMode(null),
+      buildData: buildShareData
+    }
+  ));
+}
+
+return SudKoomDashboard;
+})();
 
 window.__mountApp = function () {
   var rootEl = document.getElementById('root');
