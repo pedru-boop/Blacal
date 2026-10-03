@@ -8,7 +8,7 @@ const BRAND = {
     ink: "#000000", sub: "#404040", danger: "#B93232", warn: "#6B4508",
     label: "#000000", nameBlue: "#1668D6", mainBlue: "#0C2F63", dataBlack: "#000000",
 };
-const APP_VERSION = "v2.12.0 (2569-10-02)"; // อัปเดตเลขนี้ทุกครั้งที่มีการแก้ไข/เพิ่มแบบประกันใหม่ เพื่อให้รู้ว่าไฟล์ที่ใช้อยู่เป็นเวอร์ชันล่าสุดหรือไม่
+const APP_VERSION = "v2.13.0 (2569-10-02)"; // อัปเดตเลขนี้ทุกครั้งที่มีการแก้ไข/เพิ่มแบบประกันใหม่ เพื่อให้รู้ว่าไฟล์ที่ใช้อยู่เป็นเวอร์ชันล่าสุดหรือไม่
 const fmt = (n) => (n === null || n === undefined || isNaN(n) ? "0" : Math.round(n).toLocaleString("th-TH"));
 const baht = (n) => (n === null || n === undefined ? "-" : (typeof n === "string" ? n : fmt(n) + " บาท"));
 /* ============================== PERSISTENT STORAGE (works in Claude.ai artifact and standalone browser) ============================== */
@@ -45,6 +45,165 @@ const storageAdapter = (typeof window !== "undefined" && window.storage) ? {
     }
     catch (e) { } },
 };
+
+/* ============================== ส่ง LINE (ข้อความ / รูป) ============================== */
+// ข้อมูลตัวแทนเก็บแยกคีย์ — ปุ่ม "ล้างค่า" ของเครื่องคำนวณจะไม่ลบ
+const AGENT_KEY = "bla-agent-info-v1";
+const DEFAULT_AGENT = { name: "ป้าเป็ด CFP®", phone: "096-595-4789", lineId: "@422cilco", confirmed: false };
+const SHARE_DISCLAIMER = "ตัวเลขเป็นการประมาณการเบื้องต้น ผลประโยชน์และเงื่อนไขเป็นไปตามกรมธรรม์";
+// รวมแถวที่ค่าเท่ากันติดกันเป็นช่วง เช่น เงินคืนปีที่ 1-15 ปีละ 80,000
+function groupRuns(values) {
+    const out = [];
+    values.forEach((v, i) => {
+        const last = out[out.length - 1];
+        if (last && last.v === v && last.to === i - 1) last.to = i;
+        else out.push({ v, from: i, to: i });
+    });
+    return out;
+}
+// สรุปตัวเลขสำคัญเป็นรายการ [ไอคอน, หัวข้อ, ค่า] ใช้ร่วมกันทั้งข้อความและรูป
+function shareKeyLines(d) {
+    const lines = [];
+    lines.push(["🛡️", "ทุนประกัน", baht(d.si)]);
+    lines.push(["💳", "เบี้ยประกัน", `${fmt(d.premium)} บาท/ปี · ชำระ ${d.payYears} ปี`]);
+    lines.push(["🧾", "รวมเบี้ยทั้งหมด", baht(d.totalPremium)]);
+    if (d.type === "savings") {
+        lines.push(["⏳", "ระยะคุ้มครอง", `${d.rows.length} ปี`]);
+        const mid = d.rows.slice(0, -1).map((r) => r.cashBaht);
+        groupRuns(mid).filter((g) => g.v > 0).slice(0, 3).forEach((g) => {
+            lines.push(["💰", g.from === g.to ? `เงินคืนปีที่ ${g.from + 1}` : `เงินคืนปีที่ ${g.from + 1}-${g.to + 1}`, `ปีละ ${baht(g.v)}`]);
+        });
+        lines.push(["🎁", "ครบสัญญารับ", baht(d.rows[d.rows.length - 1].cashBaht)]);
+        lines.push(["💵", "รับรวมตลอดสัญญา (การันตี)", baht(d.totalCash)]);
+        lines.push(["📈", "ส่วนต่างเงินรับ − เบี้ย", (d.totalCash - d.totalPremium >= 0 ? "+" : "") + baht(d.totalCash - d.totalPremium)]);
+    }
+    else {
+        const pr = d.rows.filter((r) => r.pension > 0);
+        const runs = groupRuns(pr.map((r) => r.pension));
+        runs.slice(0, 3).forEach((g) => {
+            const a1 = pr[g.from].age, a2 = pr[g.to].age;
+            lines.push(["🏖️", a1 === a2 ? `บำนาญ อายุ ${a1} ปี` : `บำนาญ อายุ ${a1}-${a2} ปี`, a1 === a2 ? baht(g.v) : `ปีละ ${baht(g.v)}`]);
+        });
+        lines.push(["💰", "รวมบำนาญตลอดสัญญา", baht(pr.reduce((t, r) => t + r.pension, 0))]);
+        if (d.breakEvenAge) lines.push(["✅", "จุดคุ้มทุน", `อายุ ${d.breakEvenAge} ปี`]);
+    }
+    if (d.ciPerYear > 0) lines.push(["🎗️", "แถมฟรี 8 โรคร้ายแรง", `${baht(d.ciPerYear)}/ปี`]);
+    return lines;
+}
+function buildShareText(d) {
+    const out = [];
+    if (d.customer) out.push(`เรียน คุณ${d.customer}`, "");
+    out.push(`📋 ${d.productName}`);
+    out.push(`👤 ${d.gender === "female" ? "เพศหญิง" : "เพศชาย"} อายุ ${d.age} ปี`);
+    shareKeyLines(d).forEach(([ic, k, v]) => out.push(`${ic} ${k}: ${v}`));
+    out.push("", "————————");
+    if (d.agent.name) out.push(d.agent.name);
+    if (d.agent.phone) out.push(`📞 ${d.agent.phone}`);
+    if (d.agent.lineId) out.push(`LINE: ${d.agent.lineId}`);
+    out.push(`* ${SHARE_DISCLAIMER}`);
+    return out.join("\n");
+}
+function openLineText(text) {
+    try { if (navigator.clipboard) navigator.clipboard.writeText(text).catch(() => { }); } catch (e) { }
+    window.open("https://line.me/R/share?text=" + encodeURIComponent(text), "_blank");
+}
+// วาดใบสรุปเป็นรูปด้วย Canvas (ไม่ต้องใช้ไลบรารีเสริม)
+function drawShareImage(d) {
+    const W = 1080, P = 48, FONT = "'IBM Plex Sans Thai','Prompt',sans-serif";
+    const keys = shareKeyLines(d);
+    const isSav = d.type === "savings";
+    const cols = isSav ? ["ปีที่", "อายุ", "เบี้ย", "เงินคืน", "คุ้มครอง"] : ["อายุ", "เบี้ย", "บำนาญ", "เบี้ยสะสม", "บำนาญสะสม"];
+    const colW = isSav ? [0.12, 0.12, 0.24, 0.24, 0.28] : [0.12, 0.22, 0.22, 0.22, 0.22];
+    const rowH = 44, keyH = 54;
+    const c = document.createElement("canvas");
+    const measure = c.getContext("2d");
+    measure.font = `600 44px ${FONT}`;
+    const wrap = (ctx, text, maxW) => {
+        const words = Array.from(text); const lines = []; let cur = "";
+        words.forEach((ch) => { if (ctx.measureText(cur + ch).width > maxW && cur) { lines.push(cur); cur = ch; } else cur += ch; });
+        if (cur) lines.push(cur); return lines;
+    };
+    const titleLines = wrap(measure, d.productName, W - P * 2);
+    const headerH = 120 + titleLines.length * 56;
+    const H = headerH + 110 + keys.length * keyH + 40 + 56 + d.rows.length * rowH + 60 + 250;
+    c.width = W; c.height = H;
+    const g = c.getContext("2d");
+    g.fillStyle = "#FFFFFF"; g.fillRect(0, 0, W, H);
+    // หัวกระดาษ
+    const grd = g.createLinearGradient(0, 0, W, headerH); grd.addColorStop(0, BRAND.navy); grd.addColorStop(1, BRAND.navyDeep);
+    g.fillStyle = grd; g.fillRect(0, 0, W, headerH);
+    g.textBaseline = "top"; g.textAlign = "left";
+    g.fillStyle = "#BFE3F5"; g.font = `500 30px ${FONT}`; g.fillText("สรุปข้อเสนอแบบประกัน · กรุงเทพประกันชีวิต", P, 40);
+    g.fillStyle = "#FFFFFF"; g.font = `600 44px ${FONT}`;
+    titleLines.forEach((t, i) => g.fillText(t, P, 92 + i * 56));
+    let y = headerH + 30;
+    g.fillStyle = BRAND.ink; g.font = `600 34px ${FONT}`;
+    g.fillText(d.customer ? `เรียน คุณ${d.customer}` : "ผู้เอาประกันภัย", P, y);
+    g.fillStyle = BRAND.sub; g.font = `500 30px ${FONT}`;
+    g.fillText(`${d.gender === "female" ? "เพศหญิง" : "เพศชาย"} อายุ ${d.age} ปี`, P, y + 44);
+    y += 110;
+    // ตัวเลขสำคัญ
+    keys.forEach(([ic, k, v], i) => {
+        if (i % 2 === 0) { g.fillStyle = BRAND.bg; g.fillRect(P - 12, y - 6, W - P * 2 + 24, keyH); }
+        g.textAlign = "left"; g.fillStyle = BRAND.sub; g.font = `500 28px ${FONT}`; g.fillText(`${ic} ${k}`, P, y + 6);
+        g.textAlign = "right"; g.fillStyle = BRAND.navy; g.font = `600 30px ${FONT}`; g.fillText(v, W - P, y + 5);
+        y += keyH;
+    });
+    y += 40;
+    // ตาราง
+    const tx = (i) => P + colW.slice(0, i).reduce((a, b) => a + b, 0) * (W - P * 2);
+    const tw = (i) => colW[i] * (W - P * 2);
+    g.fillStyle = BRAND.navy; g.fillRect(P - 12, y, W - P * 2 + 24, 56);
+    g.fillStyle = "#FFFFFF"; g.font = `600 26px ${FONT}`; g.textAlign = "center";
+    cols.forEach((h, i) => g.fillText(h, tx(i) + tw(i) / 2, y + 13));
+    y += 56;
+    g.font = `500 25px ${FONT}`;
+    d.rows.forEach((r, idx) => {
+        const hi = isSav ? !!r.note : r.age === d.breakEvenAge;
+        g.fillStyle = hi ? "#FFF6E0" : (idx % 2 ? "#F7FBFD" : "#FFFFFF"); g.fillRect(P - 12, y, W - P * 2 + 24, rowH);
+        const vals = isSav
+            ? [idx + 1, r.age, r.premium > 0 ? fmt(r.premium) : "-", fmt(r.cashBaht), fmt(r.coverageBaht)]
+            : [r.age, r.premium > 0 ? fmt(r.premium) : "-", r.pension > 0 ? fmt(r.pension) : "-", fmt(r.cumPremium), fmt(r.cumPension)];
+        vals.forEach((v, i) => {
+            g.fillStyle = (isSav ? i === 3 : i === 2) ? BRAND.greenDeep : BRAND.ink;
+            g.fillText(String(v), tx(i) + tw(i) / 2, y + 8);
+        });
+        y += rowH;
+    });
+    if (isSav) {
+        g.fillStyle = BRAND.bg; g.fillRect(P - 12, y, W - P * 2 + 24, 52);
+        g.font = `600 26px ${FONT}`; g.fillStyle = BRAND.navy;
+        g.fillText("รวม", tx(0) + (tw(0) + tw(1)) / 2, y + 11);
+        g.fillText(fmt(d.totalPremium), tx(2) + tw(2) / 2, y + 11);
+        g.fillStyle = BRAND.greenDeep; g.fillText(fmt(d.totalCash), tx(3) + tw(3) / 2, y + 11);
+    }
+    y += 60;
+    // ข้อมูลตัวแทน
+    g.fillStyle = BRAND.navy; g.fillRect(0, y, W, 150);
+    g.textAlign = "left"; g.fillStyle = "#FFFFFF"; g.font = `600 36px ${FONT}`;
+    g.fillText(d.agent.name || "", P, y + 24);
+    g.fillStyle = "#BFE3F5"; g.font = `500 30px ${FONT}`;
+    g.fillText([d.agent.phone ? `📞 ${d.agent.phone}` : "", d.agent.lineId ? `LINE: ${d.agent.lineId}` : ""].filter(Boolean).join("    "), P, y + 82);
+    y += 150;
+    g.fillStyle = "#808080"; g.font = `500 22px ${FONT}`;
+    wrap(g, `* ${SHARE_DISCLAIMER}`, W - P * 2).forEach((t, i) => g.fillText(t, P, y + 16 + i * 30));
+    return c;
+}
+function shareCanvasImage(canvas) {
+    const dataUrl = canvas.toDataURL("image/png");
+    const bin = atob(dataUrl.split(",")[1]);
+    const arr = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
+    const file = new File([arr], "insurance-summary.png", { type: "image/png" });
+    if (navigator.canShare && navigator.canShare({ files: [file] })) {
+        navigator.share({ files: [file] }).catch(() => { });
+        return "shared";
+    }
+    const a = document.createElement("a");
+    a.href = dataUrl; a.download = "insurance-summary.png";
+    document.body.appendChild(a); a.click(); a.remove();
+    return "downloaded";
+}
 /* ============================== RATE DATA ============================== */
 // 1) แอคซิเดนท์ แคร์ (อบ.) รบข.33/2568
 const ACC_BANDS = [[0, 60], [61, 65], [66, 70], [71, 75], [76, 80], [81, 85], [86, 90], [91, 95], [96, 98]];
@@ -1268,6 +1427,57 @@ function App() {
     const [pensionGroupOpen, setPensionGroupOpen] = useState(false);
     const [pensionScheduleOpen, setPensionScheduleOpen] = useState({});
     const [pensionYearModal, setPensionYearModal] = useState(null); // { name, age, irr }
+    const [agentInfo, setAgentInfo] = useState(DEFAULT_AGENT);
+    const [agentDraft, setAgentDraft] = useState(null); // กำลังแก้ไขข้อมูลตัวแทน (null = ไม่ได้แก้)
+    const [customerName, setCustomerName] = useState("");
+    const [shareModal, setShareModal] = useState(null); // { id, mode: "text"|"image", pl } หรือ { id: null } = เปิดเฉพาะตั้งค่าตัวแทน
+    const [shareNote, setShareNote] = useState("");
+    useEffect(() => {
+        (async () => {
+            const raw = await storageAdapter.get(AGENT_KEY);
+            if (raw) { try { setAgentInfo(Object.assign({}, DEFAULT_AGENT, JSON.parse(raw))); } catch (e) { } }
+        })();
+    }, []);
+    function saveAgent(info) {
+        const next = Object.assign({}, info, { confirmed: true });
+        setAgentInfo(next);
+        setAgentDraft(null);
+        storageAdapter.set(AGENT_KEY, JSON.stringify(next));
+    }
+    // รวบรวมข้อมูลสำหรับส่ง LINE จากตารางที่กดส่ง + ข้อมูลแบบประกันที่เลือกไว้
+    function buildShareData(id, pl) {
+        const prod = PRODUCTS.find((x) => x.id === id);
+        const rows = pl.rows || [];
+        const premiumRows = rows.filter((r) => r.premium > 0);
+        let ciPerYear = 0;
+        if (SAVINGS_DEFS[id] && SAVINGS_DEFS[id].ciPct) ciPerYear = Math.round(mainSIOf(id) * SAVINGS_DEFS[id].ciPct / 100);
+        if (id === "PENSIONCARE888") ciPerYear = Math.round(mainSIOf(id) * PENSIONCARE888_CI_PCT);
+        return {
+            type: pl.type, rows, breakEvenAge: pl.breakEvenAge, productName: prod ? prod.name : (pl.title || ""),
+            customer: customerName.trim(), gender, age, si: mainSIOf(id),
+            premium: premiumRows.length ? premiumRows[0].premium : 0, payYears: premiumRows.length,
+            totalPremium: premiumRows.reduce((t, r) => t + r.premium, 0),
+            totalCash: rows.reduce((t, r) => t + (r.cashBaht || 0), 0), ciPerYear, agent: agentInfo,
+        };
+    }
+    function handleShareLine(id, pl) {
+        setShareNote("");
+        setAgentDraft(agentInfo.confirmed ? null : null);
+        setShareModal({ id, mode: pl.mode, pl });
+    }
+    function doShare() {
+        if (!shareModal || !shareModal.id) return;
+        const d = buildShareData(shareModal.id, shareModal.pl);
+        if (shareModal.mode === "text") {
+            openLineText(buildShareText(d));
+            setShareModal(null);
+        }
+        else {
+            const r = shareCanvasImage(drawShareImage(d));
+            if (r === "downloaded") setShareNote("บันทึกรูปลงเครื่องแล้ว — เปิด LINE แล้วแนบรูปส่งลูกค้าได้เลย");
+            else setShareModal(null);
+        }
+    }
     const [printData, setPrintData] = useState(null); // { type, title, rows, ... } — ข้อมูลตารางที่จะพิมพ์/บันทึกเป็น PDF
     const [savingsGroupOpen, setSavingsGroupOpen] = useState(false);
     const [compareOpen, setCompareOpen] = useState(false);
@@ -1817,7 +2027,7 @@ function App() {
                 happypensionTerm && (React.createElement("button", { onClick: () => setPensionScheduleOpen((o) => (Object.assign(Object.assign({}, o), { HAPPYPENSION: !o.HAPPYPENSION }))), className: "w-full text-[21px] font-semibold px-4 py-2.5 rounded-xl mt-1", style: { background: BRAND.bg, color: BRAND.navy, border: "1px solid #D7E8F0" } }, pensionScheduleOpen.HAPPYPENSION ? "▴ ซ่อนตารางบำนาญ" : "▾ ดูตารางการจ่ายบำนาญ + จุดคุ้มทุน")),
                 pensionScheduleOpen.HAPPYPENSION && (() => {
                     const s = buildPensionSchedule("HAPPYPENSION");
-                    return React.createElement(PensionScheduleTable, { rows: s.rows, breakEvenAge: s.breakEvenAge, onRowClick: (a) => setPensionYearModal({ name: "แฮปปี้ เพนชั่น (มีเงินปันผล)", age: a, irr: computePensionIRRUpToAge("HAPPYPENSION", a) }), title: "\u0E41\u0E2E\u0E1B\u0E1B\u0E35\u0E49 \u0E40\u0E1E\u0E19\u0E0A\u0E31\u0E48\u0E19 (\u0E21\u0E35\u0E40\u0E07\u0E34\u0E19\u0E1B\u0E31\u0E19\u0E1C\u0E25) \u2014 \u0E15\u0E32\u0E23\u0E32\u0E07\u0E01\u0E32\u0E23\u0E08\u0E48\u0E32\u0E22\u0E1A\u0E33\u0E19\u0E32\u0E0D", onPrint: handlePrintTable });
+                    return React.createElement(PensionScheduleTable, { rows: s.rows, breakEvenAge: s.breakEvenAge, onRowClick: (a) => setPensionYearModal({ name: "แฮปปี้ เพนชั่น (มีเงินปันผล)", age: a, irr: computePensionIRRUpToAge("HAPPYPENSION", a) }), title: "\u0E41\u0E2E\u0E1B\u0E1B\u0E35\u0E49 \u0E40\u0E1E\u0E19\u0E0A\u0E31\u0E48\u0E19 (\u0E21\u0E35\u0E40\u0E07\u0E34\u0E19\u0E1B\u0E31\u0E19\u0E1C\u0E25) \u2014 \u0E15\u0E32\u0E23\u0E32\u0E07\u0E01\u0E32\u0E23\u0E08\u0E48\u0E32\u0E22\u0E1A\u0E33\u0E19\u0E32\u0E0D", onPrint: handlePrintTable, onShare: (pl) => handleShareLine("HAPPYPENSION", pl) });
                 })()));
             case "HAPPYSAVING": return selected.HAPPYSAVING && (React.createElement(React.Fragment, null,
                 React.createElement(PlanRow, { label: "\u0E23\u0E30\u0E22\u0E30\u0E40\u0E27\u0E25\u0E32\u0E0A\u0E33\u0E23\u0E30\u0E40\u0E1A\u0E35\u0E49\u0E22" },
@@ -1832,7 +2042,7 @@ function App() {
                         "\u0E17\u0E38\u0E19\u0E1B\u0E23\u0E30\u0E01\u0E31\u0E19\u0E20\u0E31\u0E22\u0E17\u0E35\u0E48\u0E04\u0E33\u0E19\u0E27\u0E13\u0E44\u0E14\u0E49: ",
                         baht(getEffectiveSI("HAPPYSAVING"))))),
                 happysavingTerm > 0 && getEffectiveSI("HAPPYSAVING") >= HAPPYSAVING_MIN_SI && (React.createElement("button", { onClick: () => setSavingsScheduleOpen((o) => (Object.assign(Object.assign({}, o), { HAPPYSAVING: !o.HAPPYSAVING }))), className: "w-full text-[21px] font-semibold px-4 py-2.5 rounded-xl mt-1", style: { background: BRAND.bg, color: BRAND.navy, border: "1px solid #D7E8F0" } }, savingsScheduleOpen.HAPPYSAVING ? "▴ ซ่อนตารางเงินคืนตลอดสัญญา" : "▾ ดูตารางเงินคืนตลอดสัญญา (การันตี)")),
-                savingsScheduleOpen.HAPPYSAVING && (() => { const s = buildSavingsSchedule("HAPPYSAVING"); return React.createElement(SavingsScheduleTable, { rows: s.rows, irr: s.irr, title: "\u0E41\u0E2E\u0E1B\u0E1B\u0E35\u0E49\u0E40\u0E0B\u0E1F\u0E27\u0E34\u0E48\u0E07 (\u0E21\u0E35\u0E40\u0E07\u0E34\u0E19\u0E1B\u0E31\u0E19\u0E1C\u0E25) \u2014 \u0E15\u0E32\u0E23\u0E32\u0E07\u0E40\u0E07\u0E34\u0E19\u0E04\u0E37\u0E19\u0E15\u0E25\u0E2D\u0E14\u0E2A\u0E31\u0E0D\u0E0D\u0E32", onPrint: handlePrintTable }); })()));
+                savingsScheduleOpen.HAPPYSAVING && (() => { const s = buildSavingsSchedule("HAPPYSAVING"); return React.createElement(SavingsScheduleTable, { rows: s.rows, irr: s.irr, title: "\u0E41\u0E2E\u0E1B\u0E1B\u0E35\u0E49\u0E40\u0E0B\u0E1F\u0E27\u0E34\u0E48\u0E07 (\u0E21\u0E35\u0E40\u0E07\u0E34\u0E19\u0E1B\u0E31\u0E19\u0E1C\u0E25) \u2014 \u0E15\u0E32\u0E23\u0E32\u0E07\u0E40\u0E07\u0E34\u0E19\u0E04\u0E37\u0E19\u0E15\u0E25\u0E2D\u0E14\u0E2A\u0E31\u0E0D\u0E0D\u0E32", onPrint: handlePrintTable, onShare: (pl) => handleShareLine("HAPPYSAVING", pl) }); })()));
             case "HAPPYWL": return selected.HAPPYWL && (React.createElement(React.Fragment, null,
                 React.createElement(PlanRow, { label: "\u0E23\u0E30\u0E22\u0E30\u0E40\u0E27\u0E25\u0E32\u0E0A\u0E33\u0E23\u0E30\u0E40\u0E1A\u0E35\u0E49\u0E22" },
                     React.createElement(Chips, { options: HAPPYWL_TERMS, value: happywlTerm, onChange: setHappywlTerm, fmt: (t) => t + " ปี" })),
@@ -1924,7 +2134,7 @@ function App() {
                         "\u0E17\u0E38\u0E19\u0E1B\u0E23\u0E30\u0E01\u0E31\u0E19\u0E20\u0E31\u0E22\u0E17\u0E35\u0E48\u0E04\u0E33\u0E19\u0E27\u0E13\u0E44\u0E14\u0E49: ",
                         baht(getEffectiveSI("PSAVE104"))))),
                 getEffectiveSI("PSAVE104") >= PSAVE104_MIN_SI && (React.createElement("button", { onClick: () => setSavingsScheduleOpen((o) => (Object.assign(Object.assign({}, o), { PSAVE104: !o.PSAVE104 }))), className: "w-full text-[21px] font-semibold px-4 py-2.5 rounded-xl mt-1", style: { background: BRAND.bg, color: BRAND.navy, border: "1px solid #D7E8F0" } }, savingsScheduleOpen.PSAVE104 ? "▴ ซ่อนตารางเงินคืนตลอดสัญญา" : "▾ ดูตารางเงินคืนตลอดสัญญา (การันตี)")),
-                savingsScheduleOpen.PSAVE104 && (() => { const s = buildSavingsSchedule("PSAVE104"); return React.createElement(SavingsScheduleTable, { rows: s.rows, irr: s.irr, title: "\u0E40\u0E1E\u0E23\u0E2A\u0E17\u0E35\u0E08 \u0E40\u0E0B\u0E1F\u0E27\u0E34\u0E48\u0E07 10/4 \u2014 \u0E15\u0E32\u0E23\u0E32\u0E07\u0E40\u0E07\u0E34\u0E19\u0E04\u0E37\u0E19\u0E15\u0E25\u0E2D\u0E14\u0E2A\u0E31\u0E0D\u0E0D\u0E32", onPrint: handlePrintTable }); })()));
+                savingsScheduleOpen.PSAVE104 && (() => { const s = buildSavingsSchedule("PSAVE104"); return React.createElement(SavingsScheduleTable, { rows: s.rows, irr: s.irr, title: "\u0E40\u0E1E\u0E23\u0E2A\u0E17\u0E35\u0E08 \u0E40\u0E0B\u0E1F\u0E27\u0E34\u0E48\u0E07 10/4 \u2014 \u0E15\u0E32\u0E23\u0E32\u0E07\u0E40\u0E07\u0E34\u0E19\u0E04\u0E37\u0E19\u0E15\u0E25\u0E2D\u0E14\u0E2A\u0E31\u0E0D\u0E0D\u0E32", onPrint: handlePrintTable, onShare: (pl) => handleShareLine("PSAVE104", pl) }); })()));
             case "PSAVE126": return selected.PSAVE126 && (React.createElement(React.Fragment, null,
                 React.createElement(PlanRow, { label: "\u0E23\u0E30\u0E1A\u0E38\u0E02\u0E49\u0E2D\u0E21\u0E39\u0E25\u0E08\u0E32\u0E01" },
                     React.createElement(SegButton, { options: [{ k: "si", l: "ทุนประกัน" }, { k: "premium", l: "เบี้ยประกัน" }], value: savingsMode.PSAVE126 || "si", onChange: (v) => setSavingsMode((m) => (Object.assign(Object.assign({}, m), { PSAVE126: v }))) })),
@@ -1936,7 +2146,7 @@ function App() {
                         "\u0E17\u0E38\u0E19\u0E1B\u0E23\u0E30\u0E01\u0E31\u0E19\u0E20\u0E31\u0E22\u0E17\u0E35\u0E48\u0E04\u0E33\u0E19\u0E27\u0E13\u0E44\u0E14\u0E49: ",
                         baht(getEffectiveSI("PSAVE126"))))),
                 getEffectiveSI("PSAVE126") >= PSAVE126_MIN_SI && (React.createElement("button", { onClick: () => setSavingsScheduleOpen((o) => (Object.assign(Object.assign({}, o), { PSAVE126: !o.PSAVE126 }))), className: "w-full text-[21px] font-semibold px-4 py-2.5 rounded-xl mt-1", style: { background: BRAND.bg, color: BRAND.navy, border: "1px solid #D7E8F0" } }, savingsScheduleOpen.PSAVE126 ? "▴ ซ่อนตารางเงินคืนตลอดสัญญา" : "▾ ดูตารางเงินคืนตลอดสัญญา (การันตี)")),
-                savingsScheduleOpen.PSAVE126 && (() => { const s = buildSavingsSchedule("PSAVE126"); return React.createElement(SavingsScheduleTable, { rows: s.rows, irr: s.irr, title: "\u0E40\u0E1E\u0E23\u0E2A\u0E17\u0E35\u0E08 \u0E40\u0E0B\u0E1F\u0E27\u0E34\u0E48\u0E07 12/6 \u2014 \u0E15\u0E32\u0E23\u0E32\u0E07\u0E40\u0E07\u0E34\u0E19\u0E04\u0E37\u0E19\u0E15\u0E25\u0E2D\u0E14\u0E2A\u0E31\u0E0D\u0E0D\u0E32", onPrint: handlePrintTable }); })()));
+                savingsScheduleOpen.PSAVE126 && (() => { const s = buildSavingsSchedule("PSAVE126"); return React.createElement(SavingsScheduleTable, { rows: s.rows, irr: s.irr, title: "\u0E40\u0E1E\u0E23\u0E2A\u0E17\u0E35\u0E08 \u0E40\u0E0B\u0E1F\u0E27\u0E34\u0E48\u0E07 12/6 \u2014 \u0E15\u0E32\u0E23\u0E32\u0E07\u0E40\u0E07\u0E34\u0E19\u0E04\u0E37\u0E19\u0E15\u0E25\u0E2D\u0E14\u0E2A\u0E31\u0E0D\u0E0D\u0E32", onPrint: handlePrintTable, onShare: (pl) => handleShareLine("PSAVE126", pl) }); })()));
             case "HS208":
             case "HS126":
             case "HS157":
@@ -1960,7 +2170,7 @@ function App() {
                             "\u0E17\u0E38\u0E19\u0E1B\u0E23\u0E30\u0E01\u0E31\u0E19\u0E20\u0E31\u0E22\u0E17\u0E35\u0E48\u0E04\u0E33\u0E19\u0E27\u0E13\u0E44\u0E14\u0E49: ",
                             baht(getEffectiveSI(id))))),
                     getEffectiveSI(id) >= def.minSI && (React.createElement("button", { onClick: () => setSavingsScheduleOpen((o) => (Object.assign(Object.assign({}, o), { [id]: !o[id] }))), className: "w-full text-[21px] font-semibold px-4 py-2.5 rounded-xl mt-1", style: { background: BRAND.bg, color: BRAND.navy, border: "1px solid #D7E8F0" } }, savingsScheduleOpen[id] ? "▴ ซ่อนตารางเงินคืนตลอดสัญญา" : "▾ ดูตารางเงินคืนตลอดสัญญา (การันตี)")),
-                    savingsScheduleOpen[id] && (() => { const s = buildSavingsSchedule(id); return React.createElement(SavingsScheduleTable, { rows: s.rows, irr: s.irr, title: def.name + " — ตารางเงินคืนตลอดสัญญา", onPrint: handlePrintTable }); })()));
+                    savingsScheduleOpen[id] && (() => { const s = buildSavingsSchedule(id); return React.createElement(SavingsScheduleTable, { rows: s.rows, irr: s.irr, title: def.name + " — ตารางเงินคืนตลอดสัญญา", onPrint: handlePrintTable, onShare: (pl) => handleShareLine(id, pl) }); })()));
             }
             case "PENSION888": return selected.PENSION888 && (React.createElement(React.Fragment, null,
                 React.createElement(PlanRow, { label: "\u0E27\u0E34\u0E18\u0E35\u0E01\u0E23\u0E2D\u0E01\u0E02\u0E49\u0E2D\u0E21\u0E39\u0E25" },
@@ -1977,7 +2187,7 @@ function App() {
                 pension888Row().ok && (React.createElement("button", { onClick: () => setPensionScheduleOpen((o) => (Object.assign(Object.assign({}, o), { PENSION888: !o.PENSION888 }))), className: "w-full text-[21px] font-semibold px-4 py-2.5 rounded-xl mt-1", style: { background: BRAND.bg, color: BRAND.navy, border: "1px solid #D7E8F0" } }, pensionScheduleOpen.PENSION888 ? "▴ ซ่อนตารางบำนาญ" : "▾ ดูตารางการจ่ายบำนาญ + จุดคุ้มทุน")),
                 pensionScheduleOpen.PENSION888 && (() => {
                     const s = buildPensionSchedule("PENSION888");
-                    return React.createElement(PensionScheduleTable, { rows: s.rows, breakEvenAge: s.breakEvenAge, onRowClick: (a) => setPensionYearModal({ name: "บีแอลเอ เพนชั่น 888", age: a, irr: computePensionIRRUpToAge("PENSION888", a) }), title: "\u0E1A\u0E35\u0E41\u0E2D\u0E25\u0E40\u0E2D \u0E40\u0E1E\u0E19\u0E0A\u0E31\u0E48\u0E19 888 \u2014 \u0E15\u0E32\u0E23\u0E32\u0E07\u0E01\u0E32\u0E23\u0E08\u0E48\u0E32\u0E22\u0E1A\u0E33\u0E19\u0E32\u0E0D", onPrint: handlePrintTable });
+                    return React.createElement(PensionScheduleTable, { rows: s.rows, breakEvenAge: s.breakEvenAge, onRowClick: (a) => setPensionYearModal({ name: "บีแอลเอ เพนชั่น 888", age: a, irr: computePensionIRRUpToAge("PENSION888", a) }), title: "\u0E1A\u0E35\u0E41\u0E2D\u0E25\u0E40\u0E2D \u0E40\u0E1E\u0E19\u0E0A\u0E31\u0E48\u0E19 888 \u2014 \u0E15\u0E32\u0E23\u0E32\u0E07\u0E01\u0E32\u0E23\u0E08\u0E48\u0E32\u0E22\u0E1A\u0E33\u0E19\u0E32\u0E0D", onPrint: handlePrintTable, onShare: (pl) => handleShareLine("PENSION888", pl) });
                 })()));
             case "PENSIONCARE888": return selected.PENSIONCARE888 && (React.createElement(React.Fragment, null,
                 React.createElement(PlanRow, { label: "\u0E27\u0E34\u0E18\u0E35\u0E01\u0E23\u0E2D\u0E01\u0E02\u0E49\u0E2D\u0E21\u0E39\u0E25" },
@@ -1994,7 +2204,7 @@ function App() {
                 pensioncare888Row().ok && (React.createElement("button", { onClick: () => setPensionScheduleOpen((o) => (Object.assign(Object.assign({}, o), { PENSIONCARE888: !o.PENSIONCARE888 }))), className: "w-full text-[21px] font-semibold px-4 py-2.5 rounded-xl mt-1", style: { background: BRAND.bg, color: BRAND.navy, border: "1px solid #D7E8F0" } }, pensionScheduleOpen.PENSIONCARE888 ? "▴ ซ่อนตารางบำนาญ" : "▾ ดูตารางการจ่ายบำนาญ + จุดคุ้มทุน")),
                 pensionScheduleOpen.PENSIONCARE888 && (() => {
                     const s = buildPensionSchedule("PENSIONCARE888");
-                    return React.createElement(PensionScheduleTable, { rows: s.rows, breakEvenAge: s.breakEvenAge, onRowClick: (a) => setPensionYearModal({ name: "บีแอลเอ เพนชั่น แอนด์ แคร์ 888", age: a, irr: computePensionIRRUpToAge("PENSIONCARE888", a) }), title: "บีแอลเอ เพนชั่น แอนด์ แคร์ 888 \u2014 \u0E15\u0E32\u0E23\u0E32\u0E07\u0E01\u0E32\u0E23\u0E08\u0E48\u0E32\u0E22\u0E1A\u0E33\u0E19\u0E32\u0E0D", onPrint: handlePrintTable });
+                    return React.createElement(PensionScheduleTable, { rows: s.rows, breakEvenAge: s.breakEvenAge, onRowClick: (a) => setPensionYearModal({ name: "บีแอลเอ เพนชั่น แอนด์ แคร์ 888", age: a, irr: computePensionIRRUpToAge("PENSIONCARE888", a) }), title: "บีแอลเอ เพนชั่น แอนด์ แคร์ 888 \u2014 \u0E15\u0E32\u0E23\u0E32\u0E07\u0E01\u0E32\u0E23\u0E08\u0E48\u0E32\u0E22\u0E1A\u0E33\u0E19\u0E32\u0E0D", onPrint: handlePrintTable, onShare: (pl) => handleShareLine("PENSIONCARE888", pl) });
                 })()));
             default: return null;
         }
@@ -2174,6 +2384,7 @@ function App() {
         setTaxsaver105SI(0);
         setBlasave168SI(0);
         setPension888SI(0);
+        setCustomerName("");
         setPension888Mode("premium");
         setPension888PremiumInput(0);
         setPension888TargetPension(0);
@@ -3918,6 +4129,7 @@ function App() {
             React.createElement("header", { style: { background: `linear-gradient(120deg, ${BRAND.navy}, ${BRAND.navyDeep})` }, className: "text-white" },
                 React.createElement("div", { className: "max-w-5xl mx-auto px-5 py-4 flex items-center gap-4 relative" },
                     React.createElement("span", { className: "absolute top-2 right-2 text-[14px] px-2 py-0.5 rounded-full", style: { background: "rgba(255,255,255,0.15)", color: "#BFE3F5" } }, APP_VERSION),
+                    React.createElement("button", { onClick: () => { setAgentDraft(Object.assign({}, agentInfo)); setShareModal({ id: null }); }, className: "absolute bottom-2 right-2 text-[15px] px-2.5 py-1 rounded-full", style: { background: "rgba(255,255,255,0.15)", color: "#FFFFFF" } }, "⚙️ ข้อมูลตัวแทน"),
                     React.createElement("div", { style: { background: "#fff" }, className: "w-24 h-24 sm:w-28 sm:h-28 rounded-3xl flex items-center justify-center shrink-0 overflow-hidden shadow-lg" },
                         React.createElement("img", { src: LOGO_DATA_URI, alt: "\u0E04\u0E33\u0E19\u0E27\u0E13\u0E40\u0E1A\u0E35\u0E49\u0E22\u0E2D\u0E22\u0E48\u0E32\u0E07\u0E07\u0E48\u0E32\u0E22", className: "w-full h-full object-cover" })),
                     React.createElement("div", null,
@@ -4133,6 +4345,26 @@ function App() {
                     React.createElement("button", { onClick: () => setPensionYearModal(null), className: "w-full mt-4 rounded-xl py-3 text-[24px] font-medium text-white flex items-center justify-center gap-1", style: { background: BRAND.navy } },
                         React.createElement("span", { style: { fontSize: 18 } }, "✕"),
                         " \u0E1B\u0E34\u0E14")))),
+            shareModal && (React.createElement("div", { className: "fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4", style: { background: "rgba(8,30,62,0.55)" }, onClick: () => setShareModal(null) },
+                React.createElement("div", { className: "w-full max-w-md rounded-2xl p-5 max-h-[90vh] overflow-y-auto", style: { background: BRAND.card }, onClick: (e) => e.stopPropagation() },
+                    React.createElement("h3", { className: "text-[24px] font-semibold mb-3", style: { color: BRAND.navy } }, !shareModal.id ? "⚙️ ข้อมูลตัวแทน" : shareModal.mode === "text" ? "💬 ส่งข้อความ LINE" : "🖼️ ส่งรูป LINE"),
+                    shareModal.id && (React.createElement("label", { className: "block mb-3" },
+                        React.createElement("span", { className: "text-[19px]", style: { color: BRAND.sub } }, "ชื่อลูกค้า (ไม่บังคับ)"),
+                        React.createElement("input", { value: customerName, onChange: (e) => setCustomerName(e.target.value), placeholder: "เช่น สมชาย", className: "w-full mt-1 rounded-xl px-3 py-2.5 text-[21px]", style: { border: "1px solid #D7E8F0" } }))),
+                    agentDraft ? (React.createElement("div", { className: "rounded-xl p-3 mb-3", style: { background: BRAND.bg } },
+                        [["name", "ชื่อตัวแทน"], ["phone", "เบอร์โทร"], ["lineId", "LINE ID"]].map(([k, l]) => (React.createElement("label", { key: k, className: "block mb-2" },
+                            React.createElement("span", { className: "text-[18px]", style: { color: BRAND.sub } }, l),
+                            React.createElement("input", { value: agentDraft[k] || "", onChange: (e) => setAgentDraft(Object.assign({}, agentDraft, { [k]: e.target.value })), className: "w-full mt-1 rounded-xl px-3 py-2 text-[20px] bg-white", style: { border: "1px solid #D7E8F0" } })))),
+                        React.createElement("button", { onClick: () => { saveAgent(agentDraft); if (!shareModal.id) setShareModal(null); }, className: "w-full rounded-xl py-2.5 text-[21px] font-medium text-white", style: { background: BRAND.navy } }, "💾 บันทึกข้อมูลตัวแทน"))) : (React.createElement("div", { className: "rounded-xl p-3 mb-3", style: { background: agentInfo.confirmed ? BRAND.bg : "#FFF6E0", border: agentInfo.confirmed ? "none" : "1px solid #F0C36D" } },
+                        !agentInfo.confirmed && (React.createElement("p", { className: "text-[19px] font-semibold mb-1", style: { color: BRAND.warn } }, "กรุณาตรวจสอบข้อมูลตัวแทนก่อนส่งครั้งแรก")),
+                        React.createElement("p", { className: "text-[20px]", style: { color: BRAND.ink } }, agentInfo.name || "-"),
+                        React.createElement("p", { className: "text-[19px]", style: { color: BRAND.sub } }, "📞 ", agentInfo.phone || "-", " · LINE: ", agentInfo.lineId || "-"),
+                        React.createElement("div", { className: "flex gap-2 mt-2" },
+                            !agentInfo.confirmed && (React.createElement("button", { onClick: () => saveAgent(agentInfo), className: "flex-1 rounded-xl py-2 text-[19px] font-medium text-white", style: { background: BRAND.greenDeep } }, "✓ ถูกต้อง")),
+                            React.createElement("button", { onClick: () => setAgentDraft(Object.assign({}, agentInfo)), className: "flex-1 rounded-xl py-2 text-[19px] font-medium", style: { background: "#FFFFFF", color: BRAND.navy, border: "1px solid #D7E8F0" } }, "✎ แก้ไข")))),
+                    shareNote && (React.createElement("p", { className: "text-[19px] mb-3", style: { color: BRAND.greenDeep } }, shareNote)),
+                    shareModal.id && (React.createElement("button", { disabled: !agentInfo.confirmed || !!agentDraft, onClick: doShare, className: "w-full rounded-xl py-3 text-[22px] font-semibold text-white", style: { background: "#06C755", opacity: (!agentInfo.confirmed || agentDraft) ? 0.4 : 1 } }, shareModal.mode === "text" ? "💬 เปิด LINE เพื่อส่งข้อความ" : "🖼️ สร้างรูปและส่ง LINE")),
+                    React.createElement("button", { onClick: () => { setShareModal(null); setAgentDraft(null); }, className: "w-full mt-2 rounded-xl py-2.5 text-[20px] font-medium", style: { background: BRAND.bg, color: BRAND.navy } }, "✕ ปิด")))),
             React.createElement("footer", { className: "text-center text-[21px] py-6", style: { color: BRAND.sub } }, "\u0E40\u0E1E\u0E37\u0E48\u0E2D\u0E01\u0E32\u0E23\u0E19\u0E33\u0E40\u0E2A\u0E19\u0E2D\u0E40\u0E1A\u0E37\u0E49\u0E2D\u0E07\u0E15\u0E49\u0E19\u0E40\u0E17\u0E48\u0E32\u0E19\u0E31\u0E49\u0E19 \u0E44\u0E21\u0E48\u0E43\u0E0A\u0E48\u0E40\u0E2D\u0E01\u0E2A\u0E32\u0E23\u0E40\u0E2A\u0E19\u0E2D\u0E02\u0E32\u0E22\u0E2D\u0E22\u0E48\u0E32\u0E07\u0E40\u0E1B\u0E47\u0E19\u0E17\u0E32\u0E07\u0E01\u0E32\u0E23")),
         React.createElement("style", null, `
         .print-only-container { display: none; }
@@ -4260,7 +4492,7 @@ function PlanRow({ label, children }) {
 // การ์ดกะทัดรัดในภาพรวม 4 คอลัมน์ — โชว์แค่ชื่อ+เครื่องหมายถูก แตะเพื่อเลือก/เปิดพื้นที่กรอกข้อมูลด้านล่าง
 // ตารางกระแสเงินคืนรายปี (การันตี) + ความคุ้มครองตลอดสัญญา สำหรับแบบสะสมทรัพย์ — แสดงเต็มพื้นที่ในหน้าเดียวกัน ไม่ใช่ป็อปอัพ
 // ตารางการจ่ายบำนาญรายปี — ไฮไลต์อายุจุดคุ้มทุน กดแถวเพื่อดู IRR ณ อายุนั้นในป็อปอัพ
-function PensionScheduleTable({ rows, breakEvenAge, onRowClick, title, onPrint }) {
+function PensionScheduleTable({ rows, breakEvenAge, onRowClick, title, onPrint, onShare }) {
     const [fitLevel, setFitLevel] = useState(0);
     if (!rows || rows.length === 0)
         return null;
@@ -4273,6 +4505,8 @@ function PensionScheduleTable({ rows, breakEvenAge, onRowClick, title, onPrint }
                 fit.label,
                 ")"),
             onPrint && (React.createElement("button", { onClick: () => onPrint({ type: "pension", title, rows, breakEvenAge }), className: "text-[17px] font-medium px-3 py-1.5 rounded-full", style: { background: BRAND.bg, color: BRAND.navy, border: "1px solid #D7E8F0" } }, "\uD83D\uDDA8\uFE0F \u0E1E\u0E34\u0E21\u0E1E\u0E4C / \u0E1A\u0E31\u0E19\u0E17\u0E36\u0E01\u0E40\u0E1B\u0E47\u0E19 PDF"))),
+            onShare && (React.createElement("button", { onClick: () => onShare(Object.assign({ mode: "text" }, { type: "pension", title, rows, breakEvenAge })), className: "text-[17px] font-medium px-3 py-1.5 rounded-full text-white", style: { background: "#06C755" } }, "💬 ส่งข้อความ LINE")),
+            onShare && (React.createElement("button", { onClick: () => onShare(Object.assign({ mode: "image" }, { type: "pension", title, rows, breakEvenAge })), className: "text-[17px] font-medium px-3 py-1.5 rounded-full text-white", style: { background: "#06C755" } }, "🖼️ ส่งรูป LINE")),
         React.createElement("div", { className: "rounded-xl border overflow-x-auto", style: { borderColor: "#D7E8F0" } },
             React.createElement("table", { className: "w-full", style: { minWidth: 680 } },
                 React.createElement("thead", { style: { background: BRAND.bg } },
@@ -4303,7 +4537,7 @@ const TABLE_FIT_LEVELS = [
     { label: "85%", fontSize: 15, pad: "5px 6px" },
     { label: "70%", fontSize: 12, pad: "3px 4px" },
 ];
-function SavingsScheduleTable({ rows, irr, title, onPrint }) {
+function SavingsScheduleTable({ rows, irr, title, onPrint, onShare }) {
     const [fitLevel, setFitLevel] = useState(0);
     if (!rows || rows.length === 0)
         return null;
@@ -4319,6 +4553,8 @@ function SavingsScheduleTable({ rows, irr, title, onPrint }) {
                 fit.label,
                 ")"),
             onPrint && (React.createElement("button", { onClick: () => onPrint({ type: "savings", title, rows, totalPremium, totalCash, diff, irr }), className: "text-[17px] font-medium px-3 py-1.5 rounded-full", style: { background: BRAND.bg, color: BRAND.navy, border: "1px solid #D7E8F0" } }, "\uD83D\uDDA8\uFE0F พิมพ์ / บันทึกเป็น PDF"))),
+            onShare && (React.createElement("button", { onClick: () => onShare(Object.assign({ mode: "text" }, { type: "savings", title, rows, totalPremium, totalCash, diff, irr })), className: "text-[17px] font-medium px-3 py-1.5 rounded-full text-white", style: { background: "#06C755" } }, "💬 ส่งข้อความ LINE")),
+            onShare && (React.createElement("button", { onClick: () => onShare(Object.assign({ mode: "image" }, { type: "savings", title, rows, totalPremium, totalCash, diff, irr })), className: "text-[17px] font-medium px-3 py-1.5 rounded-full text-white", style: { background: "#06C755" } }, "🖼️ ส่งรูป LINE")),
         React.createElement("div", { className: "rounded-xl border overflow-x-auto", style: { borderColor: "#D7E8F0" } },
             React.createElement("table", { className: "w-full", style: { minWidth: 560, tableLayout: "fixed" } },
                 React.createElement("colgroup", null, ["10%", "20%", "10%", "20%", "20%", "20%"].map((w, i) => React.createElement("col", { key: i, style: { width: w } }))),
