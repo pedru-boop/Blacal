@@ -8,7 +8,7 @@ const BRAND = {
     ink: "#000000", sub: "#404040", danger: "#B93232", warn: "#6B4508",
     label: "#000000", nameBlue: "#1668D6", mainBlue: "#0C2F63", dataBlack: "#000000",
 };
-const APP_VERSION = "v2.20.0 (2569-10-03)"; // อัปเดตเลขนี้ทุกครั้งที่มีการแก้ไข/เพิ่มแบบประกันใหม่ เพื่อให้รู้ว่าไฟล์ที่ใช้อยู่เป็นเวอร์ชันล่าสุดหรือไม่
+const APP_VERSION = "v2.21.0 (2569-10-03)"; // อัปเดตเลขนี้ทุกครั้งที่มีการแก้ไข/เพิ่มแบบประกันใหม่ เพื่อให้รู้ว่าไฟล์ที่ใช้อยู่เป็นเวอร์ชันล่าสุดหรือไม่
 const fmt = (n) => (n === null || n === undefined || isNaN(n) ? "0" : Math.round(n).toLocaleString("th-TH"));
 const baht = (n) => (n === null || n === undefined ? "-" : (typeof n === "string" ? n : fmt(n) + " บาท"));
 /* ============================== PERSISTENT STORAGE (works in Claude.ai artifact and standalone browser) ============================== */
@@ -54,7 +54,6 @@ const DEFAULT_AGENT = { name: "ป้าเป็ด CFP®", phone: "096-595-478
 const SHARE_MAIN_NOTE = "⚠️ เอกสารนี้ไม่ใช่ใบเสนอขาย เป็นเพียงการนำเสนอเบื้องต้นเท่านั้น หากลูกค้าสนใจแผนประกันนี้ จะดำเนินการจัดส่งใบเสนอราคาเต็มรูปแบบภายหลัง";
 function shareNotes(items) {
     const notes = [SHARE_MAIN_NOTE];
-    if (items.some((it) => /ปันผล/.test(it.name || ""))) notes.push("• เงินปันผลไม่รับประกัน ขึ้นอยู่กับผลการดำเนินงานของบริษัท");
     if (items.some((it) => /^ปรับ/.test(it.renewalNote || "") && it.renewalNote !== "ปรับตามเบี้ยที่คุ้มครอง")) notes.push("• เบี้ยประกันอาจปรับเปลี่ยนตามช่วงอายุ");
     return notes;
 }
@@ -80,7 +79,7 @@ function shareKeyLines(d) {
         groupRuns(mid).filter((g) => g.v > 0).slice(0, 3).forEach((g) => {
             lines.push(["💰", g.from === g.to ? `เงินคืนปีที่ ${g.from + 1}` : `เงินคืนปีที่ ${g.from + 1}-${g.to + 1}`, `ปีละ ${baht(g.v)}`]);
         });
-        lines.push(["🎁", "ครบสัญญารับ", baht(d.rows[d.rows.length - 1].cashBaht)]);
+        lines.push(["🏁", "ครบสัญญารับ", baht(d.rows[d.rows.length - 1].cashBaht)]);
         lines.push(["💵", "รับรวมตลอดสัญญา (การันตี)", baht(d.totalCash)]);
         lines.push(["📈", "ส่วนต่างเงินรับ − เบี้ย", (d.totalCash - d.totalPremium >= 0 ? "+" : "") + baht(d.totalCash - d.totalPremium)]);
     }
@@ -101,8 +100,10 @@ function buildShareText(d) {
     const out = [];
     if (d.customer) out.push(`เรียน คุณ${d.customer}`, "");
     out.push(`📋 ${d.productName}`);
+    if (d.div) out.push(d.div.badge);
     out.push(`👤 ${d.gender === "female" ? "เพศหญิง" : "เพศชาย"} อายุ ${d.age} ปี`);
     shareKeyLines(d).forEach(([ic, k, v]) => out.push(`${ic} ${k}: ${v}`));
+    if (d.div) { out.push("", `${d.div.badge} — เงื่อนไข`); d.div.lines.forEach((n) => out.push(`• ${n}`)); }
     if (d.customerNotes && d.customerNotes.length) { out.push("", "📌 ข้อควรรู้"); d.customerNotes.forEach((n) => out.push(`• ${n}`)); }
     out.push("", "————————");
     if (d.agent.name) out.push(d.agent.name);
@@ -136,7 +137,7 @@ function imgTextW(ctx, text, size) {
     let m = 0;
     try { m = ctx.measureText(text).width || 0; } catch (e) { }
     let est = 0;
-    for (const ch of String(text)) { const cp = ch.codePointAt(0); est += (cp >= 0x0E31 && cp <= 0x0E3A && cp !== 0x0E32 && cp !== 0x0E33) || (cp >= 0x0E47 && cp <= 0x0E4E) ? 0 : cp > 0xFFFF ? size : size * 0.58; }
+    for (const ch of String(text)) { const cp = ch.codePointAt(0); est += (cp >= 0x0E31 && cp <= 0x0E3A && cp !== 0x0E32 && cp !== 0x0E33) || (cp >= 0x0E47 && cp <= 0x0E4E) ? 0 : cp > 0xFFFF ? size : size * 0.62; }
     return Math.max(m, est);
 }
 function imgWrap(ctx, text, size, maxW) {
@@ -238,8 +239,10 @@ function drawShareImage(d) {
     const P = IMG_P, W = IMG_W;
     const L = makeImgLayout();
     let y = imgHeader(L, "สรุปข้อเสนอแบบประกัน · กรุงเทพประกันชีวิต", d.productName);
+    if (d.div) { y += 18; y += imgBadge(L, P, y, d.div.badge); }
     y = imgCustomer(L, d, y);
     shareKeyLines(d).forEach(([ic, k, v], i) => { y = imgKeyRow(L, y, `${ic} ${k}`, v, i % 2 === 0); });
+    if (d.div) { y += 14; y += imgDividendBox(L, y, d.div); }
     if (d.customerNotes && d.customerNotes.length) {
         y += 14;
         const ns = L.ops.length; let nh = 14;
@@ -278,6 +281,46 @@ function drawShareImage(d) {
     return renderImgLayout(L, y);
 }
 // ===== ใบเสนอทั้งชุด (ทุกแบบที่เลือก + รายละเอียดผลประโยชน์) =====
+// ===== เงินปันผล: ป้ายและเงื่อนไขตามคู่มือตัวแทน V.14 (ไม่แสดงตัวเลขประมาณการ) =====
+const DIV_TAIL = "ไม่รับประกัน ขึ้นอยู่กับผลการดำเนินงานของบริษัทในแต่ละปี · ตัวเลขผลประโยชน์ข้างต้นเป็นส่วนที่รับประกันเท่านั้น ยังไม่รวมเงินปันผล";
+const DIV_SOURCE = "มาจากผลตอบแทนการลงทุนของกลุ่มผลิตภัณฑ์แบบมีส่วนร่วมในเงินปันผล หลังหักต้นทุน โดยบริษัทจัดสรร 80% ให้แก่ผู้เอาประกันภัย";
+const DIVIDEND_TYPES = {
+    annual: { badge: "🎁 มีโอกาสรับเงินปันผลรายปี", lines: [
+        "บริษัทอาจพิจารณาจ่ายเงินปันผลรายปี เริ่มตั้งแต่วันครบรอบปีกรมธรรม์ที่ 2 เป็นต้นไป",
+        "เงินปันผล" + DIV_SOURCE,
+        "แจ้งความประสงค์วิธีรับเงินปันผลได้ตอนสมัคร",
+        DIV_TAIL] },
+    maturity: { badge: "🎁 มีโอกาสรับเงินปันผลเมื่อครบสัญญา", lines: [
+        "บริษัทอาจพิจารณาจ่ายเงินปันผลครั้งเดียว ณ วันครบกำหนดสัญญา — ต้องถือกรมธรรม์จนครบสัญญา",
+        "เงินปันผล" + DIV_SOURCE + " ตลอดระยะเวลาสัญญา",
+        DIV_TAIL] },
+    pension: { badge: "🎁 มีโอกาสรับบำนาญเพิ่มพิเศษ", lines: [
+        "บริษัทอาจพิจารณาเพิ่มเงินบำนาญเพิ่มพิเศษให้ในช่วงรับบำนาญ (จ่ายเพิ่มในรูปเงินบำนาญ)",
+        "คำนวณจากเงินปันผล ณ วันครบรอบปีกรมธรรม์ที่อายุครบ 59 ปี ซึ่ง" + DIV_SOURCE,
+        DIV_TAIL] },
+};
+const DIVIDEND_OF = { HRPDIV: "annual", HRP9901: "annual", HAPPYWL: "annual", HAPPYWL9901: "annual", HAPPYSAVING: "annual", HS2515: "annual",
+    HS147: "maturity", HS168: "maturity", HS1810: "maturity", TAXSAVER105: "maturity", HAPPYPENSION: "pension" };
+const dividendOf = (id) => (DIVIDEND_OF[id] ? DIVIDEND_TYPES[DIVIDEND_OF[id]] : null);
+// วาดป้ายสีทอง (ชิดซ้าย) คืนค่าความสูง
+function imgBadge(L, x, y, text) {
+    const size = 26, padX = 18, h = 46;
+    L.probe.font = `600 ${size}px ${IMG_FONT}`;
+    const w = Math.min(IMG_W - x - IMG_P, imgTextW(L.probe, text, size) + padX * 2);
+    L.rect(x, y, w, h, "#FFE9A8");
+    L.text(x + padX, y + 8, text, size, 600, "#7A4A00");
+    return h;
+}
+// กล่องเงื่อนไขเงินปันผล
+function imgDividendBox(L, y, div) {
+    const P = IMG_P, W = IMG_W;
+    const ns = L.ops.length; let nh = 14;
+    nh += L.para(P + 4, y + nh, div.badge, 27, 700, "#7A4A00", W - P * 2 - 8, 38);
+    div.lines.forEach((n) => { nh += L.para(P + 4, y + nh, `• ${n}`, 23, 500, "#5B4A2A", W - P * 2 - 8, 32); });
+    nh += 12;
+    L.ops.splice(ns, 0, { t: "rect", x: P - 12, y, w: W - P * 2 + 24, h: nh, color: "#FFF6DA" });
+    return nh;
+}
 // ===== ข้อควรรู้สำหรับลูกค้า (ร่างจากคู่มือตัวแทน V.14 / รบข. ในโปรเจกต์ — ป้าเป็ดตรวจแล้ว 2569-10-03) =====
 const CN_HEALTH = [
     "ระยะเวลารอคอย 30 วัน สำหรับการเจ็บป่วยทั่วไป (อุบัติเหตุคุ้มครองทันที)",
@@ -313,7 +356,7 @@ const AGENT_ONLY_RE = /โปรดตรวจสอบ|ก่อนนำเ�
 function customerBenefits(benefits) {
     return (benefits || []).filter((b) => Array.isArray(b) && b.length >= 2)
         .map(([k, v]) => [String(k), typeof v === "string" || typeof v === "number" ? String(v) : ""])
-        .filter(([k, v]) => v !== "" && !AGENT_ONLY_RE.test(k) && !AGENT_ONLY_RE.test(v) && !UNDERWRITING_RE.test(k));
+        .filter(([k, v]) => v !== "" && !AGENT_ONLY_RE.test(k) && !AGENT_ONLY_RE.test(v) && !UNDERWRITING_RE.test(k) && k !== "เงินปันผล");
 }
 function buildQuoteText(q) {
     const out = [];
@@ -322,8 +365,10 @@ function buildQuoteText(q) {
     out.push(`👤 ${q.gender === "female" ? "เพศหญิง" : "เพศชาย"} อายุ ${q.age} ปี · ชำระ${q.payLabel}`);
     q.cards.forEach((c, i) => {
         out.push("", `━━ ${i + 1}) ${c.name} ━━`);
+        if (c.div) out.push(c.div.badge);
         out.push(`💳 เบี้ย ${baht(c.pay)}${c.single ? " (ชำระครั้งเดียว)" : ` (${q.payLabel})`}${c.renewalNote ? " · " + c.renewalNote : ""}`);
         c.benefits.forEach(([k, v]) => out.push(`• ${k}: ${v}`));
+        if (c.div) { out.push(`${c.div.badge} — เงื่อนไข`); c.div.lines.forEach((n) => out.push(`  - ${n}`)); }
         if (c.notes && c.notes.length) { out.push("📌 ข้อควรรู้"); c.notes.forEach((n) => out.push(`  - ${n}`)); }
     });
     out.push("", `💰 รวมเบี้ย (${q.payLabel}): ${baht(q.totalPay)}`);
@@ -347,10 +392,12 @@ function drawQuoteImage(q) {
         const start = L.ops.length;
         let h = 18;
         h += L.para(P + 8, y + h, `${i + 1}) ${c.name}`, 34, 600, BRAND.nameBlue, W - P * 2 - 16, 46) + 4;
+        if (c.div) h += imgBadge(L, P + 8, y + h, c.div.badge) + 8;
         h += L.para(P + 8, y + h, `เบี้ย ${baht(c.pay)}${c.single ? " (ชำระครั้งเดียว)" : ` (${q.payLabel})`}${c.renewalNote ? " · " + c.renewalNote : ""}`, 30, 600, BRAND.ink, W - P * 2 - 16, 42) + 18;
         L.ops.splice(start, 0, { t: "rect", x: P - 12, y, w: W - P * 2 + 24, h, color: "#E6F2F8" }, { t: "rect", x: P - 12, y, w: 8, h, color: BRAND.skyDeep });
         y += h;
         c.benefits.forEach(([k, v], j) => { y = imgKeyRow(L, y, k, v, j % 2 === 1); });
+        if (c.div) y += imgDividendBox(L, y, c.div);
         if (c.notes && c.notes.length) {
             const ns = L.ops.length; let nh = 14;
             nh += L.para(P + 4, y + nh, "📌 ข้อควรรู้", 26, 600, BRAND.warn, W - P * 2 - 8, 36);
@@ -1671,7 +1718,7 @@ function App() {
             totalPremium: premiumRows.reduce((t, r) => t + r.premium, 0),
             totalCash: rows.reduce((t, r) => t + (r.cashBaht || 0), 0), ciPerYear, agent: agentInfo,
             notes: shareNotes([{ name: prod ? prod.name : "", renewalNote: prod ? prod.renewalNote : "" }]),
-            customerNotes: CUSTOMER_NOTES[id] || [],
+            customerNotes: CUSTOMER_NOTES[id] || [], div: dividendOf(id),
         };
     }
     function handleShareLine(id, pl) {
@@ -1683,7 +1730,7 @@ function App() {
         if (!result) return null;
         const cards = result.cards.map((c) => {
             const f = c.factor !== undefined ? c.factor : result.factor;
-            return { name: c.name, pay: c.premium * f, single: c.single, renewalNote: c.renewalNote, benefits: customerBenefits(c.benefits), notes: CUSTOMER_NOTES[c.id] || [] };
+            return { name: c.name, pay: c.premium * f, single: c.single, renewalNote: c.renewalNote, benefits: customerBenefits(c.benefits), notes: CUSTOMER_NOTES[c.id] || [], div: dividendOf(c.id) };
         });
         return { cards, payLabel: result.payLabel, totalPay: result.totalPay, totalYear: result.totalYear, singleNote: result.singleNote,
             customer: customerName.trim(), gender, age, agent: agentInfo, notes: shareNotes(cards) };
@@ -4463,7 +4510,7 @@ function App() {
                     compareOpen && (React.createElement("div", { className: "mt-2" },
                         React.createElement(PlanRow, { label: "\u0E17\u0E38\u0E19\u0E1B\u0E23\u0E30\u0E01\u0E31\u0E19\u0E17\u0E35\u0E48\u0E43\u0E0A\u0E49\u0E40\u0E1B\u0E23\u0E35\u0E22\u0E1A\u0E40\u0E17\u0E35\u0E22\u0E1A (\u0E1A\u0E32\u0E17)" },
                             React.createElement(NumInput, { value: compareSI, onChange: setCompareSI, min: 0, step: 100000 })),
-                        React.createElement("p", { className: "text-[16px] mb-2 px-1", style: { color: BRAND.sub } }, "\u0E43\u0E0A\u0E49\u0E2D\u0E32\u0E22\u0E38/\u0E40\u0E1E\u0E28\u0E1B\u0E31\u0E08\u0E08\u0E38\u0E1A\u0E31\u0E19\u0E02\u0E2D\u0E07\u0E25\u0E39\u0E01\u0E04\u0E49\u0E32\u0E17\u0E35\u0E48\u0E01\u0E23\u0E2D\u0E01\u0E44\u0E27\u0E49\u0E14\u0E49\u0E32\u0E19\u0E1A\u0E19 \u00B7 \u0E41\u0E2E\u0E1B\u0E1B\u0E35\u0E49\u0E40\u0E0B\u0E1F\u0E27\u0E34\u0E48\u0E07\u0E43\u0E0A\u0E49\u0E40\u0E1A\u0E35\u0E49\u0E22 5 \u0E1B\u0E35 (\u0E2A\u0E31\u0E49\u0E19\u0E2A\u0E38\u0E14) \u0E40\u0E1B\u0E47\u0E19\u0E04\u0E48\u0E32\u0E40\u0E23\u0E34\u0E48\u0E21\u0E15\u0E49\u0E19 \u00B7 \u0E40\u0E23\u0E35\u0E22\u0E07\u0E08\u0E32\u0E01 IRR \u0E2A\u0E39\u0E07\u0E44\u0E1B\u0E15\u0E48\u0E33"),
+                        React.createElement("p", { className: "text-[16px] mb-2 px-1", style: { color: BRAND.sub } }, "\u0E43\u0E0A\u0E49\u0E2D\u0E32\u0E22\u0E38/\u0E40\u0E1E\u0E28\u0E1B\u0E31\u0E08\u0E08\u0E38\u0E1A\u0E31\u0E19\u0E02\u0E2D\u0E07\u0E25\u0E39\u0E01\u0E04\u0E49\u0E32\u0E17\u0E35\u0E48\u0E01\u0E23\u0E2D\u0E01\u0E44\u0E27\u0E49\u0E14\u0E49\u0E32\u0E19\u0E1A\u0E19 \u00B7 \u0E41\u0E2E\u0E1B\u0E1B\u0E35\u0E49\u0E40\u0E0B\u0E1F\u0E27\u0E34\u0E48\u0E07\u0E43\u0E0A\u0E49\u0E40\u0E1A\u0E35\u0E49\u0E22 5 \u0E1B\u0E35 (\u0E2A\u0E31\u0E49\u0E19\u0E2A\u0E38\u0E14) \u0E40\u0E1B\u0E47\u0E19\u0E04\u0E48\u0E32\u0E40\u0E23\u0E34\u0E48\u0E21\u0E15\u0E49\u0E19 \u00B7 \u0E40\u0E23\u0E35\u0E22\u0E07\u0E08\u0E32\u0E01 IRR \u0E2A\u0E39\u0E07\u0E44\u0E1B\u0E15\u0E48\u0E33", " · 🎁 = แบบมีเงินปันผล — IRR คิดเฉพาะผลประโยชน์ที่รับประกัน ไม่รวมเงินปันผล"),
                         React.createElement("div", { className: "rounded-xl border overflow-x-auto", style: { borderColor: "#D7E8F0" } },
                             React.createElement("table", { className: "w-full text-[18px]", style: { minWidth: 560 } },
                                 React.createElement("thead", { style: { background: BRAND.bg } },
@@ -4478,7 +4525,7 @@ function App() {
                                     return cmp.length === 0 ? (React.createElement("tr", null,
                                         React.createElement("td", { colSpan: 5, className: "text-center px-2 py-4", style: { color: BRAND.sub } }, "\u0E44\u0E21\u0E48\u0E21\u0E35\u0E41\u0E1A\u0E1A\u0E43\u0E14\u0E23\u0E2D\u0E07\u0E23\u0E31\u0E1A\u0E17\u0E38\u0E19\u0E1B\u0E23\u0E30\u0E01\u0E31\u0E19/\u0E2D\u0E32\u0E22\u0E38\u0E19\u0E35\u0E49"))) : cmp.map((r, i) => (React.createElement("tr", { key: r.id, style: { borderTop: "1px solid #EEF3F7", background: i === 0 ? "#F3FBEF" : "transparent" } },
                                         React.createElement("td", { className: "px-2 py-2", style: { color: BRAND.dataBlack } }, i + 1),
-                                        React.createElement("td", { className: "px-2 py-2", style: { color: BRAND.dataBlack } }, r.name),
+                                        React.createElement("td", { className: "px-2 py-2", style: { color: BRAND.dataBlack } }, /ปันผล/.test(r.name) ? "🎁 " : "", r.name),
                                         React.createElement("td", { className: "text-right px-2 py-2", style: { color: BRAND.dataBlack } }, fmt(r.premium)),
                                         React.createElement("td", { className: "text-center px-2 py-2", style: { color: BRAND.dataBlack } },
                                             r.payYears,
@@ -4960,6 +5007,7 @@ function CompactChip({ product, checked, picked, disabled, recommended, tag, onC
             React.createElement("button", { onClick: () => !disabled && onNameClick(), disabled: disabled, className: "text-left flex-1 min-w-0", style: { cursor: disabled ? "not-allowed" : "pointer" } },
                 React.createElement("span", { className: "text-[14px] font-semibold leading-tight block", style: { color: disabled ? BRAND.sub : BRAND.nameBlue, wordBreak: "break-word" } },
                     recommended && !checked && !picked ? "⭐ " : "",
+                    product.name.includes("ปันผล") ? "🎁 " : "",
                     product.name),
                 tag && (React.createElement("span", { className: "text-[12px] font-medium leading-tight block mt-0.5", style: { color: BRAND.warn } }, tag))))));
 }
@@ -5531,7 +5579,7 @@ function imgTextW(ctx, text, size) {
   let est = 0;
   for (const ch of String(text)) {
     const cp = ch.codePointAt(0);
-    est += isThaiMark(cp) ? 0 : cp > 65535 ? size : size * 0.58;
+    est += isThaiMark(cp) ? 0 : cp > 65535 ? size : size * 0.62;
   }
   return Math.max(m, est);
 }
