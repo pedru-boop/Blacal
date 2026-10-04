@@ -8,7 +8,9 @@ const BRAND = {
     ink: "#000000", sub: "#404040", danger: "#B93232", warn: "#6B4508",
     label: "#000000", nameBlue: "#1668D6", mainBlue: "#0C2F63", dataBlack: "#000000",
 };
-const APP_VERSION = "v2.23.0 (2569-10-04)"; // อัปเดตเลขนี้ทุกครั้งที่มีการแก้ไข/เพิ่มแบบประกันใหม่ เพื่อให้รู้ว่าไฟล์ที่ใช้อยู่เป็นเวอร์ชันล่าสุดหรือไม่
+const APP_VERSION = "v2.26.0 (2569-10-04)";
+const RATE_SOURCE = "อัตราเบี้ยตามคู่มือตัวแทน V.14 (14-02-2026) · ค่าคอม 10-09-2026";
+const CASES_KEY = "blacal-cases-v1"; // อัปเดตเลขนี้ทุกครั้งที่มีการแก้ไข/เพิ่มแบบประกันใหม่ เพื่อให้รู้ว่าไฟล์ที่ใช้อยู่เป็นเวอร์ชันล่าสุดหรือไม่
 const fmt = (n) => (n === null || n === undefined || isNaN(n) ? "0" : Math.round(n).toLocaleString("th-TH"));
 const baht = (n) => (n === null || n === undefined ? "-" : (typeof n === "string" ? n : fmt(n) + " บาท"));
 /* ============================== PERSISTENT STORAGE (works in Claude.ai artifact and standalone browser) ============================== */
@@ -67,33 +69,101 @@ function groupRuns(values) {
     });
     return out;
 }
-// สรุปตัวเลขสำคัญเป็นรายการ [ไอคอน, หัวข้อ, ค่า] ใช้ร่วมกันทั้งข้อความและรูป
+// อธิบายเงินคืนระหว่างสัญญาให้ครบทุกก้อน: กี่ % ของทุน, กี่บาท, ทุกกี่ปี, ปีกรมธรรม์ที่เท่าไรถึงเท่าไร (อายุ), รวมกี่ครั้ง
+// items = [{ pct, age }] ของปีกรมธรรม์ที่ 1..(ปีก่อนครบกำหนด) — age = อายุครบ ณ วันที่ได้รับเงินคืน (วันครบรอบปีกรมธรรม์)
+// 1) ชั้นฐาน "ทุกปี" (ค่าที่พบบ่อยสุดและทุกปีในช่วงนั้นได้ไม่น้อยกว่าค่านี้) 2) ส่วนที่เหลือจัดเป็นกลุ่ม "ทุก N ปี"
+function cashBackLines(items, si) {
+    const r4 = (x) => Math.round(x * 10000) / 10000;
+    const rem = items.map((it) => r4(it.pct || 0));
+    const n = rem.length, groups = [];
+    const pctTxt = (v) => String(r4(v));
+    for (let layer = 0; layer < 3; layer++) {
+        const cnt = {};
+        rem.forEach((v) => { if (v > 0) cnt[v] = (cnt[v] || 0) + 1; });
+        const keys = Object.keys(cnt).map(Number);
+        if (!keys.length) break;
+        const v = keys.sort((a, b) => cnt[b] - cnt[a] || a - b)[0];
+        const f = rem.findIndex((x) => x === v);
+        let l = rem.lastIndexOf(v);
+        while (l + 1 < n && rem[l + 1] >= v) l++;
+        if (l - f < 1 || rem.slice(f, l + 1).some((x) => x < v)) break;
+        for (let i = f; i <= l; i++) rem[i] = r4(rem[i] - v);
+        groups.push({ v, idx: Array.from({ length: l - f + 1 }, (_, k) => f + k), step: 1 });
+    }
+    const byVal = {};
+    rem.forEach((v, i) => { if (v > 0) (byVal[v] = byVal[v] || []).push(i); });
+    Object.keys(byVal).forEach((k) => {
+        const pos = byVal[k].slice();
+        while (pos.length) {
+            const a = pos.shift();
+            if (!pos.length) { groups.push({ v: Number(k), idx: [a], step: 0 }); break; }
+            const step = pos[0] - a, idx = [a];
+            while (pos.length && pos[0] - idx[idx.length - 1] === step) idx.push(pos.shift());
+            groups.push({ v: Number(k), idx, step });
+        }
+    });
+    groups.sort((x, y) => x.idx[0] - y.idx[0] || x.step - y.step);
+    return groups.map((g) => {
+        const a = g.idx[0], b = g.idx[g.idx.length - 1];
+        const amt = baht(Math.round(si * g.v / 100));
+        const yrs = a === b ? `ปีกรมธรรม์ที่ ${a + 1} (อายุครบ ${items[a].age} ปี)` : `ปีกรมธรรม์ที่ ${a + 1}-${b + 1} (อายุครบ ${items[a].age}-${items[b].age} ปี)`;
+        if (g.idx.length === 1)
+            return [`เงินคืน ${pctTxt(g.v)}% ของทุน`, `${amt} ครั้งเดียว ${yrs}`];
+        const every = g.step === 1 ? "ทุกปี" : `ทุก ${g.step} ปี`;
+        return [`เงินคืน ${pctTxt(g.v)}% ของทุน ${every}`, `${amt}/ครั้ง ${yrs} · รวม ${g.idx.length} ครั้ง = ${baht(Math.round(si * g.v / 100) * g.idx.length)}`];
+    });
+}
+// 4 คำถามที่ลูกค้าอยากรู้ + เรื่องที่ควรรู้ก่อนตัดสินใจ
+const SEC = { pay: "💳 จ่ายเท่าไร นานแค่ไหน", get: "💰 ได้อะไรคืน เมื่อไร", protect: "🛡️ ถ้าเสียชีวิต / เจ็บป่วย / อุบัติเหตุ ได้เท่าไร", until: "⏳ คุ้มครองถึงเมื่อไร", know: "📌 ควรรู้ก่อนตัดสินใจ" };
+function benefitSection(k) {
+    if (/^คุ้มครองถึง/.test(k)) return "until";
+    if (/เสียชีวิต|ทุพพลภาพ/.test(k)) return "protect";
+    if (/ลดหย่อนภาษี|เวนคืน|^หมายเหตุ|^เงื่อนไข/.test(k)) return "know";
+    if (/^ทุนประกัน|ระยะเวลาชำระ|ส่วนลด|งวดชำระ|^แผน|^แบบที่เลือก|^ทุน /.test(k)) return "pay";
+    if (/เงินคืน|ครบกำหนด|ครบสัญญา|บำนาญ|มีชีวิตอยู่|ผลประโยชน์รวม|ปันผล/.test(k)) return "get";
+    return "protect";
+}
+// เรียงบรรทัดผลประโยชน์ตาม 4 คำถาม และแทรกแถวหัวข้อ ["§", ชื่อหัวข้อ] (ถ้ามีมากกว่า 1 หมวด)
+function groupBenefits(rows) {
+    const order = ["pay", "get", "protect", "until", "know"], by = {};
+    rows.forEach((r) => { const k = benefitSection(r[0]); (by[k] = by[k] || []).push(r); });
+    const present = order.filter((k) => by[k]);
+    if (present.length <= 1) return rows;
+    const out = [];
+    present.forEach((k) => { out.push(["§", SEC[k]]); out.push(...by[k]); });
+    return out;
+}
+// สรุปตัวเลขสำคัญเป็นรายการ [ไอคอน, หัวข้อ, ค่า] ใช้ร่วมกันทั้งข้อความและรูป — ["§", "", ชื่อหัวข้อ] = แถบหัวข้อ
 function shareKeyLines(d) {
+    if (d.keyLines) return d.keyLines;
     const lines = [];
+    const sec = (t) => lines.push(["§", "", t]);
+    sec(SEC.pay);
     lines.push(["🛡️", "ทุนประกัน", baht(d.si)]);
     lines.push(["💳", "เบี้ยประกัน", `${fmt(d.premium)} บาท/ปี · ชำระ ${d.payYears} ปี`]);
     lines.push(["🧾", "รวมเบี้ยทั้งหมด", baht(d.totalPremium)]);
+    sec(SEC.get);
     if (d.type === "savings") {
-        lines.push(["⏳", "ระยะคุ้มครอง", `${d.rows.length} ปี`]);
-        const mid = d.rows.slice(0, -1).map((r) => r.cashBaht);
-        groupRuns(mid).filter((g) => g.v > 0).slice(0, 3).forEach((g) => {
-            lines.push(["💰", g.from === g.to ? `เงินคืนปีที่ ${g.from + 1}` : `เงินคืนปีที่ ${g.from + 1}-${g.to + 1}`, `ปีละ ${baht(g.v)}`]);
-        });
-        lines.push(["🏁", "ครบสัญญารับ", baht(d.rows[d.rows.length - 1].cashBaht)]);
+        cashBackLines(d.rows.slice(0, -1).map((r) => ({ pct: r.cashPct, age: r.age + 1 })), d.si).forEach(([k, v]) => lines.push(["💰", k, v]));
+        const last = d.rows[d.rows.length - 1];
+        lines.push(["🏁", `ครบสัญญา ปีกรมธรรม์ที่ ${d.rows.length} (อายุครบ ${last.age + 1} ปี)`, `${baht(last.cashBaht)} (${last.cashPct}% ของทุน)`]);
         lines.push(["💵", "รับรวมตลอดสัญญา (การันตี)", baht(d.totalCash)]);
         lines.push(["📈", "ส่วนต่างเงินรับ − เบี้ย", (d.totalCash - d.totalPremium >= 0 ? "+" : "") + baht(d.totalCash - d.totalPremium)]);
     }
     else {
         const pr = d.rows.filter((r) => r.pension > 0);
-        const runs = groupRuns(pr.map((r) => r.pension));
-        runs.slice(0, 3).forEach((g) => {
+        groupRuns(pr.map((r) => r.pension)).forEach((g) => {
             const a1 = pr[g.from].age, a2 = pr[g.to].age;
-            lines.push(["🏖️", a1 === a2 ? `บำนาญ อายุ ${a1} ปี` : `บำนาญ อายุ ${a1}-${a2} ปี`, a1 === a2 ? baht(g.v) : `ปีละ ${baht(g.v)}`]);
+            lines.push(["🏖️", a1 === a2 ? `บำนาญ อายุ ${a1} ปี` : `บำนาญ อายุ ${a1}-${a2} ปี`, a1 === a2 ? baht(g.v) : `ปีละ ${baht(g.v)} (${g.to - g.from + 1} ปี)`]);
         });
         lines.push(["💰", "รวมบำนาญตลอดสัญญา", baht(pr.reduce((t, r) => t + r.pension, 0))]);
         if (d.breakEvenAge) lines.push(["✅", "จุดคุ้มทุน", `อายุ ${d.breakEvenAge} ปี`]);
     }
-    if (d.ciPerYear > 0) lines.push(["🎗️", "แถมฟรี 8 โรคร้ายแรง", `${baht(d.ciPerYear)}/ปี`]);
+    const prot = (d.protectLines || []).slice();
+    if (d.ciPerYear > 0 && !prot.some(([k]) => /โรคร้ายแรง/.test(k))) prot.push(["แถมฟรี 8 โรคร้ายแรง", `${baht(d.ciPerYear)}/ปี`]);
+    if (prot.length) { sec(SEC.protect); prot.forEach(([k, v]) => lines.push(["•", k, v])); }
+    if (d.coverUntil) { sec(SEC.until); lines.push(["⏳", "คุ้มครองถึง", d.coverUntil]); }
+    if (d.knowLines && d.knowLines.length) { sec(SEC.know); d.knowLines.forEach(([k, v]) => lines.push(["•", k, v])); }
     return lines;
 }
 function buildShareText(d) {
@@ -102,7 +172,7 @@ function buildShareText(d) {
     out.push(`📋 ${d.productName}`);
     if (d.div) out.push(d.div.badge);
     out.push(`👤 ${d.gender === "female" ? "เพศหญิง" : "เพศชาย"} อายุ ${d.age} ปี`);
-    shareKeyLines(d).forEach(([ic, k, v]) => out.push(`${ic} ${k}: ${v}`));
+    shareKeyLines(d).forEach(([ic, k, v]) => out.push(ic === "§" ? `\n${v}` : `${ic ? ic + " " : ""}${k}: ${v}`));
     if (d.div) { out.push("", `${d.div.badge} — เงื่อนไข`); d.div.lines.forEach((n) => out.push(`• ${n}`)); }
     if (d.customerNotes && d.customerNotes.length) { out.push("", "📌 ข้อควรรู้"); d.customerNotes.forEach((n) => out.push(`• ${n}`)); }
     out.push("", "————————");
@@ -188,7 +258,7 @@ function renderImgLayout(L, H) {
             else g.fillStyle = o.color;
             g.fillRect(o.x, o.y, o.w, o.h);
         }
-        else { g.font = `${o.weight} ${o.size}px ${IMG_FONT}`; g.fillStyle = o.color; g.textAlign = "left"; g.fillText(o.txt, o.x, o.y); }
+        else { g.font = `${o.weight} ${o.size}px ${IMG_FONT}`; g.fillStyle = o.color; g.textAlign = o.align || "left"; g.fillText(o.txt, o.x, o.y); }
     });
     return c;
 }
@@ -235,13 +305,20 @@ function imgFooter(L, d, y) {
     return y + 24;
 }
 // รูปตารางเงินคืน (สะสมทรัพย์) / ตารางบำนาญ
-function drawShareImage(d) {
+// part: "all" = สรุป + ตาราง (รูปเดียว) · "summary" = เฉพาะสรุป · "table" = เฉพาะตาราง (รูปที่ 2)
+function drawShareImage(d, part) {
+    part = part || "all";
     const P = IMG_P, W = IMG_W;
     const L = makeImgLayout();
-    let y = imgHeader(L, "สรุปข้อเสนอแบบประกัน · กรุงเทพประกันชีวิต", d.productName);
+    let y = imgHeader(L, part === "table" ? (d.type === "savings" ? "ตารางเงินคืนตลอดสัญญา (รูปที่ 2)" : "ตารางบำนาญตลอดสัญญา (รูปที่ 2)") : "สรุปข้อเสนอแบบประกัน · กรุงเทพประกันชีวิต", d.productName);
+    if (part !== "table") {
     if (d.div) { y += 18; y += imgBadge(L, P, y, d.div.badge); }
     y = imgCustomer(L, d, y);
-    shareKeyLines(d).forEach(([ic, k, v], i) => { y = imgKeyRow(L, y, `${ic} ${k}`, v, i % 2 === 0); });
+    let shade = 0;
+    shareKeyLines(d).forEach(([ic, k, v]) => {
+        if (ic === "§") { y += imgSection(L, y, v); shade = 0; return; }
+        y = imgKeyRow(L, y, ic ? `${ic} ${k}` : k, v, (shade++) % 2 === 1);
+    });
     if (d.div) { y += 14; y += imgDividendBox(L, y, d.div); }
     if (d.customerNotes && d.customerNotes.length) {
         y += 14;
@@ -252,34 +329,101 @@ function drawShareImage(d) {
         L.ops.splice(ns, 0, { t: "rect", x: P - 12, y, w: W - P * 2 + 24, h: nh, color: "#FFF8E6" });
         y += nh;
     }
+    if (part === "summary") { y += 20; y += L.para(P, y, `📊 ตาราง${d.type === "savings" ? "เงินคืน" : "บำนาญ"}ตลอดสัญญาอยู่ในรูปที่ 2`, 26, 600, BRAND.navy, W - P * 2, 36); }
+    }
+    else y = imgCustomer(L, d, y);
     y += 36;
-    const isSav = d.type === "savings";
-    const cols = isSav ? ["ปีที่", "อายุ", "เบี้ย", "เงินคืน", "คุ้มครอง"] : ["อายุ", "เบี้ย", "บำนาญ", "เบี้ยสะสม", "บำนาญสะสม"];
-    const colW = isSav ? [0.11, 0.11, 0.24, 0.25, 0.29] : [0.11, 0.21, 0.21, 0.23, 0.24];
-    const tx = (i) => P + 8 + colW.slice(0, i).reduce((a, b) => a + b, 0) * (W - P * 2);
-    L.rect(P - 12, y, W - P * 2 + 24, 56, BRAND.navy);
-    cols.forEach((h, i) => L.text(tx(i), y + 13, h, 25, 600, "#FFFFFF"));
-    y += 56;
-    const rowH = 44;
-    d.rows.forEach((r, idx) => {
-        const hi = isSav ? !!r.note : r.age === d.breakEvenAge;
-        L.rect(P - 12, y, W - P * 2 + 24, rowH, hi ? "#FFF6E0" : (idx % 2 ? "#F7FBFD" : "#FFFFFF"));
-        const vals = isSav
-            ? [idx + 1, r.age, r.premium > 0 ? fmt(r.premium) : "-", fmt(r.cashBaht), fmt(r.coverageBaht)]
-            : [r.age, r.premium > 0 ? fmt(r.premium) : "-", r.pension > 0 ? fmt(r.pension) : "-", fmt(r.cumPremium), fmt(r.cumPension)];
-        vals.forEach((v, i) => L.text(tx(i), y + 8, v, 25, 500, (isSav ? i === 3 : i === 2) ? BRAND.greenDeep : BRAND.ink));
-        y += rowH;
-    });
-    if (isSav) {
-        L.rect(P - 12, y, W - P * 2 + 24, 52, BRAND.bg);
-        L.text(tx(0), y + 11, "รวม", 26, 600, BRAND.navy);
-        L.text(tx(2), y + 11, fmt(d.totalPremium), 26, 600, BRAND.navy);
-        L.text(tx(3), y + 11, fmt(d.totalCash), 26, 600, BRAND.greenDeep);
-        y += 52;
+    if (part === "summary") { }
+    else if (d.type === "savings") {
+        // ตารางเดียวกับหน้าจอ (SavingsScheduleTable): อายุ | เบี้ยต่อปี | เงินคืน % | เงินคืน (บาท) | ความคุ้มครอง (บาท) | หมายเหตุ — ไม่แสดง IRR
+        const X0 = P - 12, TW = W - P * 2 + 24;
+        const fr = [0.10, 0.20, 0.10, 0.20, 0.20, 0.20];
+        const colX = (i) => X0 + fr.slice(0, i).reduce((a, b) => a + b, 0) * TW;
+        const colW = (i) => fr[i] * TW;
+        const ctext = (i, yy, txt, size, weight, color) => { L.probe.font = `${weight} ${size}px ${IMG_FONT}`; L.text(colX(i) + Math.max(4, (colW(i) - imgTextW(L.probe, String(txt), size)) / 2), yy, txt, size, weight, color); };
+        const FS = 24, line = (yy, h, color) => L.rect(X0, yy, TW, h, color);
+        const heads = [["อายุ"], ["เบี้ยต่อปี", "(ณ ต้นปีกรมธรรม์)"], ["เงินคืน %"], ["เงินคืน (บาท)", "(ณ สิ้นปีกรมธรรม์)"], ["ความคุ้มครอง (บาท)"], ["หมายเหตุ"]];
+        const headH = 78;
+        L.rect(X0, y, TW, headH, BRAND.bg);
+        heads.forEach(([h, sub], i) => {
+            L.probe.font = `600 ${FS}px ${IMG_FONT}`;
+            const hl = imgWrap(L.probe, h, FS, colW(i) - 10);
+            const total = hl.length * 30 + (sub ? 24 : 0);
+            let yy = y + (headH - total) / 2;
+            hl.forEach((t) => { ctext(i, yy, t, FS, 600, BRAND.navy); yy += 30; });
+            if (sub) ctext(i, yy, sub, 17, 400, BRAND.sub);
+        });
+        y += headH;
+        d.rows.forEach((r) => {
+            L.probe.font = `500 20px ${IMG_FONT}`;
+            const nl = r.note ? imgWrap(L.probe, r.note, 20, colW(5) - 12) : [];
+            const rowH = Math.max(46, nl.length * 26 + 16);
+            line(y, rowH, r.note ? "#FFF9EE" : "#FFFFFF");
+            line(y, 1, "#EEF3F7");
+            const ty = y + (rowH - 30) / 2;
+            ctext(0, ty, r.age, FS, 500, BRAND.dataBlack);
+            ctext(1, ty, r.premium > 0 ? fmt(r.premium) : "-", FS, 500, BRAND.dataBlack);
+            ctext(2, ty, `${r.cashPct}%`, FS, 500, BRAND.dataBlack);
+            ctext(3, ty, fmt(r.cashBaht), FS, 600, BRAND.greenDeep);
+            ctext(4, ty, fmt(r.coverageBaht), FS, 500, BRAND.dataBlack);
+            nl.forEach((t, k) => ctext(5, y + (rowH - nl.length * 26) / 2 + k * 26, t, 20, 500, BRAND.warn));
+            y += rowH;
+        });
+        line(y, 2, BRAND.navy);
+        line(y + 2, 52, BRAND.bg);
+        ctext(0, y + 13, "รวม", FS, 700, BRAND.navy);
+        ctext(1, y + 13, fmt(d.totalPremium), FS, 700, BRAND.navy);
+        ctext(3, y + 13, fmt(d.totalCash), FS, 700, BRAND.greenDeep);
+        y += 54 + 14;
+        const diff = d.totalCash - d.totalPremium;
+        const lbl = "ส่วนต่าง (เงินคืนรวม − เบี้ยรวม): ";
+        L.probe.font = `500 24px ${IMG_FONT}`;
+        L.text(P, y, lbl, 24, 500, BRAND.sub);
+        L.text(P + imgTextW(L.probe, lbl, 24) + 6, y, (diff >= 0 ? "+" : "") + fmt(diff), 24, 700, diff >= 0 ? BRAND.greenDeep : BRAND.danger);
+        y += 40;
+    }
+    else {
+        const isSav = false;
+        const cols = isSav ? ["ปีที่", "อายุ", "เบี้ย", "เงินคืน", "คุ้มครอง"] : ["อายุ", "เบี้ย", "บำนาญ", "เบี้ยสะสม", "บำนาญสะสม"];
+        const colW = isSav ? [0.11, 0.11, 0.24, 0.25, 0.29] : [0.11, 0.21, 0.21, 0.23, 0.24];
+        const tx = (i) => P + 8 + colW.slice(0, i).reduce((a, b) => a + b, 0) * (W - P * 2);
+        L.rect(P - 12, y, W - P * 2 + 24, 56, BRAND.navy);
+        cols.forEach((h, i) => L.text(tx(i), y + 13, h, 25, 600, "#FFFFFF"));
+        y += 56;
+        const rowH = 44;
+        d.rows.forEach((r, idx) => {
+            const hi = isSav ? !!r.note : r.age === d.breakEvenAge;
+            L.rect(P - 12, y, W - P * 2 + 24, rowH, hi ? "#FFF6E0" : (idx % 2 ? "#F7FBFD" : "#FFFFFF"));
+            const vals = isSav
+                ? [idx + 1, r.age, r.premium > 0 ? fmt(r.premium) : "-", fmt(r.cashBaht), fmt(r.coverageBaht)]
+                : [r.age, r.premium > 0 ? fmt(r.premium) : "-", r.pension > 0 ? fmt(r.pension) : "-", fmt(r.cumPremium), fmt(r.cumPension)];
+            vals.forEach((v, i) => L.text(tx(i), y + 8, v, 25, 500, (isSav ? i === 3 : i === 2) ? BRAND.greenDeep : BRAND.ink));
+            y += rowH;
+        });
+        if (isSav) {
+            L.rect(P - 12, y, W - P * 2 + 24, 52, BRAND.bg);
+            L.text(tx(0), y + 11, "รวม", 26, 600, BRAND.navy);
+            L.text(tx(2), y + 11, fmt(d.totalPremium), 26, 600, BRAND.navy);
+            L.text(tx(3), y + 11, fmt(d.totalCash), 26, 600, BRAND.greenDeep);
+            y += 52;
+        }
     }
     y = imgFooter(L, d, y + 10);
     return renderImgLayout(L, y);
 }
+// แถบหัวข้อ (4 คำถามที่ลูกค้าสงสัย) คืนค่าความสูง
+function imgSection(L, y, title) {
+    const P = IMG_P, W = IMG_W;
+    const start = L.ops.length;
+    const h = L.para(P + 8, y + 22, title, 29, 700, BRAND.navy, W - P * 2 - 16, 40) + 30;
+    L.ops.splice(start, 0, { t: "rect", x: P - 12, y: y + 10, w: W - P * 2 + 24, h: h - 10, color: "#DCEEF7" }, { t: "rect", x: P - 12, y: y + 10, w: 8, h: h - 10, color: BRAND.navy });
+    return h;
+}
+// ตารางยาว (เกิน 20 แถว) แยกเป็น 2 รูป: รูปสรุปที่อ่านจบในจอเดียว + รูปตารางเต็ม
+function drawShareImages(d) {
+    return (d.rows || []).length > 20 ? [drawShareImage(d, "summary"), drawShareImage(d, "table")] : [drawShareImage(d, "all")];
+}
+
 // ===== ใบเสนอทั้งชุด (ทุกแบบที่เลือก + รายละเอียดผลประโยชน์) =====
 // ===== เงินปันผล: ป้ายและเงื่อนไขตามคู่มือตัวแทน V.14 (ไม่แสดงตัวเลขประมาณการ) =====
 const DIV_TAIL = "ไม่รับประกัน ขึ้นอยู่กับผลการดำเนินงานของบริษัทในแต่ละปี · ตัวเลขผลประโยชน์ข้างต้นเป็นส่วนที่รับประกันเท่านั้น ยังไม่รวมเงินปันผล";
@@ -334,12 +478,13 @@ const CN_ACC = ["ไม่คุ้มครองขณะมึนเมาห
 const CN_LIFE = ["ลดหย่อนภาษีได้สูงสุด 100,000 บาท", "กู้เงินจากกรมธรรม์ได้สูงสุด 90% ของมูลค่าเวนคืน"];
 const CN_FREE_CI = "8 โรคร้ายแรงที่แถมฟรี มีระยะเวลารอคอย 90 วัน และจ่ายได้ 1 โรคตลอดสัญญา";
 const CN_PENSION = ["ลดหย่อนภาษีแบบประกันบำนาญได้"];
-const CUSTOMER_NOTES = (() => {
+const CUSTOMER_NOTES_RAW = (() => {
     const m = {};
-    ["VH", "VHKIDS", "HHP", "PH"].forEach((id) => { m[id] = CN_HEALTH; });
+    ["VH", "VHKIDS", "HHP", "PH", "HH"].forEach((id) => { m[id] = CN_HEALTH; });
     ["SUPER", "SS", "UNJAI", "CANCERMAX", "PLUS2"].forEach((id) => { m[id] = CN_CI; });
     ["HAPPYCI", "LLC"].forEach((id) => { m[id] = CN_CI.concat(["ลดหย่อนภาษีได้สูงสุด 25,000 บาท"]); });
     ["ACC", "ACC3"].forEach((id) => { m[id] = CN_ACC; });
+    ["ACC1", "ACC2"].forEach((id) => { m[id] = CN_ACC.slice(0, 2); });
     m.RPPR = ["เจ็บป่วยภายใน 30 วันแรกไม่คุ้มครอง (อุบัติเหตุคุ้มครองทันที)", "โรคหรือการบาดเจ็บที่เป็นมาก่อนและยังรักษาไม่หายไม่คุ้มครอง"];
     ["SUD", "LIFE99", "PRESTIGE", "HRP9920", "HAPPYKID", "PSAVE104", "PSAVE126", "HS208", "HS126", "HS157", "BLASAVE168",
         "HAPPYSAVING", "HAPPYWL", "HRPDIV", "HRP9901", "HAPPYWL9901", "HS147", "HS168", "HS1810", "HS2515", "TAXSAVER105", "HS999", "PUNSUK"].forEach((id) => { m[id] = CN_LIFE; });
@@ -349,8 +494,21 @@ const CUSTOMER_NOTES = (() => {
     ["CHAK", "CHAP"].forEach((id) => { m[id] = ["การฆ่าตัวตายภายใน 1 ปี และการปกปิดข้อมูลสุขภาพ ไม่คุ้มครอง"]; });
     return m;
 })();
+// เรื่องลดหย่อนภาษีคำนวณเป็นตัวเลขจริงในบรรทัด "ลดหย่อนภาษี" ของแต่ละแบบแล้ว จึงตัดข้อความกว้างๆ ออก
+const CUSTOMER_NOTES = Object.fromEntries(Object.entries(CUSTOMER_NOTES_RAW).map(([k, v]) => [k, v.filter((n) => !/^ลดหย่อนภาษี/.test(n))]));
 // เงื่อนไขการรับประกัน (เรื่องของตัวแทน) — ไม่ส่งถึงลูกค้า
 const UNDERWRITING_RE = /อายุรับประกัน|ทุนขั้นต่ำ|ทุนสูงสุด|ชั้นอาชีพ|ใบคำขอ|ตรวจสุขภาพ|เงื่อนไขการรับประกัน/;
+// ภาษาที่ลูกค้าอ่านเข้าใจ: ใช้ชื่อสถานการณ์ และวงเล็บศัพท์ประกันไว้ท้าย
+function plainKey(k) {
+    let t = k.replace("(ผู้ป่วยใน)", "(นอนโรงพยาบาล)").replace("(ผู้ป่วยนอก)", "(ไม่ต้องนอนโรงพยาบาล)");
+    if (/ผู้ป่วยใน/.test(t) && !/นอนโรงพยาบาล/.test(t)) t = t.replace("ผู้ป่วยใน", "นอนโรงพยาบาล (ผู้ป่วยใน)");
+    if (/ผู้ป่วยนอก/.test(t) && !/นอนโรงพยาบาล/.test(t)) t = t.replace("ผู้ป่วยนอก", "ไม่ต้องนอนโรงพยาบาล (ผู้ป่วยนอก)");
+    if (/ทุพพลภาพถาวรสิ้นเชิง/.test(t) && !/ทำงานไม่ได้/.test(t)) t = t.replace("ทุพพลภาพถาวรสิ้นเชิง", "ทุพพลภาพถาวรจนทำงานไม่ได้ (ทุพพลภาพถาวรสิ้นเชิง)");
+    t = t.replace(/ความรับผิดส่วนแรก \(Deductible\)|ความรับผิดส่วนแรก(?! \()/, "ส่วนที่ลูกค้าจ่ายเองก่อน (ความรับผิดส่วนแรก)");
+    if (/Day Surgery/.test(t) && !/กลับบ้าน/.test(t)) t = t.replace("Day Surgery", "ผ่าตัดแล้วกลับบ้านได้ (Day Surgery)");
+    t = t.replace("มะเร็งระยะไม่ลุกลาม", "มะเร็งระยะเริ่มต้น (ไม่ลุกลาม)");
+    return t;
+}
 // ตัดบรรทัดที่เป็นหมายเหตุสำหรับตัวแทน (ไม่ควรถึงมือลูกค้า)
 const AGENT_ONLY_RE = /โปรดตรวจสอบ|ก่อนนำเสนอ|ค่าคอม|ค่านายหน้า|ค่าบำเหน็จ|FYC|เครดิตผลงาน/;
 function customerBenefits(benefits) {
@@ -367,7 +525,7 @@ function buildQuoteText(q) {
         out.push("", `━━ ${i + 1}) ${c.name} ━━`);
         if (c.div) out.push(c.div.badge);
         out.push(`💳 เบี้ย ${baht(c.pay)}${c.single ? " (ชำระครั้งเดียว)" : ` (${q.payLabel})`}${c.renewalNote ? " · " + c.renewalNote : ""}`);
-        c.benefits.forEach(([k, v]) => out.push(`• ${k}: ${v}`));
+        c.benefits.forEach(([k, v]) => out.push(k === "§" ? `▸ ${v}` : `• ${k}: ${v}`));
         if (c.div) { out.push(`${c.div.badge} — เงื่อนไข`); c.div.lines.forEach((n) => out.push(`  - ${n}`)); }
         if (c.notes && c.notes.length) { out.push("📌 ข้อควรรู้"); c.notes.forEach((n) => out.push(`  - ${n}`)); }
     });
@@ -396,7 +554,8 @@ function drawQuoteImage(q) {
         h += L.para(P + 8, y + h, `เบี้ย ${baht(c.pay)}${c.single ? " (ชำระครั้งเดียว)" : ` (${q.payLabel})`}${c.renewalNote ? " · " + c.renewalNote : ""}`, 30, 600, BRAND.ink, W - P * 2 - 16, 42) + 18;
         L.ops.splice(start, 0, { t: "rect", x: P - 12, y, w: W - P * 2 + 24, h, color: "#E6F2F8" }, { t: "rect", x: P - 12, y, w: 8, h, color: BRAND.skyDeep });
         y += h;
-        c.benefits.forEach(([k, v], j) => { y = imgKeyRow(L, y, k, v, j % 2 === 1); });
+        let shade = 0;
+        c.benefits.forEach(([k, v]) => { if (k === "§") { y += imgSection(L, y, v); shade = 0; } else y = imgKeyRow(L, y, k, v, (shade++) % 2 === 1); });
         if (c.div) y += imgDividendBox(L, y, c.div);
         if (c.notes && c.notes.length) {
             const ns = L.ops.length; let nh = 14;
@@ -425,19 +584,39 @@ function drawQuoteImage(q) {
 function preloadShareFonts() {
     try { if (document.fonts && document.fonts.load) { ["500", "600", "700"].forEach((w) => document.fonts.load(`${w} 30px 'IBM Plex Sans Thai'`, "ทดสอบ").catch(() => { })); } } catch (e) { }
 }
-function shareCanvasImage(canvas) {
-    const dataUrl = canvas.toDataURL("image/png");
-    const bin = atob(dataUrl.split(",")[1]);
-    const arr = new Uint8Array(bin.length);
-    for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
-    const file = new File([arr], "insurance-summary.png", { type: "image/png" });
-    if (navigator.canShare && navigator.canShare({ files: [file] })) {
-        navigator.share({ files: [file] }).catch(() => { });
+// ตัวแก้บรรทัดก่อนส่ง: groups = [{ title, rows: [{ sec?, k, v, sub? }] }]
+function LineEditor({ groups, onChange }) {
+    const box = { border: "1px solid #D7E8F0", borderRadius: 10, padding: "6px 8px", fontSize: 16, width: "100%", background: "#FFFFFF", fontFamily: "inherit" };
+    const upd = (gi, ri, patch) => onChange(groups.map((g, i) => i !== gi ? g : Object.assign({}, g, { rows: g.rows.map((r, j) => j !== ri ? r : Object.assign({}, r, patch)) })));
+    const del = (gi, ri) => onChange(groups.map((g, i) => i !== gi ? g : Object.assign({}, g, { rows: g.rows.filter((_, j) => j !== ri) })));
+    return React.createElement("div", null, groups.map((g, gi) => React.createElement("div", { key: gi, style: { marginBottom: 8 } },
+        g.title ? React.createElement("p", { style: { fontWeight: 700, color: "#0C2F63", fontSize: 17, margin: "6px 0" } }, g.title) : null,
+        g.rows.map((r, ri) => React.createElement("div", { key: ri, style: { display: "flex", gap: 6, alignItems: "flex-start", marginBottom: 6, padding: 6, borderRadius: 10, background: r.sec ? "#DCEEF7" : "#F7FBFD" } },
+            React.createElement("div", { style: { flex: 1, display: "flex", flexDirection: "column", gap: 4 } },
+                r.sec ? React.createElement("input", { value: r.k || "", onChange: (e) => upd(gi, ri, { k: e.target.value }), style: Object.assign({}, box, { fontWeight: 700 }) })
+                    : [r.k !== undefined && React.createElement("input", { key: "k", value: r.k, onChange: (e) => upd(gi, ri, { k: e.target.value }), style: Object.assign({}, box, { color: "#5A6B7B" }) }),
+                        r.sub !== undefined && React.createElement("input", { key: "s", value: r.sub, onChange: (e) => upd(gi, ri, { sub: e.target.value }), style: Object.assign({}, box, { fontSize: 15 }) }),
+                        React.createElement("textarea", { key: "v", value: r.v || "", rows: Math.min(5, Math.max(1, Math.ceil(String(r.v || "").length / 32))), onChange: (e) => upd(gi, ri, { v: e.target.value }), style: Object.assign({}, box, { fontWeight: 600, resize: "vertical" }) })]),
+            React.createElement("button", { onClick: () => del(gi, ri), title: "ลบบรรทัดนี้", style: { width: 34, height: 34, borderRadius: 17, background: "#FFFFFF", border: "1px solid #F0C9C9", color: "#B93232", fontSize: 16, flexShrink: 0 } }, "✕"))))));
+}
+function shareCanvasImage(canvasOrList) {
+    const list = Array.isArray(canvasOrList) ? canvasOrList : [canvasOrList];
+    const urls = list.map((c) => c.toDataURL("image/png"));
+    const files = urls.map((u, k) => {
+        const bin = atob(u.split(",")[1]);
+        const arr = new Uint8Array(bin.length);
+        for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
+        return new File([arr], list.length > 1 ? `insurance-summary-${k + 1}.png` : "insurance-summary.png", { type: "image/png" });
+    });
+    if (navigator.canShare && navigator.canShare({ files })) {
+        navigator.share({ files }).catch(() => { });
         return "shared";
     }
-    const a = document.createElement("a");
-    a.href = dataUrl; a.download = "insurance-summary.png";
-    document.body.appendChild(a); a.click(); a.remove();
+    urls.forEach((u, k) => {
+        const a = document.createElement("a");
+        a.href = u; a.download = files[k].name;
+        document.body.appendChild(a); a.click(); a.remove();
+    });
     return "downloaded";
 }
 /* ============================== RATE DATA ============================== */
@@ -732,6 +911,15 @@ const OPD_RATES = [
     [12000, 24000, 36000, 48000],
     [13000, 26000, 39000, 52000],
 ];
+// 5e) โอพีดี สบายใจ เพรสทีจ (บันทึกสลักหลังผู้ป่วยนอก แบบแพ็กเกจ รบข.9/2565) — แนบได้เฉพาะ เพรสทีจ เฮลธ์ ปลดล็อค แผน 20 ล้าน (1,500/ครั้ง) และ 30 ล้าน (2,000/ครั้ง)
+const OPDP_BANDS = [[11, 60], [61, 70], [71, 75], [76, 80], [81, 98]];
+const OPDP_AMOUNTS = [1500, 2000];
+const OPDP_RATES = [[5700, 7600], [19950, 26600], [28500, 38000], [34200, 45600], [37050, 49400]];
+const opdpAmountForPh = (plan) => (plan === 20000000 ? 1500 : plan === 30000000 ? 2000 : 0);
+// 5f) อบ.1-ฆจ.1 / อบ.2-ฆจ.2 (รบข.11/2543) — คุ้มครองถึงอายุ 65 ปี เบี้ยคงที่ อัตราต่อทุน 1,000 บาท (รายปี) ตามชั้นอาชีพ 1/2/3
+const ACC1_RATE = { 1: 2, 2: 3, 3: 4 }, KJ1_RATE = 0.75;
+const ACC2_RATE = { 1: 5, 2: 6, 3: 7 }, KJ2_RATE = 1.35;
+const ACC12_MIN_SI = 50000, ACC12_MAX_TOTAL = 10000000, ACC1_MINOR_MAX = 1000000, KJ_MAX_TOTAL = 2000000;
 // 5d) สัญญาเพิ่มเติม บีแอลเอ ลองไลฟ์แคร์ (10) และ ลองไลฟ์แคร์ พลัส (99) — คุ้มครอง 8 โรค/ภาวะพึ่งพิงระยะยาว (Alzheimer's, Stroke, Parkinson's, ฯลฯ) + TPD
 // ทั้งสองแบบคุ้มครองเหมือนกันทุกประการ ต่างกันที่อัตราเบี้ยประกันภัย (ลองไลฟ์แคร์ พลัส (99) เบี้ยสูงกว่า มีเงื่อนไขผลประโยชน์เพิ่มเติมกว่าแบบ (10))
 const LLC_MIN_AGE = 15, LLC_MAX_AGE = 65;
@@ -1413,6 +1601,99 @@ const HHP_MALE_C3 = [
     [[466950, 378522, 342502], [512589, 412409, 370969], [562005, 501250, 426783]], [[538300, 437606, 397858], [592004, 477950, 432165], [657681, 596737, 515654]],
 ];
 const HHP_TABLE = { female: { c12: HHP_FEMALE_C12, c3: HHP_FEMALE_C3 }, male: { c12: HHP_MALE_C12, c3: HHP_MALE_C3 } };
+// 7c) บีแอลเอ แฮปปี้ เฮลธ์ (รบข.2/2566, 50/2567) — ขายได้เฉพาะ แผน 2 (1 ล้าน) / แผน 3 (5 ล้าน) / แผน 4 (10 ล้าน) แบบมีความรับผิดส่วนแรก 30,000 หรือ 100,000 บาท
+// ดัชนีแถว = ช่วงอายุ (VH_BANDS 11-15 ... 96-98), คอลัมน์ = [แผน2-30k, แผน2-100k, แผน3-30k, แผน3-100k, แผน4-30k, แผน4-100k]
+const HH_PLANS = [1000000, 5000000, 10000000];
+const HH_DEDUCT = [30000, 100000];
+const HH_FEMALE_C12 = [
+    [8133, 1782, 9352, 1849, 10522, 2342],
+    [8031, 1974, 9235, 2675, 10433, 3359],
+    [8813, 2386, 9871, 3012, 11165, 3784],
+    [9876, 2867, 10863, 3268, 12277, 4086],
+    [10308, 3244, 11339, 3880, 13157, 5135],
+    [11276, 4020, 12630, 4487, 14643, 5856],
+    [11959, 4369, 14112, 4879, 16346, 6324],
+    [13948, 5644, 16040, 5758, 20338, 8586],
+    [17415, 8392, 20027, 9287, 27635, 12801],
+    [28205, 14658, 31307, 19670, 42788, 25203],
+    [37779, 22019, 43824, 28541, 63531, 38813],
+    [52868, 31970, 59212, 42339, 82074, 54862],
+    [73809, 48446, 82666, 63991, 112268, 78933],
+    [86969, 69412, 100015, 75387, 132659, 91251],
+    [102469, 81027, 117840, 88811, 163146, 108837],
+    [114589, 90605, 129486, 99301, 180251, 120650],
+    [128138, 101309, 143515, 111024, 200096, 133050],
+    [144560, 114285, 161907, 125233, 225694, 148269],
+];
+const HH_MALE_C12 = [
+    [7129, 1613, 8198, 1777, 9549, 2570],
+    [7071, 1916, 8131, 2584, 9521, 3565],
+    [7688, 2293, 8840, 2934, 10342, 4006],
+    [8696, 2782, 9740, 3213, 11346, 4335],
+    [9225, 3148, 10333, 3747, 12343, 5291],
+    [9988, 3861, 11486, 4288, 13671, 5934],
+    [10419, 4374, 12502, 4661, 14877, 6382],
+    [11339, 5235, 13833, 5560, 18182, 8674],
+    [15402, 8291, 18482, 8968, 25997, 12762],
+    [24834, 14066, 29553, 18994, 40880, 24806],
+    [33584, 20724, 40300, 27560, 59761, 38774],
+    [48534, 31042, 55813, 40884, 78652, 54386],
+    [71639, 48144, 78802, 61790, 108101, 77817],
+    [84411, 60661, 92852, 72796, 124313, 89840],
+    [99456, 78893, 110397, 85758, 153795, 107840],
+    [111219, 88218, 122341, 95887, 170951, 120130],
+    [124369, 98640, 136807, 107207, 191063, 137872],
+    [139664, 111272, 153631, 120927, 223629, 165712],
+];
+// หมายเหตุ: คู่มือหน้า 105 ช่อง หญิง ชั้น 3 อายุ 81-85 แผน 2 (30,000) พิมพ์ 243,457 — ทุกช่องอื่นของชั้น 3 = ชั้น 1-2 x 1.4 จึงใช้ 143,457 (102,469 x 1.4)
+const HH_FEMALE_C3 = [
+    [11386, 2495, 13093, 2589, 14731, 3279],
+    [11243, 2764, 12929, 3745, 14606, 4703],
+    [12338, 3340, 13819, 4217, 15631, 5298],
+    [13826, 4014, 15208, 4575, 17188, 5720],
+    [14431, 4542, 15875, 5432, 18420, 7189],
+    [15786, 5628, 17682, 6282, 20500, 8198],
+    [16743, 6117, 19757, 6831, 22884, 8854],
+    [19527, 7902, 22456, 8061, 28473, 12020],
+    [24381, 11749, 28038, 13002, 38689, 17921],
+    [39487, 20521, 43830, 27538, 59903, 35284],
+    [52891, 30827, 61354, 39957, 88943, 54338],
+    [74015, 44758, 82897, 59275, 114904, 76807],
+    [103333, 67824, 115732, 89587, 157175, 110506],
+    [121757, 97177, 140021, 105542, 185723, 127751],
+    [143457, 113438, 164976, 124335, 228404, 152372],
+    [160425, 126847, 181280, 139021, 252351, 168910],
+    [179393, 141833, 200921, 155434, 280134, 186270],
+    [202384, 159999, 226670, 175326, 315972, 207577],
+];
+const HH_MALE_C3 = [
+    [9981, 2258, 11477, 2488, 13369, 3598],
+    [9899, 2682, 11383, 3618, 13329, 4991],
+    [10763, 3210, 12376, 4108, 14479, 5608],
+    [12174, 3895, 13636, 4498, 15884, 6069],
+    [12915, 4407, 14466, 5246, 17280, 7407],
+    [13983, 5405, 16080, 6003, 19139, 8308],
+    [14587, 6124, 17503, 6525, 20828, 8935],
+    [15875, 7329, 19366, 7784, 25455, 12144],
+    [21563, 11607, 25875, 12555, 36396, 17867],
+    [34768, 19692, 41374, 26592, 57232, 34728],
+    [47018, 29014, 56420, 38584, 83665, 54284],
+    [67948, 43459, 78138, 57238, 110113, 76140],
+    [100295, 67402, 110323, 86506, 151341, 108944],
+    [118175, 84925, 129993, 101914, 174038, 125776],
+    [139238, 110450, 154556, 120061, 215313, 150976],
+    [155707, 123505, 171277, 134242, 239331, 168182],
+    [174117, 138096, 191530, 150090, 267488, 193021],
+    [195530, 155781, 215083, 169298, 313081, 231997],
+];
+const HH_TABLE = { female: { c12: HH_FEMALE_C12, c3: HH_FEMALE_C3 }, male: { c12: HH_MALE_C12, c3: HH_MALE_C3 } };
+// วงเงินที่ระบุเป็นตัวเลขในตารางผลประโยชน์ (แผน 2 / 3 / 4)
+const HH_BEN = {
+    ci: { 1000000: 1100000, 5000000: 5500000, 10000000: 11000000 },
+    takeHome: { 1000000: 20000, 5000000: 20000, 10000000: 50000 },
+    prePost: { 1000000: 2000, 5000000: 2000, 10000000: 10000 },
+    yearly: { 1000000: 100000, 5000000: 100000, 10000000: 200000 },
+};
 // 7b) แวลู เฮลธ์ คิดส์ พรีเมียร์ รบข.31/2568 — สุขภาพเด็ก อายุแรกเข้า 1 เดือน - 10 ปี
 const VHKIDS_BANDS = [[0, 5], [6, 10], [11, 15], [16, 20], [21, 25], [26, 30], [31, 35], [36, 40], [41, 45], [46, 50], [51, 55], [56, 60], [61, 65], [66, 70], [71, 75], [76, 80], [81, 85], [86, 90], [91, 95], [96, 98]];
 const VHKIDS_PLANS = [3000, 4000, 5000];
@@ -1519,11 +1800,11 @@ const CS_FORBIDDEN_MAIN_IDS = ["UNJAI", "PRESTIGE", "HAPPYWL", "HAPPYWL9901", "P
 // กิมมิก "ความกังวลของลูกค้า" — แต่ละความกังวลจับคู่กับแบบประกันที่เกี่ยวข้อง เพื่อขึ้นป้าย "แนะนำ" ให้เอเจนต์ตัดสินใจ (ไม่ติ๊กเลือกให้อัตโนมัติ)
 const CONCERNS = [
     { id: "retire", icon: "🏖️", label: "อยากมีเงินใช้ตอนเกษียณ", products: ["HAPPYPENSION", "PENSION888", "PENSIONCARE888"] },
-    { id: "health", icon: "🏥", label: "ห่วงค่ารักษาพยาบาล/นอนโรงพยาบาล", products: ["VH", "VHKIDS", "HHP", "OPD"] },
+    { id: "health", icon: "🏥", label: "ห่วงค่ารักษาพยาบาล/นอนโรงพยาบาล", products: ["VH", "VHKIDS", "HHP", "HH", "OPD"] },
     { id: "critical", icon: "🎗️", label: "ห่วงค่าใช้จ่ายโรคร้ายแรง", products: ["SUPER", "HAPPYCI", "CANCERMAX", "UNJAI", "LLC", "SS"] },
     { id: "family", icon: "👨‍👩‍👧", label: "ห่วงคนข้างหลังหากเป็นอะไรไป", products: ["SUD", "LIFE99", "PRESTIGE", "PLUS2", "HAPPYSAVING", "HAPPYWL", "HRP9920", "HRPDIV", "HRP9901", "HAPPYWL9901", "HAPPYKID"] },
     { id: "disability", icon: "🦽", label: "ห่วงเรื่องทุพพลภาพ/ขาดรายได้", products: ["TPD", "RPPR", "CS"] },
-    { id: "accident", icon: "🚑", label: "ห่วงเรื่องอุบัติเหตุ", products: ["ACC", "ACC3"] },
+    { id: "accident", icon: "🚑", label: "ห่วงเรื่องอุบัติเหตุ", products: ["ACC", "ACC3", "ACC1", "ACC2"] },
 ];
 const PRODUCTS = [
     { id: "CS", name: "คช. คุ้มครองการชำระเบี้ย", tag: "คุ้มครองผู้ชำระเบี้ย (ผู้ปกครอง 20-55 ปี) สำหรับผู้เยาว์ 0-14 ปี · ระยะคุ้มครองตามระยะชำระเบี้ยของแบบหลัก", ageMin: 0, ageMax: 14, coverAge: 21, isTop: true, renewalNote: "ปรับตามเบี้ยที่คุ้มครอง",
@@ -1549,11 +1830,19 @@ const PRODUCTS = [
     { id: "HHP", name: "แฮปปี้ เฮลธ์ พรีเมียร์", tag: "สุขภาพเหมาจ่าย", ageMin: 11, ageMax: 80, coverAge: 98, renewalNote: "ปรับทุก 5 ปี",
         occNote: "รับได้ทุกชั้นอาชีพ (ชั้น 1-2 เบี้ยเดียวกัน / ชั้น 3 เบี้ยสูงกว่า)", siNote: "ต้องมีทุนประกันหลักขั้นต่ำ 50,000 บาท จึงซื้อได้" },
     { id: "OPD", name: "OPD สบายใจ (แบบปกติ)", tag: "บันทึกสลักหลังผู้ป่วยนอก", ageMin: 1, ageMax: 80, coverAge: 98, renewalNote: "ปรับเป็นช่วงอายุ",
-        occNote: "ไม่ขึ้นกับชั้นอาชีพ", siNote: "ต้องซื้อคู่กับ แวลู เฮลธ์ / แวลู เฮลธ์ คิดส์ พรีเมียร์ / แฮปปี้ เฮลธ์ พรีเมียร์ อย่างใดอย่างหนึ่งก่อน · วงเงินสูงสุดที่ซื้อได้ขึ้นกับค่าห้องของสัญญาหลักที่แนบ" },
+        occNote: "ไม่ขึ้นกับชั้นอาชีพ", siNote: "ต้องซื้อคู่กับ แวลู เฮลธ์ / แวลู เฮลธ์ คิดส์ พรีเมียร์ / แฮปปี้ เฮลธ์ (พรีเมียร์) / เพรสทีจ เฮลธ์ ปลดล็อค 20-30 ล้าน อย่างใดอย่างหนึ่งก่อน · วงเงินสูงสุดที่ซื้อได้ขึ้นกับค่าห้องของสัญญาหลักที่แนบ · OPD ทุกฉบับรวมกันไม่เกิน 2,000/ครั้ง" },
+    { id: "HH", name: "แฮปปี้ เฮลธ์", tag: "สุขภาพเหมาจ่าย (มีความรับผิดส่วนแรก)", ageMin: 11, ageMax: 80, coverAge: 98, renewalNote: "ปรับทุก 5 ปี",
+        occNote: "รับได้ทุกชั้นอาชีพ (ชั้น 1-2 เบี้ยเดียวกัน / ชั้น 3 เบี้ยสูงกว่า)", siNote: "ขายได้เฉพาะแผน 2/3/4 (1/5/10 ล้านบาทต่อครั้ง) แบบมีความรับผิดส่วนแรก 30,000 หรือ 100,000 บาท · ซื้อ OPD สบายใจ เพิ่มได้ (สูงสุด 2,000/ครั้ง) · ลดหย่อนภาษีสุขภาพสูงสุด 25,000 บาท" },
+    { id: "OPDP", name: "OPD สบายใจ เพรสทีจ", tag: "บันทึกสลักหลังผู้ป่วยนอก แบบแพ็กเกจ", ageMin: 11, ageMax: 80, coverAge: 98, renewalNote: "ปรับเป็นช่วงอายุ",
+        occNote: "ไม่ขึ้นกับชั้นอาชีพ (ถ้า เพรสทีจ เฮลธ์ มีเบี้ยเพิ่มตามอาชีพ/สุขภาพ ซื้อไม่ได้)", siNote: "แนบได้เฉพาะ เพรสทีจ เฮลธ์ ปลดล็อค แผน 20 ล้าน (1,500 บาท/ครั้ง) หรือ 30 ล้าน (2,000 บาท/ครั้ง) · วงเงิน OPD ทุกฉบับรวมกันไม่เกิน 2,000 บาท/ครั้ง" },
     { id: "ACC", name: "แอคซิเดนท์ แคร์", tag: "อุบัติเหตุ", ageMin: 0, ageMax: 70, coverAge: 98, renewalNote: "ปรับเป็นช่วงอายุ",
         occNote: "รับได้ทุกชั้นอาชีพ (เบี้ยต่างกันตามชั้นอาชีพ)", siNote: "ต้องมีทุนประกันหลักขั้นต่ำ 50,000 บาท จึงซื้อได้" },
     { id: "ACC3", name: "อบ.3 พลัส", tag: "ค่ารักษาอุบัติเหตุ", ageMin: 0, ageMax: 64, coverAge: 65, renewalNote: "เบี้ยคงที่",
         occNote: "รับได้ทุกชั้นอาชีพ (เบี้ยต่างกันตามชั้นอาชีพ)", siNote: "ทุนหลักตั้งแต่ 50,000 บาท → ซื้อได้สูงสุด 10,000 บาท / ทุนหลักตั้งแต่ 100,000 บาท → สูงสุด 15,000 บาท" },
+    { id: "ACC1", name: "อบ.1 + ฆจ.1", tag: "อุบัติเหตุ (เสียชีวิต/สูญเสียอวัยวะ)", ageMin: 0, ageMax: 64, coverAge: 65, renewalNote: "เบี้ยคงที่",
+        occNote: "รับได้ทุกชั้นอาชีพ (เบี้ยต่างกันตามชั้นอาชีพ) · แม่บ้าน/พระ คิดชั้น 1 · นักเรียน/เด็กก่อนวัยเรียน คิดชั้น 2", siNote: "ทุนขั้นต่ำ 50,000 บาท · ไม่เกิน 5 เท่าของทุนชีวิต (รวม อบ.1+อบ.2 ไม่เกิน 10 ล้าน) · ผู้เยาว์ต่ำกว่า 15 ปี ไม่เกิน 1 ล้าน · ฆจ.1 ทุนเท่า อบ.1 แต่ไม่เกิน 2 ล้าน (บังคับซื้อคู่)" },
+    { id: "ACC2", name: "อบ.2 + ฆจ.2", tag: "อุบัติเหตุ (รวมค่าชดเชยทุพพลภาพ/นอน รพ.)", ageMin: 15, ageMax: 64, coverAge: 65, renewalNote: "เบี้ยคงที่",
+        occNote: "ขายเฉพาะผู้มีอาชีพ/รายได้ประจำ (ไม่ขายนักเรียน แม่บ้าน พระ) · เบี้ยต่างกันตามชั้นอาชีพ", siNote: "ทุนขั้นต่ำ 50,000 บาท · ไม่เกิน 5 เท่าของทุนชีวิต (รวม อบ.1+อบ.2 ไม่เกิน 10 ล้าน) · ฆจ.2 ทุนเท่า อบ.2 แต่ไม่เกิน 2 ล้าน (รวม ฆจ.1+ฆจ.2 ไม่เกิน 2 ล้าน, บังคับซื้อคู่)" },
     { id: "RPPR", name: "รพ.ปร. (ปัญจรักษ์)", tag: "ค่ารักษารายวัน", ageMin: 6, ageMax: 64, coverAge: 65, renewalNote: "ปรับเป็นช่วงอายุ",
         occNote: "รับได้ทุกชั้นอาชีพ (เบี้ยเท่ากันทุกชั้น)", siNote: "วงเงินต่อวันที่ซื้อได้ขึ้นกับทุนหลัก (เริ่มจาก): 50,000→300-500 / 100,000→300-2,000 / 500,000→300-2,500 / 750,000→300-3,000 / 1,000,000→300-4,000 / 3,000,000→300-5,000 บาท/วัน" },
     { id: "TPD", name: "ทุพพลภาพ โพรเทค", tag: "ทุพพลภาพ", ageMin: 15, ageMax: 65, coverAge: 74, renewalNote: "ปรับทุกปี",
@@ -1632,7 +1921,7 @@ function App() {
     const [age, setAge] = useState(35);
     const [occClass, setOccClass] = useState(1);
     const [payMode, setPayMode] = useState("year");
-    const [selected, setSelected] = useState({ SUD: false, LIFE99: false, UNJAI: false, CANCERMAX: false, PLUS2: false, PRESTIGE: false, ACC: false, ACC3: false, TPD: false, SUPER: false, VH: false, VHKIDS: false, RPPR: false, HHP: false, OPD: false, HAPPYCI: false, LLC: false, SS: false, HAPPYPENSION: false, HAPPYSAVING: false, HAPPYWL: false, HRP9920: false, HRPDIV: false, HRP9901: false, HAPPYWL9901: false, HAPPYKID: false, CHAK: false, CHAP: false, PH: false, PSAVE104: false, PSAVE126: false, HS208: false, HS126: false, HS157: false, HS147: false, HS168: false, HS1810: false, HS2515: false, TAXSAVER105: false, BLASAVE168: false, HS999: false, PUNSUK: false, PENSION888: false, SAVECARE168: false, PENSIONCARE888: false, CS: false });
+    const [selected, setSelected] = useState({ SUD: false, LIFE99: false, UNJAI: false, CANCERMAX: false, PLUS2: false, PRESTIGE: false, ACC: false, ACC3: false, TPD: false, SUPER: false, VH: false, VHKIDS: false, RPPR: false, HHP: false, OPD: false, HH: false, OPDP: false, ACC1: false, ACC2: false, HAPPYCI: false, LLC: false, SS: false, HAPPYPENSION: false, HAPPYSAVING: false, HAPPYWL: false, HRP9920: false, HRPDIV: false, HRP9901: false, HAPPYWL9901: false, HAPPYKID: false, CHAK: false, CHAP: false, PH: false, PSAVE104: false, PSAVE126: false, HS208: false, HS126: false, HS157: false, HS147: false, HS168: false, HS1810: false, HS2515: false, TAXSAVER105: false, BLASAVE168: false, HS999: false, PUNSUK: false, PENSION888: false, SAVECARE168: false, PENSIONCARE888: false, CS: false });
     const [sudSI, setSudSI] = useState(500000);
     const [life99SI, setLife99SI] = useState(0);
     const [unjaiPlan, setUnjaiPlan] = useState(0);
@@ -1653,6 +1942,10 @@ function App() {
     const [csPayorAge, setCsPayorAge] = useState(40);
     const [csPayorGender, setCsPayorGender] = useState("male");
     const [opdPlan, setOpdPlan] = useState(0);
+    const [hhPlan, setHhPlan] = useState(1000000);
+    const [hhDeduct, setHhDeduct] = useState(30000);
+    const [acc1SI, setAcc1SI] = useState(100000);
+    const [acc2SI, setAcc2SI] = useState(100000);
     const [happyciSI, setHappyciSI] = useState(0);
     const [happyciTerm, setHappyciTerm] = useState(0);
     const [llcSI, setLlcSI] = useState(0);
@@ -1733,7 +2026,24 @@ function App() {
     const [customerName, setCustomerName] = useState("");
     const [shareModal, setShareModal] = useState(null); // { id, mode: "text"|"image", pl } หรือ { id: null } = เปิดเฉพาะตั้งค่าตัวแทน
     const [shareNote, setShareNote] = useState("");
-    const [sharePreview, setSharePreview] = useState(""); // dataURL ของรูป สำหรับกดค้างบันทึก (ใช้กับ LINE OA)
+    const [sharePreview, setSharePreview] = useState("");
+    const [casesOpen, setCasesOpen] = useState(false);
+    const [cases, setCases] = useState([]); // [{ id, name, savedAt, summary, snap }]
+    const [caseName, setCaseName] = useState("");
+    useEffect(() => { (async () => { const raw = await storageAdapter.get(CASES_KEY); if (raw) { try { setCases(JSON.parse(raw) || []); } catch (e) { } } })(); }, []);
+    function persistCases(list) { setCases(list); storageAdapter.set(CASES_KEY, JSON.stringify(list)); }
+    function saveCase() {
+        const name = (caseName || customerName || "").trim() || `เคส ${new Date().toLocaleDateString("th-TH")}`;
+        const summary = PRODUCTS.filter((p) => selected[p.id]).map((p) => p.name).join(", ");
+        const snap = Object.assign(currentSnapshot(), { savingsMode, savingsPremiumInput });
+        const rest = cases.filter((c) => c.name !== name);
+        persistCases([{ id: Date.now(), name, savedAt: new Date().toISOString(), summary, snap }, ...rest].slice(0, 100));
+        setCaseName("");
+    }
+    function openCase(c) { applySnapshot(c.snap); setCustomerName(c.name); setResult(null); setCasesOpen(false); }
+    function deleteCase(c) { if (window.confirm(`ลบเคส "${c.name}"?`)) persistCases(cases.filter((x) => x.id !== c.id)); }
+    const [shareDraft, setShareDraft] = useState(null); // ฉบับแก้ไขก่อนส่ง { key, dirty, text, groups }
+    const [shareLive, setShareLive] = useState([]); // รูปตัวอย่างก่อนส่ง (dataURL) // dataURL ของรูป สำหรับกดค้างบันทึก (ใช้กับ LINE OA)
     useEffect(() => {
         (async () => {
             const raw = await storageAdapter.get(AGENT_KEY);
@@ -1754,7 +2064,10 @@ function App() {
         let ciPerYear = 0;
         if (SAVINGS_DEFS[id] && SAVINGS_DEFS[id].ciPct) ciPerYear = Math.round(mainSIOf(id) * SAVINGS_DEFS[id].ciPct / 100);
         if (id === "PENSIONCARE888") ciPerYear = Math.round(mainSIOf(id) * PENSIONCARE888_CI_PCT);
+        const calc = CALC[id] ? CALC[id]() : null;
+        const fb = calc && calc.ok ? customerBenefits(finalizeBenefits(id, calc.benefits, calc.premium)) : [];
         return {
+            protectLines: fb.filter(([k]) => benefitSection(k) === "protect"), knowLines: fb.filter(([k]) => benefitSection(k) === "know"), coverUntil: coverUntilText(id),
             type: pl.type, rows, breakEvenAge: pl.breakEvenAge, productName: prod ? prod.name : (pl.title || ""),
             customer: customerName.trim(), gender, age, si: mainSIOf(id),
             premium: premiumRows.length ? premiumRows[0].premium : 0, payYears: premiumRows.length,
@@ -1773,56 +2086,66 @@ function App() {
         if (!result) return null;
         const cards = result.cards.map((c) => {
             const f = c.factor !== undefined ? c.factor : result.factor;
-            return { name: c.name, pay: c.premium * f, single: c.single, renewalNote: c.renewalNote, benefits: customerBenefits(c.benefits), notes: CUSTOMER_NOTES[c.id] || [], div: dividendOf(c.id) };
+            return { name: c.name, pay: c.premium * f, single: c.single, renewalNote: c.renewalNote, benefits: groupBenefits(customerBenefits(c.benefits)), notes: CUSTOMER_NOTES[c.id] || [], div: dividendOf(c.id) };
         });
         return { cards, payLabel: result.payLabel, totalPay: result.totalPay, totalYear: result.totalYear, singleNote: result.singleNote,
             customer: customerName.trim(), gender, age, agent: agentInfo, notes: shareNotes(cards) };
     }
     useEffect(() => { if (shareModal) preloadShareFonts(); else setSharePreview(""); }, [!!shareModal]);
     // ข้อความ/รูปของรายการที่กำลังจะส่ง (ใช้ทั้งปุ่มส่ง LINE และปุ่มคัดลอก/บันทึกสำหรับ LINE OA)
-    function currentShareText() {
+    function defaultShareText() {
         if (!shareModal || !shareModal.id) return "";
         if (shareModal.id === "QUOTE") { const q = buildQuoteData(); return q ? buildQuoteText(q) : ""; }
         return buildShareText(buildShareData(shareModal.id, shareModal.pl));
     }
-    function currentShareCanvas() {
-        if (!shareModal || !shareModal.id) return null;
-        if (shareModal.id === "QUOTE") { const q = buildQuoteData(); return q ? drawQuoteImage(q) : null; }
-        return drawShareImage(buildShareData(shareModal.id, shareModal.pl));
+    function defaultShareGroups() {
+        if (shareModal.id === "QUOTE") {
+            const q = buildQuoteData();
+            return q ? q.cards.map((c) => ({ title: c.name, rows: c.benefits.map((b) => (b[0] === "§" ? { sec: true, k: b[1] } : { k: b[0], v: b[1] })) })) : [];
+        }
+        return [{ title: "", rows: shareKeyLines(buildShareData(shareModal.id, shareModal.pl)).map(([ic, k, v]) => (ic === "§" ? { sec: true, k: v } : { ic, k, v })) }];
     }
+    const shareKeyOf = (m) => (m ? `${m.id}|${m.mode}` : "");
+    function makeShareDraft() {
+        return { key: shareKeyOf(shareModal), dirty: false, text: shareModal.mode === "text" ? defaultShareText() : null, groups: shareModal.mode === "image" ? defaultShareGroups() : null };
+    }
+    useEffect(() => {
+        if (!shareModal || !shareModal.id) { setShareDraft(null); return; }
+        setShareDraft((dr) => (dr && dr.key === shareKeyOf(shareModal) && dr.dirty ? dr : makeShareDraft()));
+    }, [shareModal, customerName, agentInfo]);
+    function currentShareText() {
+        if (!shareModal || !shareModal.id) return "";
+        if (shareModal.mode === "text" && shareDraft && shareDraft.text != null) return shareDraft.text;
+        return defaultShareText();
+    }
+    function currentShareCanvases() {
+        if (!shareModal || !shareModal.id) return [];
+        const g = shareModal.mode === "image" && shareDraft ? shareDraft.groups : null;
+        if (shareModal.id === "QUOTE") {
+            const q = buildQuoteData();
+            if (!q) return [];
+            if (g) q.cards = q.cards.map((c, i) => (g[i] ? Object.assign({}, c, { benefits: g[i].rows.map((r) => (r.sec ? ["§", r.k] : [r.k, r.v])) }) : c));
+            return [drawQuoteImage(q)];
+        }
+        const d = buildShareData(shareModal.id, shareModal.pl);
+        if (g && g[0]) d.keyLines = g[0].rows.map((r) => (r.sec ? ["§", "", r.k] : [r.ic || "", r.k, r.v]));
+        return drawShareImages(d);
+    }
+    useEffect(() => {
+        if (!shareModal || !shareModal.id || shareModal.mode !== "image") { setShareLive([]); return; }
+        const t = setTimeout(() => { try { setShareLive(currentShareCanvases().map((c) => c.toDataURL("image/png"))); } catch (e) { } }, 250);
+        return () => clearTimeout(t);
+    }, [shareModal, shareDraft, customerName, agentInfo]);
     function copyForOA() {
         const ok = copyTextToClipboard(currentShareText());
         setShareNote(ok ? "📋 คัดลอกข้อความแล้ว — เปิดแชทลูกค้าใน LINE OA แล้วกดวาง" : "คัดลอกไม่สำเร็จ ลองใหม่อีกครั้ง");
     }
-    function saveImageForOA() {
-        const c = currentShareCanvas();
-        if (!c) return;
-        setSharePreview(c.toDataURL("image/png"));
-        setShareNote("");
-    }
     function doShare() {
         if (!shareModal || !shareModal.id) return;
-        if (shareModal.id === "QUOTE") {
-            const q = buildQuoteData();
-            if (!q) return;
-            if (shareModal.mode === "text") { openLineText(buildQuoteText(q)); setShareModal(null); }
-            else {
-                const r = shareCanvasImage(drawQuoteImage(q));
-                if (r === "downloaded") setShareNote("บันทึกรูปลงเครื่องแล้ว — เปิด LINE แล้วแนบรูปส่งลูกค้าได้เลย");
-                else setShareModal(null);
-            }
-            return;
-        }
-        const d = buildShareData(shareModal.id, shareModal.pl);
-        if (shareModal.mode === "text") {
-            openLineText(buildShareText(d));
-            setShareModal(null);
-        }
-        else {
-            const r = shareCanvasImage(drawShareImage(d));
-            if (r === "downloaded") setShareNote("บันทึกรูปลงเครื่องแล้ว — เปิด LINE แล้วแนบรูปส่งลูกค้าได้เลย");
-            else setShareModal(null);
-        }
+        if (shareModal.mode === "text") { openLineText(currentShareText()); setShareModal(null); return; }
+        const r = shareCanvasImage(currentShareCanvases());
+        if (r === "downloaded") setShareNote("บันทึกรูปลงเครื่องแล้ว — เปิด LINE แล้วแนบรูปส่งลูกค้าได้เลย");
+        else setShareModal(null);
     }
     const [printData, setPrintData] = useState(null); // { type, title, rows, ... } — ข้อมูลตารางที่จะพิมพ์/บันทึกเป็น PDF
     const [savingsGroupOpen, setSavingsGroupOpen] = useState(false);
@@ -1848,178 +2171,194 @@ function App() {
     const [openCards, setOpenCards] = useState({});
     const [openProductCards, setOpenProductCards] = useState({ SUD: true, ACC: true });
     const [loadedFromStorage, setLoadedFromStorage] = useState(false);
+    // ใส่ค่าที่บันทึกไว้ (ข้อมูลล่าสุด หรือเคสลูกค้าที่เปิด) กลับเข้าแอป
+    function applySnapshot(s) {
+        if (s.gender)
+            setGender(s.gender);
+        if (s.age !== undefined)
+            setAge(s.age);
+        if (s.occClass)
+            setOccClass(s.occClass);
+        if (s.payMode)
+            setPayMode(s.payMode);
+        if (s.sudSI !== undefined)
+            setSudSI(s.sudSI);
+        if (s.life99SI !== undefined)
+            setLife99SI(s.life99SI);
+        if (s.unjaiPlan !== undefined)
+            setUnjaiPlan(s.unjaiPlan);
+        if (s.cancermaxPlan !== undefined)
+            setCancermaxPlan(s.cancermaxPlan);
+        if (s.plus2SI !== undefined)
+            setPlus2SI(s.plus2SI);
+        if (s.plus2Term !== undefined)
+            setPlus2Term(s.plus2Term);
+        if (s.prestigeSI !== undefined)
+            setPrestigeSI(s.prestigeSI);
+        if (s.prestigeTerm !== undefined)
+            setPrestigeTerm(s.prestigeTerm);
+        if (s.selected)
+            setSelected(s.selected);
+        if (s.accPlan !== undefined)
+            setAccPlan(s.accPlan);
+        if (s.acc3Plan !== undefined)
+            setAcc3Plan(s.acc3Plan);
+        if (s.tpdSI !== undefined)
+            setTpdSI(s.tpdSI);
+        if (s.supSI !== undefined)
+            setSupSI(s.supSI);
+        if (s.vhPlan !== undefined)
+            setVhPlan(s.vhPlan);
+        if (s.vhkidsPlan !== undefined)
+            setVhkidsPlan(s.vhkidsPlan);
+        if (s.rpprDaily !== undefined)
+            setRpprDaily(s.rpprDaily);
+        if (s.hhpPlan !== undefined)
+            setHhpPlan(s.hhpPlan);
+        if (s.hhpDeduct !== undefined)
+            setHhpDeduct(s.hhpDeduct);
+        if (s.csPayorAge !== undefined)
+            setCsPayorAge(s.csPayorAge);
+        if (s.csPayorGender)
+            setCsPayorGender(s.csPayorGender);
+        if (s.happysavingSI !== undefined)
+            setHappysavingSI(s.happysavingSI);
+        if (s.happysavingTerm !== undefined)
+            setHappysavingTerm(s.happysavingTerm);
+        if (s.happywlSI !== undefined)
+            setHappywlSI(s.happywlSI);
+        if (s.happywlTerm !== undefined)
+            setHappywlTerm(s.happywlTerm);
+        if (s.hrp9920SI !== undefined)
+            setHrp9920SI(s.hrp9920SI);
+        if (s.hrpdivSI !== undefined)
+            setHrpdivSI(s.hrpdivSI);
+        if (s.hrpdivTerm !== undefined)
+            setHrpdivTerm(s.hrpdivTerm);
+        if (s.hrp9901SI !== undefined)
+            setHrp9901SI(s.hrp9901SI);
+        if (s.happywl9901SI !== undefined)
+            setHappywl9901SI(s.happywl9901SI);
+        if (s.happykidSI !== undefined)
+            setHappykidSI(s.happykidSI);
+        if (s.chakSI !== undefined)
+            setChakSI(s.chakSI);
+        if (s.chakTerm !== undefined)
+            setChakTerm(s.chakTerm);
+        if (s.chapSI !== undefined)
+            setChapSI(s.chapSI);
+        if (s.chapTerm !== undefined)
+            setChapTerm(s.chapTerm);
+        if (s.chapPayorAge !== undefined)
+            setChapPayorAge(s.chapPayorAge);
+        if (s.chapPayorGender)
+            setChapPayorGender(s.chapPayorGender);
+        if (s.phPlan !== undefined)
+            setPhPlan(s.phPlan);
+        if (s.phDeduct !== undefined)
+            setPhDeduct(s.phDeduct);
+        if (s.phArea)
+            setPhArea(s.phArea);
+        if (s.psave104SI !== undefined)
+            setPsave104SI(s.psave104SI);
+        if (s.psave126SI !== undefined)
+            setPsave126SI(s.psave126SI);
+        if (s.hs208SI !== undefined)
+            setHs208SI(s.hs208SI);
+        if (s.hs126SI !== undefined)
+            setHs126SI(s.hs126SI);
+        if (s.hs157SI !== undefined)
+            setHs157SI(s.hs157SI);
+        if (s.hs147SI !== undefined)
+            setHs147SI(s.hs147SI);
+        if (s.hs168SI !== undefined)
+            setHs168SI(s.hs168SI);
+        if (s.hs1810SI !== undefined)
+            setHs1810SI(s.hs1810SI);
+        if (s.hs2515SI !== undefined)
+            setHs2515SI(s.hs2515SI);
+        if (s.taxsaver105SI !== undefined)
+            setTaxsaver105SI(s.taxsaver105SI);
+        if (s.blasave168SI !== undefined)
+            setBlasave168SI(s.blasave168SI);
+        if (s.hs999SI !== undefined)
+            setHs999SI(s.hs999SI);
+        if (s.punsukSI !== undefined)
+            setPunsukSI(s.punsukSI);
+        if (s.pension888SI !== undefined)
+            setPension888SI(s.pension888SI);
+        if (s.pension888Mode)
+            setPension888Mode(s.pension888Mode);
+        if (s.pension888PremiumInput !== undefined)
+            setPension888PremiumInput(s.pension888PremiumInput);
+        if (s.pension888TargetPension !== undefined)
+            setPension888TargetPension(s.pension888TargetPension);
+        if (s.pensioncare888SI !== undefined)
+            setPensioncare888SI(s.pensioncare888SI);
+        if (s.pensioncare888Mode)
+            setPensioncare888Mode(s.pensioncare888Mode);
+        if (s.pensioncare888PremiumInput !== undefined)
+            setPensioncare888PremiumInput(s.pensioncare888PremiumInput);
+        if (s.pensioncare888TargetPension !== undefined)
+            setPensioncare888TargetPension(s.pensioncare888TargetPension);
+        if (s.savecare168SI !== undefined)
+            setSavecare168SI(s.savecare168SI);
+        if (s.selectedConcerns)
+            setSelectedConcerns(s.selectedConcerns);
+        if (s.opdPlan !== undefined)
+            setOpdPlan(s.opdPlan);
+        if (s.hhPlan !== undefined)
+            setHhPlan(s.hhPlan);
+        if (s.hhDeduct !== undefined)
+            setHhDeduct(s.hhDeduct);
+        if (s.acc1SI !== undefined)
+            setAcc1SI(s.acc1SI);
+        if (s.acc2SI !== undefined)
+            setAcc2SI(s.acc2SI);
+        if (s.happyciSI !== undefined)
+            setHappyciSI(s.happyciSI);
+        if (s.happyciTerm !== undefined)
+            setHappyciTerm(s.happyciTerm);
+        if (s.llcSI !== undefined)
+            setLlcSI(s.llcSI);
+        if (s.llcVariant !== undefined)
+            setLlcVariant(s.llcVariant);
+        if (s.ssSI !== undefined)
+            setSsSI(s.ssSI);
+        if (s.happypensionPremiumInput !== undefined)
+            setHappypensionPremiumInput(s.happypensionPremiumInput);
+        if (s.happypensionTerm !== undefined)
+            setHappypensionTerm(s.happypensionTerm);
+        if (s.happypensionMode !== undefined)
+            setHappypensionMode(s.happypensionMode);
+        if (s.happypensionTargetPension !== undefined)
+            setHappypensionTargetPension(s.happypensionTargetPension);
+        if (s.savingsMode) setSavingsMode(s.savingsMode);
+        if (s.savingsPremiumInput) setSavingsPremiumInput(s.savingsPremiumInput);
+    }
     // โหลดข้อมูลที่บันทึกไว้ล่าสุด (ถ้ามี) ตอนเปิดแอปครั้งแรก
     useEffect(() => {
         (async () => {
             const raw = await storageAdapter.get(STORAGE_KEY);
             if (raw) {
                 try {
-                    const s = JSON.parse(raw);
-                    if (s.gender)
-                        setGender(s.gender);
-                    if (s.age !== undefined)
-                        setAge(s.age);
-                    if (s.occClass)
-                        setOccClass(s.occClass);
-                    if (s.payMode)
-                        setPayMode(s.payMode);
-                    if (s.sudSI !== undefined)
-                        setSudSI(s.sudSI);
-                    if (s.life99SI !== undefined)
-                        setLife99SI(s.life99SI);
-                    if (s.unjaiPlan !== undefined)
-                        setUnjaiPlan(s.unjaiPlan);
-                    if (s.cancermaxPlan !== undefined)
-                        setCancermaxPlan(s.cancermaxPlan);
-                    if (s.plus2SI !== undefined)
-                        setPlus2SI(s.plus2SI);
-                    if (s.plus2Term !== undefined)
-                        setPlus2Term(s.plus2Term);
-                    if (s.prestigeSI !== undefined)
-                        setPrestigeSI(s.prestigeSI);
-                    if (s.prestigeTerm !== undefined)
-                        setPrestigeTerm(s.prestigeTerm);
-                    if (s.selected)
-                        setSelected(s.selected);
-                    if (s.accPlan !== undefined)
-                        setAccPlan(s.accPlan);
-                    if (s.acc3Plan !== undefined)
-                        setAcc3Plan(s.acc3Plan);
-                    if (s.tpdSI !== undefined)
-                        setTpdSI(s.tpdSI);
-                    if (s.supSI !== undefined)
-                        setSupSI(s.supSI);
-                    if (s.vhPlan !== undefined)
-                        setVhPlan(s.vhPlan);
-                    if (s.vhkidsPlan !== undefined)
-                        setVhkidsPlan(s.vhkidsPlan);
-                    if (s.rpprDaily !== undefined)
-                        setRpprDaily(s.rpprDaily);
-                    if (s.hhpPlan !== undefined)
-                        setHhpPlan(s.hhpPlan);
-                    if (s.hhpDeduct !== undefined)
-                        setHhpDeduct(s.hhpDeduct);
-                    if (s.csPayorAge !== undefined)
-                        setCsPayorAge(s.csPayorAge);
-                    if (s.csPayorGender)
-                        setCsPayorGender(s.csPayorGender);
-                    if (s.happysavingSI !== undefined)
-                        setHappysavingSI(s.happysavingSI);
-                    if (s.happysavingTerm !== undefined)
-                        setHappysavingTerm(s.happysavingTerm);
-                    if (s.happywlSI !== undefined)
-                        setHappywlSI(s.happywlSI);
-                    if (s.happywlTerm !== undefined)
-                        setHappywlTerm(s.happywlTerm);
-                    if (s.hrp9920SI !== undefined)
-                        setHrp9920SI(s.hrp9920SI);
-                    if (s.hrpdivSI !== undefined)
-                        setHrpdivSI(s.hrpdivSI);
-                    if (s.hrpdivTerm !== undefined)
-                        setHrpdivTerm(s.hrpdivTerm);
-                    if (s.hrp9901SI !== undefined)
-                        setHrp9901SI(s.hrp9901SI);
-                    if (s.happywl9901SI !== undefined)
-                        setHappywl9901SI(s.happywl9901SI);
-                    if (s.happykidSI !== undefined)
-                        setHappykidSI(s.happykidSI);
-                    if (s.chakSI !== undefined)
-                        setChakSI(s.chakSI);
-                    if (s.chakTerm !== undefined)
-                        setChakTerm(s.chakTerm);
-                    if (s.chapSI !== undefined)
-                        setChapSI(s.chapSI);
-                    if (s.chapTerm !== undefined)
-                        setChapTerm(s.chapTerm);
-                    if (s.chapPayorAge !== undefined)
-                        setChapPayorAge(s.chapPayorAge);
-                    if (s.chapPayorGender)
-                        setChapPayorGender(s.chapPayorGender);
-                    if (s.phPlan !== undefined)
-                        setPhPlan(s.phPlan);
-                    if (s.phDeduct !== undefined)
-                        setPhDeduct(s.phDeduct);
-                    if (s.phArea)
-                        setPhArea(s.phArea);
-                    if (s.psave104SI !== undefined)
-                        setPsave104SI(s.psave104SI);
-                    if (s.psave126SI !== undefined)
-                        setPsave126SI(s.psave126SI);
-                    if (s.hs208SI !== undefined)
-                        setHs208SI(s.hs208SI);
-                    if (s.hs126SI !== undefined)
-                        setHs126SI(s.hs126SI);
-                    if (s.hs157SI !== undefined)
-                        setHs157SI(s.hs157SI);
-                    if (s.hs147SI !== undefined)
-                        setHs147SI(s.hs147SI);
-                    if (s.hs168SI !== undefined)
-                        setHs168SI(s.hs168SI);
-                    if (s.hs1810SI !== undefined)
-                        setHs1810SI(s.hs1810SI);
-                    if (s.hs2515SI !== undefined)
-                        setHs2515SI(s.hs2515SI);
-                    if (s.taxsaver105SI !== undefined)
-                        setTaxsaver105SI(s.taxsaver105SI);
-                    if (s.blasave168SI !== undefined)
-                        setBlasave168SI(s.blasave168SI);
-                    if (s.hs999SI !== undefined)
-                        setHs999SI(s.hs999SI);
-                    if (s.punsukSI !== undefined)
-                        setPunsukSI(s.punsukSI);
-                    if (s.pension888SI !== undefined)
-                        setPension888SI(s.pension888SI);
-                    if (s.pension888Mode)
-                        setPension888Mode(s.pension888Mode);
-                    if (s.pension888PremiumInput !== undefined)
-                        setPension888PremiumInput(s.pension888PremiumInput);
-                    if (s.pension888TargetPension !== undefined)
-                        setPension888TargetPension(s.pension888TargetPension);
-                    if (s.pensioncare888SI !== undefined)
-                        setPensioncare888SI(s.pensioncare888SI);
-                    if (s.pensioncare888Mode)
-                        setPensioncare888Mode(s.pensioncare888Mode);
-                    if (s.pensioncare888PremiumInput !== undefined)
-                        setPensioncare888PremiumInput(s.pensioncare888PremiumInput);
-                    if (s.pensioncare888TargetPension !== undefined)
-                        setPensioncare888TargetPension(s.pensioncare888TargetPension);
-                    if (s.savecare168SI !== undefined)
-                        setSavecare168SI(s.savecare168SI);
-                    if (s.selectedConcerns)
-                        setSelectedConcerns(s.selectedConcerns);
-                    if (s.opdPlan !== undefined)
-                        setOpdPlan(s.opdPlan);
-                    if (s.happyciSI !== undefined)
-                        setHappyciSI(s.happyciSI);
-                    if (s.happyciTerm !== undefined)
-                        setHappyciTerm(s.happyciTerm);
-                    if (s.llcSI !== undefined)
-                        setLlcSI(s.llcSI);
-                    if (s.llcVariant !== undefined)
-                        setLlcVariant(s.llcVariant);
-                    if (s.ssSI !== undefined)
-                        setSsSI(s.ssSI);
-                    if (s.happypensionPremiumInput !== undefined)
-                        setHappypensionPremiumInput(s.happypensionPremiumInput);
-                    if (s.happypensionTerm !== undefined)
-                        setHappypensionTerm(s.happypensionTerm);
-                    if (s.happypensionMode !== undefined)
-                        setHappypensionMode(s.happypensionMode);
-                    if (s.happypensionTargetPension !== undefined)
-                        setHappypensionTargetPension(s.happypensionTargetPension);
+                    applySnapshot(JSON.parse(raw));
                 }
                 catch (e) { }
             }
             setLoadedFromStorage(true);
         })();
     }, []);
+    function currentSnapshot() {
+        return { gender, age, occClass, payMode, sudSI, life99SI, unjaiPlan, cancermaxPlan, plus2SI, plus2Term, prestigeSI, prestigeTerm, selected, accPlan, acc3Plan, tpdSI, supSI, vhPlan, vhkidsPlan, rpprDaily, hhpPlan, hhpDeduct, opdPlan, hhPlan, hhDeduct, acc1SI, acc2SI, happyciSI, happyciTerm, llcSI, llcVariant, ssSI, happypensionPremiumInput, happypensionTerm, happypensionMode, happypensionTargetPension, happysavingSI, happysavingTerm, happywlSI, happywlTerm, hrp9920SI, hrpdivSI, hrpdivTerm, hrp9901SI, happywl9901SI, happykidSI, chakSI, chakTerm, chapSI, chapTerm, chapPayorAge, chapPayorGender, phPlan, phDeduct, phArea, psave104SI, psave126SI, hs208SI, hs126SI, hs157SI, hs147SI, hs168SI, hs1810SI, hs2515SI, taxsaver105SI, blasave168SI, hs999SI, punsukSI, pension888SI, pension888Mode, pension888PremiumInput, pension888TargetPension, savecare168SI, pensioncare888SI, pensioncare888Mode, pensioncare888PremiumInput, pensioncare888TargetPension, csPayorAge, csPayorGender, selectedConcerns };
+    }
     // บันทึกข้อมูลล่าสุดทุกครั้งที่มีการเปลี่ยนแปลง (หลังจากโหลดข้อมูลเดิมเสร็จแล้วเท่านั้น)
     useEffect(() => {
         if (!loadedFromStorage)
             return;
-        const snapshot = { gender, age, occClass, payMode, sudSI, life99SI, unjaiPlan, cancermaxPlan, plus2SI, plus2Term, prestigeSI, prestigeTerm, selected, accPlan, acc3Plan, tpdSI, supSI, vhPlan, vhkidsPlan, rpprDaily, hhpPlan, hhpDeduct, opdPlan, happyciSI, happyciTerm, llcSI, llcVariant, ssSI, happypensionPremiumInput, happypensionTerm, happypensionMode, happypensionTargetPension, happysavingSI, happysavingTerm, happywlSI, happywlTerm, hrp9920SI, hrpdivSI, hrpdivTerm, hrp9901SI, happywl9901SI, happykidSI, chakSI, chakTerm, chapSI, chapTerm, chapPayorAge, chapPayorGender, phPlan, phDeduct, phArea, psave104SI, psave126SI, hs208SI, hs126SI, hs157SI, hs147SI, hs168SI, hs1810SI, hs2515SI, taxsaver105SI, blasave168SI, hs999SI, punsukSI, pension888SI, pension888Mode, pension888PremiumInput, pension888TargetPension, savecare168SI, pensioncare888SI, pensioncare888Mode, pensioncare888PremiumInput, pensioncare888TargetPension, csPayorAge, csPayorGender, selectedConcerns };
+        const snapshot = currentSnapshot();
         storageAdapter.set(STORAGE_KEY, JSON.stringify(snapshot));
-    }, [loadedFromStorage, gender, age, occClass, payMode, sudSI, life99SI, unjaiPlan, cancermaxPlan, plus2SI, plus2Term, prestigeSI, prestigeTerm, selected, accPlan, acc3Plan, tpdSI, supSI, vhPlan, vhkidsPlan, rpprDaily, hhpPlan, hhpDeduct, opdPlan, happyciSI, happyciTerm, llcSI, llcVariant, ssSI, happypensionPremiumInput, happypensionTerm, happypensionMode, happypensionTargetPension, happysavingSI, happysavingTerm, happywlSI, happywlTerm, hrp9920SI, hrpdivSI, hrpdivTerm, hrp9901SI, happywl9901SI, happykidSI, chakSI, chakTerm, chapSI, chapTerm, chapPayorAge, chapPayorGender, phPlan, phDeduct, phArea, psave104SI, psave126SI, hs208SI, hs126SI, hs157SI, hs147SI, hs168SI, hs1810SI, hs2515SI, taxsaver105SI, blasave168SI, hs999SI, punsukSI, pension888SI, pension888Mode, pension888PremiumInput, pension888TargetPension, savecare168SI, pensioncare888SI, pensioncare888Mode, pensioncare888PremiumInput, pensioncare888TargetPension, csPayorAge, csPayorGender, selectedConcerns]);
+    }, [loadedFromStorage, gender, age, occClass, payMode, sudSI, life99SI, unjaiPlan, cancermaxPlan, plus2SI, plus2Term, prestigeSI, prestigeTerm, selected, accPlan, acc3Plan, tpdSI, supSI, vhPlan, vhkidsPlan, rpprDaily, hhpPlan, hhpDeduct, opdPlan, hhPlan, hhDeduct, acc1SI, acc2SI, happyciSI, happyciTerm, llcSI, llcVariant, ssSI, happypensionPremiumInput, happypensionTerm, happypensionMode, happypensionTargetPension, happysavingSI, happysavingTerm, happywlSI, happywlTerm, hrp9920SI, hrpdivSI, hrpdivTerm, hrp9901SI, happywl9901SI, happykidSI, chakSI, chakTerm, chapSI, chapTerm, chapPayorAge, chapPayorGender, phPlan, phDeduct, phArea, psave104SI, psave126SI, hs208SI, hs126SI, hs157SI, hs147SI, hs168SI, hs1810SI, hs2515SI, taxsaver105SI, blasave168SI, hs999SI, punsukSI, pension888SI, pension888Mode, pension888PremiumInput, pension888TargetPension, savecare168SI, pensioncare888SI, pensioncare888Mode, pensioncare888PremiumInput, pensioncare888TargetPension, csPayorAge, csPayorGender, selectedConcerns]);
     const toggle = (id) => setSelected((s) => {
         const turningOn = !s[id];
         const p = PRODUCTS.find((x) => x.id === id);
@@ -2086,8 +2425,10 @@ function App() {
             return true; // แพ็กเกจปิด / แบบที่ห้ามซื้อสัญญาเพิ่มเติม บล็อกอนุสัญญาทั้งหมด
         if (age < p.ageMin || age > p.ageMax)
             return true; // อายุไม่เข้าเงื่อนไขของแบบนั้น
-        if (p.id === "OPD" && !(selected.VH || selected.VHKIDS || selected.HHP))
+        if (p.id === "OPD" && !(selected.VH || selected.VHKIDS || selected.HHP || selected.HH || (selected.PH && opdpAmountForPh(phPlan) > 0)))
             return true; // ต้องมีสัญญาหลักสุขภาพก่อน
+        if (p.id === "OPDP" && !(selected.PH && opdpAmountForPh(phPlan) > 0))
+            return true; // แนบได้เฉพาะ เพรสทีจ เฮลธ์ ปลดล็อค แผน 20/30 ล้าน
         if (p.id === "HAPPYCI" && !(selected.SUD || selected.LIFE99 || selected.PRESTIGE || selected.HAPPYSAVING || selected.HAPPYWL || selected.HRP9920 || selected.HRPDIV || selected.HRP9901 || selected.HAPPYWL9901 || selected.HAPPYKID))
             return true; // ต้องเป็นแบบคุ้มครองถึงอายุ 99 ปี
         if (p.id === "LLC" && selected.PLUS2)
@@ -2096,7 +2437,7 @@ function App() {
     }
     // รวมรายชื่อแบบประกันที่ "แนะนำ" ตามความกังวลที่ลูกค้าเลือกไว้ทั้งหมด (ใช้ขึ้นป้ายเท่านั้น ไม่ติ๊กเลือกให้อัตโนมัติ)
     // + ถ้าอนุสัญญาที่แนะนำต้องซื้อคู่กับทุนประกันหลัก และยังไม่ได้เลือกทุนหลักไว้ ให้แนะนำทุนหลักที่เบี้ยถูกที่สุดสำหรับอายุนี้มาคู่กันด้วย
-    const REQUIRES_ANY_MAIN_IDS = ["ACC", "ACC3", "TPD", "VH", "VHKIDS", "HHP", "RPPR"]; // ใช้ mainSI ขั้นต่ำ 50,000 บาท จากทุนหลักตัวใดก็ได้
+    const REQUIRES_ANY_MAIN_IDS = ["ACC", "ACC3", "TPD", "VH", "VHKIDS", "HHP", "RPPR", "HH", "ACC1", "ACC2"]; // ใช้ mainSI ขั้นต่ำ 50,000 บาท จากทุนหลักตัวใดก็ได้
     const REQUIRES_SPECIFIC_MAIN_IDS = { HAPPYCI: ["SUD", "LIFE99", "PRESTIGE", "HAPPYSAVING", "HAPPYWL", "HRP9920", "HRPDIV", "HRP9901", "HAPPYWL9901", "HAPPYKID"] }; // ต้องเป็นแบบคุ้มครองถึงอายุ 99 ปีเท่านั้น
     const OCC_12_ONLY_IDS = new Set(["SUD", "PLUS2", "PRESTIGE", "HAPPYWL", "HAPPYWL9901"]); // รับประกันเฉพาะชั้นอาชีพ 1-2 เท่านั้น ไม่รับชั้นอาชีพ 3
     // เช็คเงื่อนไขเบื้องต้นก่อนจะแนะนำแบบประกันใดๆ: อายุต้องอยู่ในช่วงรับประกัน และถ้าเป็นแบบที่รับเฉพาะชั้นอาชีพ 1-2 ต้องไม่ใช่ชั้นอาชีพ 3
@@ -2294,9 +2635,9 @@ function App() {
     // จัดกลุ่มแบบประกันเป็น 4 หมวดให้เห็นภาพรวมได้ง่ายขึ้น — โรคร้ายแรงรวมทั้งทุนหลัก (อุ่นใจ/แคนเซอร์แม็กซ์) และสัญญาเพิ่มเติมไว้ด้วยกัน
     const CATEGORY_GROUPS = [
         { id: "main", label: "💰 ทุนประกันหลัก", ids: MAIN_IDS.filter((id) => id !== "UNJAI" && id !== "CANCERMAX" && !SAVINGS_IDS.includes(id) && !PENSION_IDS.includes(id)) },
-        { id: "health", label: "🏥 สุขภาพ", ids: ["VH", "VHKIDS", "HHP", "OPD", "PH"] },
+        { id: "health", label: "🏥 สุขภาพ", ids: ["VH", "VHKIDS", "HHP", "HH", "OPD", "PH", "OPDP"] },
         { id: "critical", label: "🎗️ โรคร้ายแรง (ทุนหลัก + สัญญาเพิ่มเติม)", ids: ["UNJAI", "CANCERMAX", "SUPER", "HAPPYCI", "LLC", "SS"] },
-        { id: "other", label: "🧩 อื่นๆ (อุบัติเหตุ / ทุพพลภาพ / เฉพาะกาล)", ids: ["ACC", "ACC3", "TPD", "RPPR", "CHAK", "CHAP"] },
+        { id: "other", label: "🧩 อื่นๆ (อุบัติเหตุ / ทุพพลภาพ / เฉพาะกาล)", ids: ["ACC", "ACC3", "ACC1", "ACC2", "TPD", "RPPR", "CHAK", "CHAP"] },
     ];
     // ป้ายบอกเงื่อนไขพิเศษแบบสั้นๆ ในการ์ดกะทัดรัด — แพ็กเกจปิด / ต้องมีทุนหลักคู่กัน
     const COMPACT_TAG = {
@@ -2304,6 +2645,7 @@ function App() {
         CANCERMAX: "📦 แพ็กเกจปิด (ยกเว้น คช.)",
         HAPPYCI: "🔗 ต้องมีทุนหลักคุ้มครองถึง 99 ปี",
         LLC: "🔗 ต้องมีทุนหลัก (ห้ามคู่ 2 พลัส)",
+        OPDP: "🔗 ต้องมี เพรสทีจ เฮลธ์ 20/30 ล้าน",
     };
     function productDisabled(p) {
         if (p.id === "CS")
@@ -2436,6 +2778,21 @@ function App() {
                     React.createElement(Chips, { options: HHP_DEDUCT, value: hhpDeduct, onChange: setHhpDeduct, fmt: (v) => v === 0 ? "ไม่มี" : baht(v) }))));
             case "OPD": return selected.OPD && (React.createElement(PlanRow, { label: "\u0E1C\u0E25\u0E1B\u0E23\u0E30\u0E42\u0E22\u0E0A\u0E19\u0E4C\u0E15\u0E48\u0E2D\u0E04\u0E23\u0E31\u0E49\u0E07 (\u0E1A\u0E32\u0E17)" },
                 React.createElement(Chips, { options: OPD_PLANS, value: opdPlan, onChange: setOpdPlan, fmt: baht })));
+            case "HH": return selected.HH && (React.createElement(React.Fragment, null,
+                React.createElement(PlanRow, { label: "แผนความคุ้มครอง (วงเงินต่อครั้ง)" },
+                    React.createElement(Chips, { options: HH_PLANS, value: hhPlan, onChange: setHhPlan, fmt: baht })),
+                React.createElement(PlanRow, { label: "ความรับผิดส่วนแรก" },
+                    React.createElement(Chips, { options: HH_DEDUCT, value: hhDeduct, onChange: setHhDeduct, fmt: baht }))));
+            case "OPDP": return selected.OPDP && (React.createElement("p", { className: "text-[19px] px-1", style: { color: BRAND.sub } },
+                opdpAmountForPh(phPlan) > 0 ? `วงเงิน ${baht(opdpAmountForPh(phPlan))} ต่อครั้ง (กำหนดตาม เพรสทีจ เฮลธ์ แผน ${baht(phPlan)})` : "ต้องเลือก เพรสทีจ เฮลธ์ ปลดล็อค แผน 20 หรือ 30 ล้าน"));
+            case "ACC1": return selected.ACC1 && (React.createElement(React.Fragment, null,
+                React.createElement(PlanRow, { label: "ทุนประกัน อบ.1 (บาท)" },
+                    React.createElement(NumInput, { value: acc1SI, onChange: setAcc1SI, min: 0, step: 50000 })),
+                React.createElement("p", { className: "text-[19px] px-1", style: { color: BRAND.sub } }, "สูงสุดสำหรับเคสนี้: ", mainSI > 0 ? baht(acc12Max("ACC1")) : "ยังไม่ได้เลือกทุนประกันหลัก")));
+            case "ACC2": return selected.ACC2 && (React.createElement(React.Fragment, null,
+                React.createElement(PlanRow, { label: "ทุนประกัน อบ.2 (บาท)" },
+                    React.createElement(NumInput, { value: acc2SI, onChange: setAcc2SI, min: 0, step: 50000 })),
+                React.createElement("p", { className: "text-[19px] px-1", style: { color: BRAND.sub } }, "สูงสุดสำหรับเคสนี้: ", mainSI > 0 ? baht(acc12Max("ACC2")) : "ยังไม่ได้เลือกทุนประกันหลัก")));
             case "HAPPYCI": return selected.HAPPYCI && (React.createElement(React.Fragment, null,
                 React.createElement(PlanRow, { label: "\u0E23\u0E30\u0E22\u0E30\u0E40\u0E27\u0E25\u0E32\u0E0A\u0E33\u0E23\u0E30\u0E40\u0E1A\u0E35\u0E49\u0E22" },
                     React.createElement(Chips, { options: HAPPYCI_TERMS, value: happyciTerm, onChange: setHappyciTerm, fmt: (t) => t === 20 ? "20 ปี" : "ถึงอายุ 99 ปี" })),
@@ -2655,7 +3012,7 @@ function App() {
             });
             return changed ? next : s;
         });
-    }, [age, selected.VH, selected.VHKIDS, selected.HHP, selected.SUD, selected.LIFE99, selected.PRESTIGE, selected.UNJAI, selected.CANCERMAX, selected.PLUS2, selected.HAPPYSAVING, selected.HAPPYWL, selected.HRP9920, selected.HRPDIV, selected.HRP9901, selected.HAPPYWL9901, selected.HAPPYKID]);
+    }, [age, selected.VH, selected.VHKIDS, selected.HHP, selected.HH, selected.PH, phPlan, selected.SUD, selected.LIFE99, selected.PRESTIGE, selected.UNJAI, selected.CANCERMAX, selected.PLUS2, selected.HAPPYSAVING, selected.HAPPYWL, selected.HRP9920, selected.HRPDIV, selected.HRP9901, selected.HAPPYWL9901, selected.HAPPYKID]);
     // ยกเลิกการเลือกทุนประกันหลักโดยอัตโนมัติ ถ้าอายุเปลี่ยนแล้วไม่เข้าเงื่อนไขของแบบนั้นอีกต่อไป
     useEffect(() => {
         setSelected((s) => {
@@ -2677,7 +3034,7 @@ function App() {
         setPayMode("year");
         setSelectedConcerns([]);
         setPickedRecommendations([]);
-        setSelected({ SUD: false, LIFE99: false, UNJAI: false, CANCERMAX: false, PLUS2: false, PRESTIGE: false, ACC: false, ACC3: false, TPD: false, SUPER: false, VH: false, VHKIDS: false, RPPR: false, HHP: false, OPD: false, HAPPYCI: false, LLC: false, SS: false, HAPPYPENSION: false, HAPPYSAVING: false, HAPPYWL: false, HRP9920: false, HRPDIV: false, HRP9901: false, HAPPYWL9901: false, HAPPYKID: false, CHAK: false, CHAP: false, PH: false, PSAVE104: false, PSAVE126: false, HS208: false, HS126: false, HS157: false, HS147: false, HS168: false, HS1810: false, HS2515: false, TAXSAVER105: false, BLASAVE168: false, HS999: false, PUNSUK: false, PENSION888: false, SAVECARE168: false, PENSIONCARE888: false, CS: false });
+        setSelected({ SUD: false, LIFE99: false, UNJAI: false, CANCERMAX: false, PLUS2: false, PRESTIGE: false, ACC: false, ACC3: false, TPD: false, SUPER: false, VH: false, VHKIDS: false, RPPR: false, HHP: false, OPD: false, HH: false, OPDP: false, ACC1: false, ACC2: false, HAPPYCI: false, LLC: false, SS: false, HAPPYPENSION: false, HAPPYSAVING: false, HAPPYWL: false, HRP9920: false, HRPDIV: false, HRP9901: false, HAPPYWL9901: false, HAPPYKID: false, CHAK: false, CHAP: false, PH: false, PSAVE104: false, PSAVE126: false, HS208: false, HS126: false, HS157: false, HS147: false, HS168: false, HS1810: false, HS2515: false, TAXSAVER105: false, BLASAVE168: false, HS999: false, PUNSUK: false, PENSION888: false, SAVECARE168: false, PENSIONCARE888: false, CS: false });
         setSudSI(0);
         setLife99SI(0);
         setUnjaiPlan(0);
@@ -2696,6 +3053,10 @@ function App() {
         setHhpPlan(0);
         setHhpDeduct(0);
         setOpdPlan(0);
+        setHhPlan(0);
+        setHhDeduct(0);
+        setAcc1SI(0);
+        setAcc2SI(0);
         setHappyciSI(0);
         setHappyciTerm(0);
         setLlcSI(0);
@@ -2777,12 +3138,14 @@ function App() {
             return { ok: false, msg: "ทุนประกันต่ำกว่า 500,000 บาท ต้องซื้อสัญญาเพิ่มเติมอย่างน้อย 1 รายการควบคู่กับสุดคุ้มเสมอ (ตามเงื่อนไขกรมธรรม์) — หากทุนประกันตั้งแต่ 500,000 บาทขึ้นไป ซื้อเดี่ยวได้โดยไม่บังคับซื้อสัญญาเพิ่มเติม" };
         }
         const rate = (gender === "female" ? SUD_FEMALE : SUD_MALE)[age] - sudDiscount(sudSI);
+        const sudFreeEnd = Math.min(age + 20, 60); // แถมฟรี เอดีบี + ทีพีดี: เท่าระยะชำระเบี้ย (20 ปี) หรือถึงอายุ 60 ปี แล้วแต่อย่างใดถึงก่อน
         const premium = (rate * sudSI) / 1000;
         return { ok: true, premium, benefits: [
                 ["เสียชีวิตทุกกรณี", baht(sudSI) + " (หรือเบี้ยสะสม แล้วแต่มากกว่า)"],
-                ["เสียชีวิตจากอุบัติเหตุ รับเพิ่ม", baht(Math.round(sudSI * 0.5)) + " (รวมเป็น " + baht(Math.round(sudSI * 1.5)) + ")"],
-                ["ทุพพลภาพถาวรสิ้นเชิง", baht(Math.min(Math.round(sudSI * 0.5), 5000000)) + " (สูงสุด 5,000,000 บาท)"],
-                ["ระยะเวลาคุ้มครองอุบัติเหตุ/ทุพพลภาพ", "20 ปีกรมธรรม์แรก หรือถึงอายุ 60 ปี แล้วแต่มากกว่า"],
+                ...(sudFreeEnd > age ? [
+                    ["แถมฟรี: เสียชีวิตจากอุบัติเหตุ รับเพิ่ม", baht(Math.round(sudSI * 0.5)) + " (รวมเป็น " + baht(Math.round(sudSI * 1.5)) + `) · คุ้มครองถึงอายุ ${sudFreeEnd} ปี (อีก ${sudFreeEnd - age} ปี)`],
+                    ["แถมฟรี: ทุพพลภาพถาวรสิ้นเชิง", baht(Math.min(Math.round(sudSI * 0.5), 5000000)) + ` (สูงสุด 5,000,000 บาท) · คุ้มครองถึงอายุ ${sudFreeEnd} ปี (อีก ${sudFreeEnd - age} ปี)`],
+                ] : [["แถมฟรี: อุบัติเหตุ/ทุพพลภาพ", "ไม่ได้รับ เพราะคุ้มครองได้ไม่เกินอายุ 60 ปี"]]),
                 ["มีชีวิตอยู่จนครบกำหนดสัญญา (อายุ 99 ปี)", "รับ " + baht(sudSI)],
                 ["ระยะเวลาคุ้มครอง", "รับประกันตั้งแต่อายุแรกเกิด (0 ปี) ถึง 70 ปี ชำระเบี้ย 20 ปี คุ้มครองตลอดชีพจนถึงอายุ 99 ปี"],
             ] };
@@ -3113,12 +3476,13 @@ function App() {
         const bi = bandIndex(age, OPD_BANDS);
         if (bi < 0)
             return { ok: false, msg: "อายุรับประกัน 1-80 ปี (ชำระเบี้ยได้ถึงอายุ 98 ปี)" };
-        if (!(selected.VH || selected.VHKIDS || selected.HHP))
-            return { ok: false, msg: "ต้องซื้อคู่กับ แวลู เฮลธ์ / แวลู เฮลธ์ คิดส์ พรีเมียร์ / แฮปปี้ เฮลธ์ พรีเมียร์ อย่างใดอย่างหนึ่งก่อน จึงจะซื้อ OPD สบายใจ ได้" };
+        const phOpd = selected.PH && opdpAmountForPh(phPlan) > 0;
+        if (!(selected.VH || selected.VHKIDS || selected.HHP || selected.HH || phOpd))
+            return { ok: false, msg: "ต้องซื้อคู่กับ แวลู เฮลธ์ / แวลู เฮลธ์ คิดส์ พรีเมียร์ / แฮปปี้ เฮลธ์ (พรีเมียร์) / เพรสทีจ เฮลธ์ ปลดล็อค 20-30 ล้าน อย่างใดอย่างหนึ่งก่อน จึงจะซื้อ OPD สบายใจ ได้" };
         let maxOpd = 2000, sourceNote = "";
-        if (selected.HHP) {
+        if (selected.HHP || selected.HH) {
             maxOpd = 2000;
-            sourceNote = "แฮปปี้ เฮลธ์ พรีเมียร์ (ไม่มีเพดานค่าห้อง)";
+            sourceNote = (selected.HH ? "แฮปปี้ เฮลธ์" : "แฮปปี้ เฮลธ์ พรีเมียร์") + " (ไม่ระบุค่าห้อง)";
         }
         else if (selected.VH) {
             maxOpd = vhPlan <= 2000 ? 1000 : (vhPlan <= 3000 ? 1500 : 2000);
@@ -3127,6 +3491,16 @@ function App() {
         else if (selected.VHKIDS) {
             maxOpd = vhkidsPlan <= 2000 ? 1000 : (vhkidsPlan <= 3000 ? 1500 : 2000);
             sourceNote = `แวลู เฮลธ์ คิดส์ แผน ${baht(vhkidsPlan)}/วัน`;
+        }
+        else if (phOpd) {
+            maxOpd = 2000;
+            sourceNote = `เพรสทีจ เฮลธ์ ปลดล็อค แผน ${baht(phPlan)}`;
+        }
+        if (selected.OPDP && phOpd) { // วงเงิน OPD ทุกฉบับรวมกันไม่เกิน 2,000 บาท
+            maxOpd = Math.min(maxOpd, 2000 - opdpAmountForPh(phPlan));
+            sourceNote += ` และรวมกับ OPD สบายใจ เพรสทีจ ${baht(opdpAmountForPh(phPlan))} แล้วไม่เกิน 2,000`;
+            if (maxOpd < OPD_PLANS[0])
+                return { ok: false, msg: "วงเงิน OPD รวมเต็ม 2,000 บาทแล้ว (OPD สบายใจ เพรสทีจ 2,000) จึงซื้อ OPD สบายใจ เพิ่มไม่ได้" };
         }
         const pi = OPD_PLANS.indexOf(opdPlan);
         if (pi < 0)
@@ -3139,6 +3513,105 @@ function App() {
                 ["วงเงินสูงสุดที่ซื้อได้ตามสัญญาหลักที่แนบ", baht(maxOpd) + ` (อ้างอิง ${sourceNote})`],
                 ["ความคุ้มครอง", "ค่าปรึกษาแพทย์ ค่าบริการทางการแพทย์ ค่ายา ค่าตรวจวินิจฉัยทางห้องปฏิบัติการและรังสีวิทยา ค่าภาพถ่ายทางการแพทย์ ค่าเครื่องมือและอุปกรณ์การแพทย์"],
                 ["ระยะเวลาคุ้มครอง", "1 ปี ต่ออายุพร้อมสัญญาเพิ่มเติมสุขภาพที่บันทึกสลักหลังนี้แนบอยู่"],
+            ] };
+    }
+    function calcHH() {
+        if (age < 11 || age > 80)
+            return { ok: false, msg: "อายุรับประกัน 11-80 ปี (ต่ออายุได้ถึงอายุ 98 ปี)" };
+        if (mainSI < 50000)
+            return { ok: false, msg: "ต้องมีทุนประกันหลัก ขั้นต่ำ 50,000 บาท จึงจะซื้อ แฮปปี้ เฮลธ์ ได้" };
+        const pi = HH_PLANS.indexOf(hhPlan);
+        const di = HH_DEDUCT.indexOf(hhDeduct);
+        if (pi < 0)
+            return { ok: false, msg: "กรุณาเลือกแผนความคุ้มครอง (1 / 5 / 10 ล้านบาท)" };
+        if (di < 0)
+            return { ok: false, msg: "กรุณาเลือกความรับผิดส่วนแรก (30,000 หรือ 100,000 บาท)" };
+        const bi = bandIndex(age, VH_BANDS);
+        const premium = HH_TABLE[gender][occClass === 3 ? "c3" : "c12"][bi][pi * 2 + di];
+        return { ok: true, premium, benefits: [
+                ["แผนความคุ้มครอง", `แผน ${pi + 2} · วงเงินผู้ป่วยใน ${baht(hhPlan)} ต่อการเข้าพักรักษาครั้งใดครั้งหนึ่ง`],
+                ["กรณีโรคมะเร็ง/หัวใจ/หลอดเลือดสมอง", baht(HH_BEN.ci[hhPlan]) + " ต่อครั้ง (สลักหลังโรคร้ายแรง +10% · ไม่คุ้มครอง 120 วันแรก)"],
+                ["ความรับผิดส่วนแรก (Deductible)", baht(hhDeduct) + " ต่อการเข้ารักษาครั้งใดครั้งหนึ่ง (ถ้าสวัสดิการ/ประกันอื่นจ่ายเกินส่วนแรกแล้ว บริษัทจ่ายส่วนที่เหลือ)"],
+                ["ชั้นอาชีพ", occClass === 3 ? "ชั้น 3" : "ชั้น 1-2"],
+                ["ค่าห้อง/ICU, แพทย์, ผ่าตัด, Day Surgery, รถพยาบาล, ผ่าตัดเล็ก", "จ่ายตามจริง (ห้องเดี่ยวราคาเริ่มต้นของ รพ.) ภายในวงเงินต่อครั้ง"],
+                ["ยากลับบ้าน (ไม่เกิน 7 วัน)", baht(HH_BEN.takeHome[hhPlan])],
+                ["ตรวจวินิจฉัยก่อน-หลังนอน รพ. 30 วัน / OPD ต่อเนื่อง", baht(HH_BEN.prePost[hhPlan]) + " ต่อการเข้าพักรักษาครั้งหนึ่ง"],
+                ["ล้างไต / รังสีรักษา / เคมีบำบัด (หมวด 9-11)", baht(HH_BEN.yearly[hhPlan]) + " ต่อรอบปีกรมธรรม์"],
+                ...(hhPlan === 10000000 ? [["OPD อุบัติเหตุภายใน 24 ชม. (หมวด 7)", baht(10000) + " ต่อครั้ง"]] : []),
+                ["ระยะเวลาคุ้มครอง", "สัญญาปีต่อปี รับประกันอายุ 11-80 ปี ต่ออายุได้ถึงอายุ 98 ปี"],
+                ["หมายเหตุ", "ตัวเลขหมวดย่อยถอดจากตารางในคู่มือ โปรดตรวจกับตารางฉบับเต็มก่อนนำเสนอลูกค้า · ลดหย่อนภาษีสุขภาพสูงสุด 25,000 บาท"],
+            ] };
+    }
+    function calcOPDP() {
+        if (age < 11 || age > 80)
+            return { ok: false, msg: "อายุรับประกัน 11-80 ปี (ชำระเบี้ยได้ถึงอายุ 98 ปี)" };
+        const amt = selected.PH ? opdpAmountForPh(phPlan) : 0;
+        if (!amt)
+            return { ok: false, msg: "แนบได้เฉพาะ เพรสทีจ เฮลธ์ ปลดล็อค แผน 20 ล้าน หรือ 30 ล้าน เท่านั้น" };
+        const premium = OPDP_RATES[bandIndex(age, OPDP_BANDS)][OPDP_AMOUNTS.indexOf(amt)];
+        return { ok: true, premium, benefits: [
+                ["ผลประโยชน์ต่อครั้ง", baht(amt) + " (สูงสุด 1 ครั้ง/วัน ไม่เกิน 30 ครั้ง/รอบปีกรมธรรม์)"],
+                ["แนบกับ", `เพรสทีจ เฮลธ์ ปลดล็อค แผน ${baht(phPlan)} (แผน 20 ล้าน = 1,500 / 30 ล้าน = 2,000)`],
+                ["ความคุ้มครอง", "ค่าแพทย์ ค่าบริการพยาบาลและโรงพยาบาลกรณีผู้ป่วยนอก ค่ายา ค่าตรวจทางเทคนิคการแพทย์และรังสีวิทยา ค่ากายภาพบำบัด ค่าเครื่องมือและอุปกรณ์การแพทย์"],
+                ["เงื่อนไข", "ซื้อได้ 1 ฉบับต่อคน · วงเงิน OPD ทุกฉบับรวมกันไม่เกิน 2,000 บาท · ถ้า เพรสทีจ เฮลธ์ มีเบี้ยเพิ่มตามอาชีพ/สุขภาพ ซื้อไม่ได้"],
+                ["ระยะเวลาคุ้มครอง", "1 ปี ต่ออายุพร้อม เพรสทีจ เฮลธ์ ได้ถึงอายุ 98 ปี"],
+            ] };
+    }
+    // ทุน อบ.1 / อบ.2 สูงสุดของเคสนี้ (รวม อบ.1+อบ.2 ไม่เกิน 5 เท่าทุนชีวิต และไม่เกิน 10 ล้าน · อบ.1 ผู้เยาว์ <15 ปี ไม่เกิน 1 ล้าน)
+    function acc12Max(id) {
+        const other = id === "ACC1" ? (selected.ACC2 ? acc2SI : 0) : (selected.ACC1 ? acc1SI : 0);
+        let max = Math.max(0, Math.min(mainSI * 5, ACC12_MAX_TOTAL) - other);
+        if (id === "ACC1" && age < 15)
+            max = Math.min(max, ACC1_MINOR_MAX);
+        return max;
+    }
+    const kj1SI = selected.ACC1 ? Math.min(acc1SI, KJ_MAX_TOTAL) : 0;
+    const kj2SI = selected.ACC2 ? Math.max(0, Math.min(acc2SI, KJ_MAX_TOTAL - kj1SI)) : 0;
+    const ACC_LOSS_ROWS = [
+        ["เสียชีวิต / สูญเสียมือ เท้า สายตา 2 ข้าง หรือ 2 อย่าง", "100% ของทุน"],
+        ["สูญเสียมือ 1 ข้าง หรือเท้า 1 ข้าง หรือสายตา 1 ข้าง", "60% ของทุน"],
+        ["สูญเสียนิ้วหัวแม่มือและนิ้วชี้ของมือข้างเดียวกัน", "25% ของทุน"],
+        ["จ่าย 2 เท่า", "อุบัติเหตุในยานพาหนะสาธารณะ / ลิฟท์ / ไฟไหม้โรงมหรสพ โรงแรม อาคารสาธารณะ"],
+    ];
+    function calcACC1() {
+        if (age < 0 || age > 64)
+            return { ok: false, msg: "อายุรับประกัน 0-64 ปี (คุ้มครองถึงอายุ 65 ปี)" };
+        if (mainSI < 50000)
+            return { ok: false, msg: "ต้องมีทุนประกันหลัก ขั้นต่ำ 50,000 บาท จึงจะซื้อ อบ.1 ได้" };
+        if (acc1SI < ACC12_MIN_SI)
+            return { ok: false, msg: "ทุน อบ.1 ขั้นต่ำ 50,000 บาท" };
+        const max = acc12Max("ACC1");
+        if (acc1SI > max)
+            return { ok: false, msg: `ทุน อบ.1 สูงสุดสำหรับเคสนี้ ${baht(max)} (รวม อบ.1+อบ.2 ไม่เกิน 5 เท่าของทุนหลัก ${baht(mainSI)} และไม่เกิน 10 ล้าน${age < 15 ? " · ผู้เยาว์ต่ำกว่า 15 ปี ไม่เกิน 1 ล้าน" : ""})` };
+        const premium = (acc1SI * ACC1_RATE[occClass] + kj1SI * KJ1_RATE) / 1000;
+        return { ok: true, premium, benefits: [
+                ["ทุน อบ.1", baht(acc1SI) + ` (อัตรา ${ACC1_RATE[occClass]} บาท/ทุน 1,000 · ชั้นอาชีพ ${occClass})`],
+                ["ทุน ฆจ.1 (บังคับซื้อคู่)", baht(kj1SI) + " (อัตรา 0.75 บาท/ทุน 1,000)"],
+                ...ACC_LOSS_ROWS,
+                ["ฆจ.1 คุ้มครองเพิ่ม", "ถูกฆาตกรรม/ทำร้ายร่างกาย (ไม่ได้ยั่วยุหรือร่วมทะเลาะวิวาท), สงครามกลางเมือง ปฏิวัติ รัฐประหาร กบฏ, จลาจล นัดหยุดงาน"],
+                ["ระยะเวลาคุ้มครอง", "ถึงอายุ 65 ปี (ชำระเบี้ยถึงอายุ 64 ปี) เบี้ยคงที่"],
+            ] };
+    }
+    function calcACC2() {
+        if (age < 15 || age > 64)
+            return { ok: false, msg: "อายุรับประกัน 15-64 ปี (คุ้มครองถึงอายุ 65 ปี)" };
+        if (mainSI < 50000)
+            return { ok: false, msg: "ต้องมีทุนประกันหลัก ขั้นต่ำ 50,000 บาท จึงจะซื้อ อบ.2 ได้" };
+        if (acc2SI < ACC12_MIN_SI)
+            return { ok: false, msg: "ทุน อบ.2 ขั้นต่ำ 50,000 บาท" };
+        const max = acc12Max("ACC2");
+        if (acc2SI > max)
+            return { ok: false, msg: `ทุน อบ.2 สูงสุดสำหรับเคสนี้ ${baht(max)} (รวม อบ.1+อบ.2 ไม่เกิน 5 เท่าของทุนหลัก ${baht(mainSI)} และไม่เกิน 10 ล้าน)` };
+        const premium = (acc2SI * ACC2_RATE[occClass] + kj2SI * KJ2_RATE) / 1000;
+        return { ok: true, premium, benefits: [
+                ["ทุน อบ.2", baht(acc2SI) + ` (อัตรา ${ACC2_RATE[occClass]} บาท/ทุน 1,000 · ชั้นอาชีพ ${occClass})`],
+                ["ทุน ฆจ.2 (บังคับซื้อคู่)", baht(kj2SI) + " (อัตรา 1.35 บาท/ทุน 1,000" + (kj2SI < Math.min(acc2SI, KJ_MAX_TOTAL) ? " · ลดลงเพราะรวม ฆจ.1+ฆจ.2 ไม่เกิน 2 ล้าน)" : ")")],
+                ...ACC_LOSS_ROWS,
+                ["ทุพพลภาพชั่วคราวสิ้นเชิง / บางส่วน", `${baht(acc2SI * 0.006)} / ${baht(acc2SI * 0.002)} ต่อสัปดาห์ (0.6% / 0.2% ของทุน รวมไม่เกิน 52 สัปดาห์)`],
+                ["ทุพพลภาพถาวรสิ้นเชิง (หลังรับชดเชยครบ 52 สัปดาห์)", `${baht(acc2SI * 0.1)} ต่อปี (10% ของทุน ไม่เกิน 10 ปี)`],
+                ["ชดเชยนอนโรงพยาบาล (ผู้ป่วยใน)", `${baht(acc2SI * 0.003)} ต่อสัปดาห์ (0.3% ของทุน ไม่เกิน 20 สัปดาห์)`],
+                ["ฆจ.2 คุ้มครองเพิ่ม", "ถูกฆาตกรรม/ทำร้ายร่างกาย (ไม่ได้ยั่วยุหรือร่วมทะเลาะวิวาท), สงครามกลางเมือง ปฏิวัติ รัฐประหาร กบฏ, จลาจล นัดหยุดงาน"],
+                ["ระยะเวลาคุ้มครอง", "ถึงอายุ 65 ปี (ชำระเบี้ยถึงอายุ 64 ปี) เบี้ยคงที่ · ขายเฉพาะผู้มีอาชีพ/รายได้ประจำ"],
             ] };
     }
     function calcHAPPYCI() {
@@ -3320,9 +3793,9 @@ function App() {
                 ["ระยะเวลาชำระเบี้ยที่เลือก", happysavingTerm + " ปี"],
                 ["ทุนประกันภัย", baht(si)],
                 ["เงินคืนรายปี", baht(Math.round(si * 0.04)) + " ต่อปี (4% ของทุนประกันภัย) ตั้งแต่ปีกรมธรรม์ที่ 1 จนถึงอายุครบ 98 ปี"],
-                ["คุ้มครองชีวิต ปีกรมธรรม์ที่ 1-5", "100% / 200% / 300% / 400% / 500% ของทุนประกันภัย ตามลำดับปี หรือ 105% ของเบี้ยสะสม แล้วแต่อย่างใดมากกว่า"],
-                ["คุ้มครองชีวิตเพิ่มพิเศษ ปีที่ 6 เป็นต้นไป", "เพิ่มขึ้นปีละ 10% ของทุนประกันภัย จากปีที่ 5 (500%) สูงสุดถึง 700% ของทุนประกันภัย"],
-                ["ครบกำหนดสัญญา (อายุ 99 ปี)", "รับ 700% ของทุนประกันภัย หรือเบี้ยประกันชีวิตสะสมตามจริง แล้วแต่จำนวนใดมากกว่า"],
+                ["เสียชีวิต ปีกรมธรรม์ที่ 1-5", [1, 2, 3, 4, 5].map((k) => `ปี ${k}: ${baht(si * k)} (${k * 100}%)`).join(" · ") + " — หรือ 105% ของเบี้ยสะสม แล้วแต่อย่างใดมากกว่า"],
+                ["เสียชีวิต ปีกรมธรรม์ที่ 6 เป็นต้นไป", `เพิ่มปีละ 10% ของทุน (${baht(Math.round(si * 0.1))}) จาก 500% (${baht(si * 5)}) จนถึง 700% (${baht(si * 7)}) แล้วคงที่ถึงอายุ 99 ปี`],
+                ["ครบกำหนดสัญญา (อายุ 99 ปี)", `${baht(si * 7)} (700% ของทุน) หรือเบี้ยสะสมตามจริง แล้วแต่อย่างใดมากกว่า`],
                 ["เงินปันผล", "ไม่รับประกัน ขึ้นอยู่กับผลตอบแทนการลงทุนของบริษัทในแต่ละปี"],
             ] };
     }
@@ -3585,7 +4058,7 @@ function App() {
                 ["เสียชีวิต ปีกรมธรรม์ที่ 4-10", baht(si * 4) + " (400% ของทุนประกันภัย)"],
                 ["หมายเหตุกรณีเสียชีวิต", "จ่ายตาม % ข้างต้น หรือเบี้ยประกันชีวิตสะสม แล้วแต่อย่างใดมากกว่า"],
                 ["เสียชีวิตจากอุบัติเหตุ (เพิ่มเติมจากข้างต้น)", "+100% ของทุนประกันภัย สูงสุดไม่เกิน 10,000,000 บาท (ผ่านสัญญาเพิ่มเติม บีแอลเอ อดีบี ที่แถมมาให้)"],
-                ["เงินคืนรายปี (การันตี)", "4% ของทุนประกันภัย ทุกปีกรมธรรม์ที่ 1-9"],
+                ["เงินคืน 4% ของทุน ทุกปี (การันตี)", `${baht(Math.round(si * 0.04))}/ปี ปีกรมธรรม์ที่ 1-9 · รวม 9 ครั้ง = ${baht(Math.round(si * 0.04) * 9)}`],
                 ["ครบกำหนดสัญญา (ปีกรมธรรม์ที่ 10)", baht(Math.round(si * 4.24)) + " (284% เงินคืนครบกำหนด + 140% เงินคืนพิเศษ = 424%)"],
                 ["ผลประโยชน์รวมตลอดสัญญา (การันตี)", baht(Math.round(si * 4.6)) + " (460% ของทุนประกันภัย หากมีชีวิตอยู่ครบสัญญา)"],
             ] };
@@ -3611,7 +4084,7 @@ function App() {
                 ["เสียชีวิต ปีกรมธรรม์ที่ 6-12", baht(si * 6) + " (600% ของทุนประกันภัย)"],
                 ["หมายเหตุกรณีเสียชีวิต", "จ่ายตาม % ข้างต้น หรือเบี้ยประกันชีวิตสะสม แล้วแต่อย่างใดมากกว่า"],
                 ["เสียชีวิตจากอุบัติเหตุ (เพิ่มเติมจากข้างต้น)", "+300% ของทุนประกันภัย สูงสุดไม่เกิน 6,000,000 บาท (ผ่านสัญญาเพิ่มเติม บีแอลเอ อดีบี ที่แถมมาให้)"],
-                ["เงินคืนรายปี (การันตี)", "6% ของทุนประกันภัย ทุกปีกรมธรรม์ที่ 1-11"],
+                ["เงินคืน 6% ของทุน ทุกปี (การันตี)", `${baht(Math.round(si * 0.06))}/ปี ปีกรมธรรม์ที่ 1-11 · รวม 11 ครั้ง = ${baht(Math.round(si * 0.06) * 11)}`],
                 ["ครบกำหนดสัญญา (ปีกรมธรรม์ที่ 12)", baht(Math.round(si * 6.2)) + " (440% เงินคืนครบกำหนด + 180% เงินคืนพิเศษ = 620%)"],
                 ["ผลประโยชน์รวมตลอดสัญญา (การันตี)", baht(Math.round(si * 6.86)) + " (686% ของทุนประกันภัย หากมีชีวิตอยู่ครบสัญญา)"],
             ] };
@@ -3629,12 +4102,10 @@ function App() {
         BLASAVE168: { minAge: BLASAVE168_MIN_AGE, maxAge: BLASAVE168_MAX_AGE, minSI: BLASAVE168_MIN_SI, payYears: BLASAVE168_PAY_YEARS, schedule: BLASAVE168_SCHEDULE, rate: () => BLASAVE168_RATE, discount: (si, a) => blasave168Discount(si, a), name: "บีแอลเอ เซฟวิ่ง 168" },
         HS999: { deathMaxPremium: true, minAge: HS999_MIN_AGE, maxAge: HS999_MAX_AGE, minSI: HS999_MIN_SI, payYears: HS999_PAY_YEARS, get schedule() { return hs999Schedule(age, getEffectiveSI("HS999")); }, scheduleFor: (si) => hs999Schedule(age, si), rate: (a) => hs999Rate(a), discount: () => 0, name: "แฮปปี้เซฟวิ่ง 999",
             extraLines: (si) => [["แผนที่ได้ (ตามทุน)", hs999PlanName(si) + (si >= HS999_PLAN_B_SI ? " (ทุน 300,000 บาทขึ้นไป) · เงินคืนพิเศษ 59% ทุก 9 ปี" : " (ทุน 100,000-299,999 บาท) · เงินคืนพิเศษ 39% ทุก 9 ปี")],
-                ["เงินคืนรายปี", baht(Math.round(si * 0.09)) + " ต่อปี (8.5% + พิเศษ 0.5% ของทุน) ตั้งแต่ปีกรมธรรม์ที่ 1 ถึงอายุครบ 98 ปี"],
                 ["แถมฟรี: เอดีบี 999", "เสียชีวิตจากอุบัติเหตุ รับเพิ่ม 100%-900% ของทุน (ปีกรมธรรม์ที่ 1-9) และ 990% ตั้งแต่ปีที่ 10 · ไม่คุ้มครองขณะขับขี่/โดยสารรถจักรยานยนต์"],
                 ["หมายเหตุ", "ถ้าเวนคืนกรมธรรม์ จะไม่ได้เงินคืนพิเศษ (0.5% รายปี, 39%/59% ทุก 9 ปี และ 295% ณ ครบกำหนด)"]] },
         PUNSUK: { deathMaxPremium: true, minAge: PUNSUK_MIN_AGE, maxAge: PUNSUK_MAX_AGE, minSI: PUNSUK_MIN_SI, payYears: PUNSUK_PAY_YEARS, get schedule() { return punsukSchedule(age); }, scheduleFor: () => punsukSchedule(age), rate: (a, g) => (g === "female" ? PUNSUK_FEMALE : PUNSUK_MALE)[a], discount: () => 0, name: "บีแอลเอ ปันสุข 80/20",
-            extraLines: (si) => [["เงินคืน", baht(Math.round(si * 0.015)) + " (1.5% ของทุน) ทุก 2 ปี ปีกรมธรรม์ที่ 2-20 · " + baht(Math.round(si * 0.01)) + " (1%) ทุกปี ตั้งแต่ปีที่ 21 ถึงอายุ 79 ปี"],
-                ["แถมฟรี: ทพ.", "ทุพพลภาพสิ้นเชิงถาวร ยกเว้นการชำระเบี้ยสัญญาประกันชีวิต"]] },
+            extraLines: (si) => [["แถมฟรี: ทพ.", "ทุพพลภาพสิ้นเชิงถาวร ยกเว้นการชำระเบี้ยสัญญาประกันชีวิต"]] },
         SAVECARE168: { minAge: SAVECARE168_MIN_AGE, maxAge: SAVECARE168_MAX_AGE, minSI: SAVECARE168_MIN_SI, maxSI: SAVECARE168_MAX_SI, payYears: SAVECARE168_PAY_YEARS, schedule: SAVECARE168_SCHEDULE, rate: () => SAVECARE168_RATE, discount: (si) => savecare168Discount(si), name: "บีแอลเอ เซฟวิ่ง แอนด์ แคร์ 168", ciPct: SAVECARE168_CI_PCT, ciYears: SAVECARE168_CI_YEARS },
     };
     const mainSI = selectedMainId ? mainSIOf(selectedMainId) : 0; // ต้องอยู่หลัง SAVINGS_DEFS (ใช้ย้อนคำนวณทุนจากเบี้ย)
@@ -3642,18 +4113,28 @@ function App() {
     function savingsBenefitLines(def, si) {
         const lines = [];
         const sch = def.schedule;
+        const amt = (p) => baht(Math.round(si * p / 100));
         let i = 0;
         while (i < sch.length) {
+            const step = i + 1 < sch.length ? sch[i + 1][0] - sch[i][0] : 0;
             let j = i;
-            while (j + 1 < sch.length && sch[j + 1][0] === sch[i][0])
-                j++;
-            const label = i === j ? `เสียชีวิต ปีกรมธรรม์ที่ ${i + 1}` : `เสียชีวิต ปีกรมธรรม์ที่ ${i + 1}-${j + 1}`;
-            lines.push([label, baht(Math.round(si * sch[i][0] / 100)) + ` (${sch[i][0]}% ของทุนประกันภัย${def.deathMaxPremium ? " หรือเบี้ยสะสม แล้วแต่อย่างใดมากกว่า" : ""})`]);
+            if (step !== 0) while (j + 1 < sch.length && sch[j + 1][0] - sch[j][0] === step) j++;
+            if (step !== 0 && j - i >= 2) {
+                lines.push([`เสียชีวิต ปีกรมธรรม์ที่ ${i + 1}-${j + 1}`, `เพิ่มขึ้นปีละ ${step}% ของทุน (${amt(step)}) · ปีที่ ${i + 1} = ${amt(sch[i][0])} → ปีที่ ${j + 1} = ${amt(sch[j][0])}`]);
+                i = j + 1;
+                continue;
+            }
+            j = i;
+            while (j + 1 < sch.length && sch[j + 1][0] === sch[i][0]) j++;
+            lines.push([i === j ? `เสียชีวิต ปีกรมธรรม์ที่ ${i + 1}` : `เสียชีวิต ปีกรมธรรม์ที่ ${i + 1}-${j + 1}`, `${amt(sch[i][0])} (${sch[i][0]}% ของทุน)`]);
             i = j + 1;
         }
+        if (def.deathMaxPremium) lines.push(["เงื่อนไขกรณีเสียชีวิต", "จ่ายตามข้างต้น หรือเบี้ยที่จ่ายสะสมมาแล้ว แล้วแต่อย่างใดมากกว่า"]);
         const lastCash = sch[sch.length - 1][1];
-        lines.push(["เงินคืนรายปี (การันตี)", "ดูตารางเงินคืนตลอดสัญญาด้านล่าง"]);
-        lines.push(["ครบกำหนดสัญญา (ปีสุดท้าย)", baht(Math.round(si * lastCash / 100)) + ` (${lastCash}% ของทุนประกันภัย — ยอดรวมที่ได้รับในวันครบกำหนดสัญญา)`]);
+        lines.push(...cashBackLines(sch.slice(0, -1).map(([, c], k) => ({ pct: c, age: age + k + 1 })), si));
+        lines.push([`ครบกำหนดสัญญา ปีกรมธรรม์ที่ ${sch.length} (อายุครบ ${age + sch.length} ปี)`, baht(Math.round(si * lastCash / 100)) + ` (${lastCash}% ของทุน)`]);
+        const totalPct = sch.reduce((t, r) => t + r[1], 0);
+        lines.push(["รวมเงินคืนตลอดสัญญา (การันตี)", baht(Math.round(si * totalPct / 100)) + ` (${Math.round(totalPct * 100) / 100}% ของทุน)`]);
         return lines;
     }
     function calcGenericSavings(id) {
@@ -3671,11 +4152,11 @@ function App() {
         const premium = getDisplayPremium(id, (rate * si) / 1000);
         return { ok: true, premium, benefits: [
                 ["ทุนประกันภัย", baht(si)],
-                ["ระยะเวลาชำระเบี้ย/เอาประกันภัย", `ชำระเบี้ย ${def.payYears} ปี · คุ้มครอง ${def.schedule.length} ปี`],
+                ["ระยะเวลาชำระเบี้ย", `${def.payYears} ปี (ชำระถึงอายุ ${age + def.payYears} ปี)`],
                 ...savingsBenefitLines(def, si),
                 ...(def.extraLines ? def.extraLines(si) : []),
                 ...(def.ciPct ? [
-                    ["แถมฟรี: คุ้มครอง 8 โรคร้ายแรง", baht(Math.round(si * def.ciPct / 100)) + ` ต่อปี (${def.ciPct}% ของทุน) จ่ายทุกปีหลังตรวจพบครั้งแรก ตราบที่มีชีวิต ไม่เกินปีกรมธรรม์ที่ ${def.ciYears} · รอคอย 90 วัน · จ่ายได้ 1 โรคตลอดสัญญา`],
+                    ["แถมฟรี: คุ้มครอง 8 โรคร้ายแรง", baht(Math.round(si * def.ciPct / 100)) + ` ต่อปี (${def.ciPct}% ของทุน) จ่ายทุกปีหลังตรวจพบครั้งแรก ตราบที่มีชีวิต ไม่เกินปีกรมธรรม์ที่ ${def.ciYears} (ถึงอายุ ${age + def.ciYears} ปี) · รอคอย 90 วัน · จ่ายได้ 1 โรคตลอดสัญญา`],
                     ["เจ็บป่วยระยะสุดท้าย", "เร่งจ่ายผลประโยชน์กรณีเสียชีวิตล่วงหน้า แล้วกรมธรรม์สิ้นผลบังคับ"],
                 ] : []),
             ] };
@@ -3908,6 +4389,30 @@ function App() {
                 for (let bi = fromBi; bi < ACC_BANDS.length; bi++) {
                     const [lo, hi] = ACC_BANDS[bi];
                     rows.push({ label: `อายุ ${lo}-${hi} ปี`, premium: ACC_RATES[occClass][bi][pi] });
+                }
+                break;
+            }
+            case "HH": {
+                const pi = HH_PLANS.indexOf(hhPlan);
+                const di = HH_DEDUCT.indexOf(hhDeduct);
+                const fromBi = bandIndex(age, VH_BANDS);
+                if (pi < 0 || di < 0 || fromBi < 0)
+                    break;
+                const table = HH_TABLE[gender][occClass === 3 ? "c3" : "c12"];
+                for (let bi = fromBi; bi < VH_BANDS.length; bi++) {
+                    const [lo, hi] = VH_BANDS[bi];
+                    rows.push({ label: `อายุ ${lo}-${hi} ปี`, premium: table[bi][pi * 2 + di] });
+                }
+                break;
+            }
+            case "OPDP": {
+                const amt = opdpAmountForPh(phPlan);
+                const fromBi = bandIndex(age, OPDP_BANDS);
+                if (!amt || fromBi < 0)
+                    break;
+                for (let bi = fromBi; bi < OPDP_BANDS.length; bi++) {
+                    const [lo, hi] = OPDP_BANDS[bi];
+                    rows.push({ label: `อายุ ${lo}-${hi} ปี`, premium: OPDP_RATES[bi][OPDP_AMOUNTS.indexOf(amt)] });
                 }
                 break;
             }
@@ -4209,7 +4714,7 @@ function App() {
         });
         return calcIRR(cf);
     }
-    const CALC = { SUD: calcSUD, LIFE99: calcLIFE99, UNJAI: calcUNJAI, CANCERMAX: calcCANCERMAX, PLUS2: calcPLUS2, PRESTIGE: calcPRESTIGE, ACC: calcACC, ACC3: calcACC3, TPD: calcTPD, SUPER: calcSUPER, VH: calcVH, VHKIDS: calcVHKIDS, RPPR: calcRPPR, HHP: calcHHP, OPD: calcOPD, HAPPYCI: calcHAPPYCI, LLC: calcLLC, SS: calcSS, HAPPYPENSION: calcHAPPYPENSION, HAPPYSAVING: calcHAPPYSAVING, HAPPYWL: calcHAPPYWL, HRP9920: calcHRP9920, HRPDIV: calcHRPDIV, HRP9901: calcHRP9901, HAPPYWL9901: calcHAPPYWL9901, HAPPYKID: calcHAPPYKID, CHAK: calcCHAK, CHAP: calcCHAP, PH: calcPH, PSAVE104: calcPSAVE104, PSAVE126: calcPSAVE126, HS208: calcHS208, HS126: calcHS126, HS157: calcHS157, HS147: calcHS147, HS168: calcHS168, HS1810: calcHS1810, HS2515: calcHS2515, TAXSAVER105: calcTAXSAVER105, BLASAVE168: calcBLASAVE168, HS999: calcHS999, PUNSUK: calcPUNSUK, PENSION888: calcPENSION888, SAVECARE168: calcSAVECARE168, PENSIONCARE888: calcPENSIONCARE888, CS: calcCS };
+    const CALC = { SUD: calcSUD, LIFE99: calcLIFE99, UNJAI: calcUNJAI, CANCERMAX: calcCANCERMAX, PLUS2: calcPLUS2, PRESTIGE: calcPRESTIGE, ACC: calcACC, ACC3: calcACC3, TPD: calcTPD, SUPER: calcSUPER, VH: calcVH, VHKIDS: calcVHKIDS, RPPR: calcRPPR, HHP: calcHHP, OPD: calcOPD, HH: calcHH, OPDP: calcOPDP, ACC1: calcACC1, ACC2: calcACC2, HAPPYCI: calcHAPPYCI, LLC: calcLLC, SS: calcSS, HAPPYPENSION: calcHAPPYPENSION, HAPPYSAVING: calcHAPPYSAVING, HAPPYWL: calcHAPPYWL, HRP9920: calcHRP9920, HRPDIV: calcHRPDIV, HRP9901: calcHRP9901, HAPPYWL9901: calcHAPPYWL9901, HAPPYKID: calcHAPPYKID, CHAK: calcCHAK, CHAP: calcCHAP, PH: calcPH, PSAVE104: calcPSAVE104, PSAVE126: calcPSAVE126, HS208: calcHS208, HS126: calcHS126, HS157: calcHS157, HS147: calcHS147, HS168: calcHS168, HS1810: calcHS1810, HS2515: calcHS2515, TAXSAVER105: calcTAXSAVER105, BLASAVE168: calcBLASAVE168, HS999: calcHS999, PUNSUK: calcPUNSUK, PENSION888: calcPENSION888, SAVECARE168: calcSAVECARE168, PENSIONCARE888: calcPENSIONCARE888, CS: calcCS };
     function grandTotal() {
         let sum = 0;
         for (const p of PRODUCTS) {
@@ -4278,6 +4783,16 @@ function App() {
                 { icon: "🛏️", value: "ห้องเดี่ยวมาตรฐาน", label: "ค่าห้องผู้ป่วยใน" },
                 { icon: "💓", value: baht(hhpPlan), label: "วงเงินผู้ป่วยใน ต่อครั้ง" },
             ];
+            case "HH": return [
+                { icon: "🛏️", value: "ห้องเดี่ยวมาตรฐาน", label: "ค่าห้องผู้ป่วยใน" },
+                { icon: "💓", value: baht(hhPlan), label: "วงเงินผู้ป่วยใน ต่อครั้ง" },
+                { icon: "🧾", value: baht(hhDeduct), label: "ความรับผิดส่วนแรก" },
+            ];
+            case "OPDP": return [
+                { icon: "🩺", value: baht(opdpAmountForPh(phPlan)) + "/ครั้ง", label: "ค่ารักษาผู้ป่วยนอก (สูงสุด 30 ครั้ง/ปี)" },
+            ];
+            case "ACC1": return [{ icon: "🚑", value: baht(acc1SI), label: "เสียชีวิต/สูญเสียอวัยวะจากอุบัติเหตุ" }, { icon: "🛡️", value: baht(kj1SI), label: "ฆาตกรรม/จลาจล (ฆจ.1)" }];
+            case "ACC2": return [{ icon: "🚑", value: baht(acc2SI), label: "เสียชีวิต/สูญเสียอวัยวะจากอุบัติเหตุ" }, { icon: "🏥", value: baht(acc2SI * 0.003) + "/สัปดาห์", label: "ชดเชยนอนโรงพยาบาล" }];
             case "OPD": return [
                 { icon: "🩺", value: baht(opdPlan) + "/ครั้ง", label: "ค่ารักษาผู้ป่วยนอก (สูงสุด 30 ครั้ง/ปี)" },
             ];
@@ -4358,7 +4873,7 @@ function App() {
             }
         }
     }
-    const CATEGORY = { SUD: "life", LIFE99: "life", UNJAI: "life", CANCERMAX: "life", PLUS2: "life", PRESTIGE: "life", ACC: "life", ACC3: "life", TPD: "life", SUPER: "life", VH: "ipd", VHKIDS: "ipd", HHP: "ipd", OPD: "opd", HAPPYCI: "life", LLC: "life", SS: "life", HAPPYPENSION: "life", HAPPYSAVING: "life", HAPPYWL: "life", HRP9920: "life", HRPDIV: "life", HRP9901: "life", HAPPYWL9901: "life", HAPPYKID: "life", CHAK: "life", CHAP: "life", PH: "ipd", PSAVE104: "life", PSAVE126: "life", HS208: "life", HS126: "life", HS157: "life", HS147: "life", HS168: "life", HS1810: "life", HS2515: "life", TAXSAVER105: "life", BLASAVE168: "life", HS999: "life", PUNSUK: "life", PENSION888: "life", SAVECARE168: "life", PENSIONCARE888: "life", RPPR: "opd", CS: "opd" };
+    const CATEGORY = { SUD: "life", LIFE99: "life", UNJAI: "life", CANCERMAX: "life", PLUS2: "life", PRESTIGE: "life", ACC: "life", ACC3: "life", TPD: "life", SUPER: "life", VH: "ipd", VHKIDS: "ipd", HHP: "ipd", OPD: "opd", HH: "ipd", OPDP: "opd", ACC1: "life", ACC2: "life", HAPPYCI: "life", LLC: "life", SS: "life", HAPPYPENSION: "life", HAPPYSAVING: "life", HAPPYWL: "life", HRP9920: "life", HRPDIV: "life", HRP9901: "life", HAPPYWL9901: "life", HAPPYKID: "life", CHAK: "life", CHAP: "life", PH: "ipd", PSAVE104: "life", PSAVE126: "life", HS208: "life", HS126: "life", HS157: "life", HS147: "life", HS168: "life", HS1810: "life", HS2515: "life", TAXSAVER105: "life", BLASAVE168: "life", HS999: "life", PUNSUK: "life", PENSION888: "life", SAVECARE168: "life", PENSIONCARE888: "life", RPPR: "opd", CS: "opd" };
     // live per-card premium preview (updates as you type, before pressing calculate)
     const liveResults = {};
     PRODUCTS.forEach((p) => { if (selected[p.id])
@@ -4367,7 +4882,7 @@ function App() {
     // in that case we show a gentle reminder instead of a red "invalid" outline.
     const PRIMARY_FIELD_ZERO = {
         SUD: sudSI === 0, LIFE99: life99SI === 0, UNJAI: unjaiPlan === 0, CANCERMAX: cancermaxPlan === "", PLUS2: plus2Term === 0 || plus2SI === 0, PRESTIGE: prestigeTerm === 0 || prestigeSI === 0, ACC: accPlan === 0, ACC3: acc3Plan === 0, TPD: tpdSI === 0, SUPER: supSI === 0,
-        VH: vhPlan === 0, VHKIDS: vhkidsPlan === 0, RPPR: rpprDaily === 0, HHP: hhpPlan === 0, OPD: opdPlan === 0, HAPPYCI: happyciTerm === 0 || happyciSI === 0, LLC: llcVariant === "" || llcSI === 0, SS: ssSI === 0, HAPPYPENSION: happypensionTerm === "" || (happypensionMode === "premium" ? happypensionPremiumInput === 0 : happypensionTargetPension === 0),
+        VH: vhPlan === 0, VHKIDS: vhkidsPlan === 0, RPPR: rpprDaily === 0, HHP: hhpPlan === 0, OPD: opdPlan === 0, HH: hhPlan === 0 || hhDeduct === 0, OPDP: false, ACC1: acc1SI === 0, ACC2: acc2SI === 0, HAPPYCI: happyciTerm === 0 || happyciSI === 0, LLC: llcVariant === "" || llcSI === 0, SS: ssSI === 0, HAPPYPENSION: happypensionTerm === "" || (happypensionMode === "premium" ? happypensionPremiumInput === 0 : happypensionTargetPension === 0),
         HAPPYSAVING: happysavingTerm === 0 || happysavingSI === 0, HAPPYWL: happywlTerm === 0 || happywlSI === 0, HRP9920: hrp9920SI === 0, HRPDIV: hrpdivTerm === 0 || hrpdivSI === 0, HRP9901: hrp9901SI === 0, HAPPYWL9901: happywl9901SI === 0, HAPPYKID: happykidSI === 0,
         CHAK: chakTerm === 0 || chakSI === 0, CHAP: chapTerm === 0 || chapSI === 0 || chapPayorAge === 0, PH: phPlan === 0 || phDeduct === null, PSAVE104: psave104SI === 0, PSAVE126: psave126SI === 0,
         HS208: hs208SI === 0, HS126: hs126SI === 0, HS157: hs157SI === 0, HS147: hs147SI === 0, HS168: hs168SI === 0, HS1810: hs1810SI === 0, HS2515: hs2515SI === 0, TAXSAVER105: taxsaver105SI === 0, BLASAVE168: blasave168SI === 0, HS999: (savingsMode.HS999 || "si") === "si" ? hs999SI === 0 : !savingsPremiumInput.HS999, PUNSUK: (savingsMode.PUNSUK || "si") === "si" ? punsukSI === 0 : !savingsPremiumInput.PUNSUK, PENSION888: (pension888Mode === "premium" ? pension888PremiumInput === 0 : pension888TargetPension === 0), SAVECARE168: savecare168SI === 0 && !(savingsPremiumInput.SAVECARE168 > 0), PENSIONCARE888: (pensioncare888Mode === "premium" ? pensioncare888PremiumInput === 0 : pensioncare888TargetPension === 0), CS: csPayorAge === 0,
@@ -4435,6 +4950,9 @@ function App() {
             case "HHP": return 25;
             case "PH": return phDeduct > 0 ? 20 : 18;
             case "OPD": return 10;
+            case "HH": return 25;
+            case "OPDP": return 10;
+            case "ACC1": case "ACC2": return a <= 60 ? mainRate() : 15;
             case "ACC": return a <= 65 ? 40 : 35;
             case "SUPER": { const yrs = mainCard ? mainPolicyPaymentYears(mainCard.id) : 7; return yrs >= 7 ? (a <= 60 ? 40 : 30) : 30; }
             case "HAPPYCI": return band([60, 65, 70], happyciSI >= 1000000 ? [40, 30, 25, 20] : happyciSI >= 500000 ? [35, 28, 23, 20] : [30, 25, 20, 15]);
@@ -4447,6 +4965,38 @@ function App() {
             default: return null;
         }
     }
+    // คุ้มครองถึงอายุเท่าไร (ตามอายุที่กรอก) — ใช้แทนข้อความวิชาการ "รับประกันตั้งแต่อายุ X ถึง Y ต่ออายุได้ถึง Z"
+    const COVER_RENEW = { ACC: 98, ACC3: 65, TPD: 74, SUPER: 79, VH: 98, VHKIDS: 98, HHP: 98, HH: 98, PH: 98, OPD: 98, OPDP: 98, RPPR: 65, LLC: 98, SS: 65 };
+    function coverEndAge(id) {
+        if (SAVINGS_DEFS[id]) return age + SAVINGS_DEFS[id].schedule.length;
+        const t = { PSAVE104: 10, PSAVE126: 12, PLUS2: plus2Term, CHAK: chakTerm, CHAP: chapTerm }[id];
+        if (t) return age + t;
+        if (COVER_RENEW[id]) return COVER_RENEW[id];
+        const p = PRODUCTS.find((x) => x.id === id);
+        return p && p.coverAge > age ? p.coverAge : null;
+    }
+    function coverUntilText(id) {
+        const e = coverEndAge(id);
+        if (!e || e <= age) return null;
+        return COVER_RENEW[id] ? `ต่ออายุได้ทุกปี คุ้มครองได้ถึงอายุ ${e} ปี (อีก ${e - age} ปี)` : `ถึงอายุ ${e} ปี (อีก ${e - age} ปี)`;
+    }
+    const HEALTH_TAX_IDS = ["VH", "VHKIDS", "HHP", "HH", "PH", "OPD", "OPDP", "RPPR"];
+    function finalizeBenefits(id, benefits, annualPremium) {
+        let rows = (benefits || []).filter((b) => !(Array.isArray(b) && /^ระยะเวลาคุ้มครอง$/.test(b[0])));
+        const until = coverUntilText(id);
+        if (until) rows.push(["คุ้มครองถึง", until]);
+        const p = PRODUCTS.find((x) => x.id === id) || {};
+        const yrs = (coverEndAge(id) || 0) - age;
+        if (PENSION_IDS.includes(id))
+            rows.push(["ลดหย่อนภาษี", "เบี้ยบำนาญลดหย่อนได้ 15% ของเงินได้ ไม่เกิน 200,000 บาท/ปี (รวมกองทุนเพื่อการเกษียณไม่เกิน 500,000 บาท)"]);
+        else if (age >= 18 && p.isMain && yrs >= 10 && annualPremium > 0)
+            rows.push(["ลดหย่อนภาษี", `เบี้ยประกันชีวิตลดหย่อนได้ตามจ่ายจริง ไม่เกิน 100,000 บาท/ปี (แผนนี้ลดหย่อนได้ ${baht(Math.min(Math.round(annualPremium), 100000))}/ปี)`]);
+        else if (age >= 18 && HEALTH_TAX_IDS.includes(id) && annualPremium > 0)
+            rows.push(["ลดหย่อนภาษี", `เบี้ยประกันสุขภาพลดหย่อนได้ไม่เกิน 25,000 บาท/ปี (แผนนี้ ${baht(Math.min(Math.round(annualPremium), 25000))}/ปี) และรวมกับเบี้ยประกันชีวิตไม่เกิน 100,000 บาท`]);
+        if (p.isMain && !["UNJAI", "CANCERMAX", "PLUS2"].includes(id))
+            rows.push(["ถ้าเลิกกลางทาง (เวนคืน)", "ได้มูลค่าเวนคืนตามตารางในกรมธรรม์ ซึ่งในช่วงปีแรกๆ มักได้น้อยกว่าเบี้ยที่จ่ายไป"]);
+        return rows.map((b) => (Array.isArray(b) ? [plainKey(String(b[0])), b[1], ...b.slice(2)] : b));
+    }
     function handleCalculate() {
         const errs = [];
         const cards = [];
@@ -4458,7 +5008,7 @@ function App() {
                 errs.push({ product: p.name, msg: r.msg });
                 continue;
             }
-            cards.push({ id: p.id, name: p.name, tag: p.tag, isMain: !!p.isMain, renewalNote: p.renewalNote, premium: r.premium, benefits: r.benefits, highlights: highlightsFor(p.id), category: CATEGORY[p.id] });
+            cards.push({ id: p.id, name: p.name, tag: p.tag, isMain: !!p.isMain, renewalNote: p.renewalNote, premium: r.premium, benefits: finalizeBenefits(p.id, r.benefits, r.premium), highlights: highlightsFor(p.id), category: CATEGORY[p.id] });
         }
         if (csRequired && !selected.CS)
             errs.push({ product: "คช. คุ้มครองการชำระเบี้ย", msg: `แบบ ${(PRODUCTS.find((x) => x.id === csRequiredMainId) || {}).name} กำหนดให้ผู้เยาว์ต้องซื้อ คช. ด้วย` });
@@ -4487,7 +5037,22 @@ function App() {
         const totalYear = cards.reduce((s, c) => s + (c.premium || 0), 0);
         const totalPay = cards.reduce((s, c) => s + (c.premium || 0) * c.factor, 0);
         const singleCard = cards.find((c) => c.single);
-        setResult({ cards, totalYear, totalPay, factor: modeDef.factor, payLabel: singleCard ? "งวดแรก" : modeDef.label, singleNote: singleCard ? `รวมเบี้ย ${singleCard.name} ชำระครั้งเดียว ${baht(singleCard.premium)} · ปีต่อไปชำระเฉพาะสัญญาเพิ่มเติม` : "" });
+        // ⚠️ เช็กก่อนเสนอ (เฉพาะตัวแทน ไม่ส่งถึงลูกค้า)
+        const warns = [];
+        const lifeYear = cards.filter((c) => c.isMain && !PENSION_IDS.includes(c.id)).reduce((t, c) => t + (c.premium || 0), 0);
+        const healthYear = cards.filter((c) => HEALTH_TAX_IDS.includes(c.id)).reduce((t, c) => t + (c.premium || 0), 0);
+        if (age < 18) warns.push("ผู้เอาประกันอายุต่ำกว่า 18 ปี — ผู้ปกครองนำเบี้ยของลูกไปลดหย่อนภาษีตัวเองไม่ได้");
+        else {
+            if (lifeYear > 100000) warns.push(`เบี้ยประกันชีวิตรวม ${baht(Math.round(lifeYear))}/ปี เกินเพดานลดหย่อน 100,000 บาท (ส่วนเกินลดหย่อนไม่ได้)`);
+            if (healthYear > 25000) warns.push(`เบี้ยสุขภาพรวม ${baht(Math.round(healthYear))}/ปี ลดหย่อนได้สูงสุด 25,000 บาท`);
+            if (lifeYear > 0 && healthYear > 0 && Math.min(lifeYear, 100000) + Math.min(healthYear, 25000) > 100000) warns.push("เบี้ยชีวิต + สุขภาพรวมกัน ลดหย่อนได้ไม่เกิน 100,000 บาท");
+        }
+        if (cards.filter((c) => ["VH", "VHKIDS", "HHP", "HH", "PH"].includes(c.id)).length > 1) warns.push("เลือกสุขภาพผู้ป่วยในมากกว่า 1 แบบ — ตรวจว่าตั้งใจซื้อซ้อนกันจริง");
+        if (selected.ACC2) warns.push("อบ.2 ขายเฉพาะผู้มีอาชีพ/รายได้ประจำ (ไม่ขายนักเรียน แม่บ้าน พระ)");
+        if (selected.OPDP) warns.push("OPD สบายใจ เพรสทีจ: ถ้า เพรสทีจ เฮลธ์ มีเบี้ยเพิ่มตามอาชีพ/สุขภาพ จะซื้อไม่ได้");
+        if (selected.HS999 && mode === "month") warns.push("แฮปปี้เซฟวิ่ง 999 รายเดือน: ชำระงวดแรก 2 งวด");
+        if (occClass === 3 && cards.some((c) => !c.isMain)) warns.push("อาชีพชั้น 3 — สัญญาเพิ่มเติมบางแบบอาจมีเบี้ยเพิ่มพิเศษตามการพิจารณาของบริษัท");
+        setResult({ warns, cards, totalYear, totalPay, factor: modeDef.factor, payLabel: singleCard ? "งวดแรก" : modeDef.label, singleNote: singleCard ? `รวมเบี้ย ${singleCard.name} ชำระครั้งเดียว ${baht(singleCard.premium)} · ปีต่อไปชำระเฉพาะสัญญาเพิ่มเติม` : "" });
     }
     const font = `@import url('https://fonts.googleapis.com/css2?family=Prompt:wght@400;500;600;700&family=IBM+Plex+Sans+Thai:wght@400;500;600;700&display=swap');`;
     if (page === "sudkhum") return React.createElement(SudKoomPage, { onBack: backToMain });
@@ -4496,16 +5061,13 @@ function App() {
         React.createElement("div", { id: "app-root-content" },
             React.createElement("header", { style: { background: `linear-gradient(120deg, ${BRAND.navy}, ${BRAND.navyDeep})` }, className: "text-white" },
                 React.createElement("div", { className: "max-w-5xl mx-auto px-5 py-4 flex items-center gap-4 relative" },
-                    React.createElement("span", { className: "absolute top-2 right-2 text-[14px] px-2 py-0.5 rounded-full", style: { background: "rgba(255,255,255,0.15)", color: "#BFE3F5" } }, APP_VERSION),
+                    React.createElement("span", { className: "absolute top-2 right-2 text-[14px] px-2 py-0.5 rounded-full text-right", style: { background: "rgba(255,255,255,0.15)", color: "#BFE3F5", maxWidth: "60%" } }, APP_VERSION, React.createElement("br", null), RATE_SOURCE),
                     React.createElement("button", { onClick: () => { setAgentDraft(Object.assign({}, agentInfo)); setShareModal({ id: null }); }, className: "absolute bottom-2 right-2 text-[15px] px-2.5 py-1 rounded-full", style: { background: "rgba(255,255,255,0.15)", color: "#FFFFFF" } }, "⚙️ ข้อมูลตัวแทน"),
                     React.createElement("div", { style: { background: "#fff" }, className: "w-24 h-24 sm:w-28 sm:h-28 rounded-3xl flex items-center justify-center shrink-0 overflow-hidden shadow-lg" },
                         React.createElement("img", { src: LOGO_DATA_URI, alt: "\u0E04\u0E33\u0E19\u0E27\u0E13\u0E40\u0E1A\u0E35\u0E49\u0E22\u0E2D\u0E22\u0E48\u0E32\u0E07\u0E07\u0E48\u0E32\u0E22", className: "w-full h-full object-cover" })),
                     React.createElement("div", null,
                         React.createElement("h1", { className: "text-[36px] sm:text-[45px] font-semibold leading-tight" }, "\u0E04\u0E33\u0E19\u0E27\u0E13\u0E40\u0E1A\u0E35\u0E49\u0E22\u0E2D\u0E22\u0E48\u0E32\u0E07\u0E07\u0E48\u0E32\u0E22"),
-                        React.createElement("p", { className: "text-[24px] sm:text-[27px]", style: { color: "#BFE3F5" } }, "\u0E1B\u0E49\u0E32\u0E40\u0E1B\u0E47\u0E14 CFP\u00AE \u00B7 \u0E01\u0E23\u0E38\u0E07\u0E40\u0E17\u0E1E\u0E1B\u0E23\u0E30\u0E01\u0E31\u0E19\u0E0A\u0E35\u0E27\u0E34\u0E15 \u0E2A\u0E32\u0E02\u0E32\u0E40\u0E0A\u0E35\u0E22\u0E07\u0E43\u0E2B\u0E21\u0E48")),
-                    React.createElement("div", { className: "ml-auto hidden sm:flex items-center gap-1 text-[24px] px-3 py-1.5 rounded-full", style: { background: "rgba(143,209,79,0.2)", color: BRAND.green } },
-                        React.createElement("span", { style: { fontSize: 18 } }, "✨"),
-                        " \u0E40\u0E25\u0E37\u0E2D\u0E01\u0E44\u0E14\u0E49\u0E2B\u0E25\u0E32\u0E22\u0E41\u0E1A\u0E1A\u0E1E\u0E23\u0E49\u0E2D\u0E21\u0E01\u0E31\u0E19"))),
+                        React.createElement("p", { className: "text-[24px] sm:text-[27px]", style: { color: "#BFE3F5" } }, "ป้าเป็ด CFP® · กรุงเทพประกันชีวิต สาขาเชียงใหม่ · ใช้เฉพาะทีมงานป้าเป็ด")))),
             React.createElement("main", { className: "max-w-5xl mx-auto px-5 py-6 space-y-6" },
                 React.createElement("div", { className: "flex items-start gap-2 text-[24px] rounded-xl p-4", style: { background: "#FFF6E5", color: "#5C4310", border: "1px solid #F3D98B" } },
                     React.createElement("span", { style: { fontSize: 22 }, className: "mt-0.5 shrink-0" }, "ℹ️"),
@@ -4518,6 +5080,7 @@ function App() {
                         React.createElement("button", { onClick: clearAll, className: "flex items-center gap-1.5 text-[21px] font-medium px-3 py-2 rounded-xl", style: { background: "#FDEAEA", color: BRAND.danger } },
                             React.createElement("span", { style: { fontSize: 16 } }, "🧹"),
                             " \u0E40\u0E04\u0E25\u0E35\u0E22\u0E23\u0E4C\u0E02\u0E49\u0E2D\u0E21\u0E39\u0E25\u0E17\u0E31\u0E49\u0E07\u0E2B\u0E21\u0E14")),
+                    React.createElement("button", { onClick: () => { setCaseName(customerName); setCasesOpen(true); }, className: "w-full mb-3 flex items-center justify-center gap-1.5 text-[21px] font-medium px-3 py-2 rounded-xl", style: { background: BRAND.bg, color: BRAND.navy, border: "1px solid #D7E8F0" } }, `📁 เคสลูกค้า (บันทึก/เปิดเคส)${cases.length ? ` · ${cases.length} เคส` : ""}`),
                     React.createElement("p", { className: "text-[21px] mb-3", style: { color: BRAND.sub } }, "\u0E02\u0E49\u0E2D\u0E21\u0E39\u0E25\u0E17\u0E35\u0E48\u0E04\u0E35\u0E22\u0E4C\u0E08\u0E30\u0E16\u0E39\u0E01\u0E1A\u0E31\u0E19\u0E17\u0E36\u0E01\u0E44\u0E27\u0E49\u0E2D\u0E31\u0E15\u0E42\u0E19\u0E21\u0E31\u0E15\u0E34\u0E43\u0E19\u0E40\u0E04\u0E23\u0E37\u0E48\u0E2D\u0E07\u0E19\u0E35\u0E49 \u0E41\u0E21\u0E49\u0E1B\u0E34\u0E14\u0E41\u0E2D\u0E1B\u0E41\u0E25\u0E49\u0E27\u0E40\u0E1B\u0E34\u0E14\u0E43\u0E2B\u0E21\u0E48\u0E01\u0E47\u0E22\u0E31\u0E07\u0E2D\u0E22\u0E39\u0E48 \u0E08\u0E19\u0E01\u0E27\u0E48\u0E32\u0E08\u0E30\u0E01\u0E14 \"\u0E40\u0E04\u0E25\u0E35\u0E22\u0E23\u0E4C\u0E02\u0E49\u0E2D\u0E21\u0E39\u0E25\u0E17\u0E31\u0E49\u0E07\u0E2B\u0E21\u0E14\""),
                     React.createElement("div", { className: "grid grid-cols-2 sm:grid-cols-4 gap-4" },
                         React.createElement(Field, { label: "\u0E40\u0E1E\u0E28" },
@@ -4605,7 +5168,6 @@ function App() {
                     React.createElement("div", { className: "grid grid-cols-2 sm:grid-cols-3 gap-1.5 sm:gap-2" }, sortByRecommended(PRODUCTS.filter((p) => PENSION_IDS.includes(p.id))).map((p) => (React.createElement(CompactChip, { key: p.id, product: p, checked: !!selected[p.id], picked: false, disabled: productDisabled(p), recommended: false, onCheckboxClick: () => toggle(p.id), onNameClick: () => openEditor(p.id) })))))),
                 React.createElement("section", { className: "rounded-2xl p-4", style: { background: BRAND.card, boxShadow: "0 6px 24px rgba(11,42,85,0.07)" } },
                     React.createElement("h2", { className: "text-[24px] font-bold mb-1 px-1", style: { color: BRAND.mainBlue } }, "\u0E20\u0E32\u0E1E\u0E23\u0E27\u0E21\u0E41\u0E1A\u0E1A\u0E1B\u0E23\u0E30\u0E01\u0E31\u0E19\u0E17\u0E31\u0E49\u0E07\u0E2B\u0E21\u0E14"),
-                    React.createElement("p", { className: "text-[16px] mb-3 px-1", style: { color: BRAND.sub } }, "\u0E15\u0E34\u0E4A\u0E01\u0E40\u0E25\u0E37\u0E2D\u0E01\u0E44\u0E14\u0E49\u0E2B\u0E25\u0E32\u0E22\u0E2D\u0E31\u0E19\u0E1E\u0E23\u0E49\u0E2D\u0E21\u0E01\u0E31\u0E19 \u0E41\u0E25\u0E49\u0E27\u0E01\u0E14\u0E1B\u0E38\u0E48\u0E21 \"\u0E40\u0E25\u0E37\u0E2D\u0E01\" \u0E14\u0E49\u0E32\u0E19\u0E25\u0E48\u0E32\u0E07\u0E40\u0E1E\u0E37\u0E48\u0E2D\u0E44\u0E1B\u0E01\u0E23\u0E2D\u0E01\u0E02\u0E49\u0E2D\u0E21\u0E39\u0E25 \u00B7 \u0E17\u0E38\u0E19\u0E2B\u0E25\u0E31\u0E01\u0E40\u0E25\u0E37\u0E2D\u0E01\u0E44\u0E14\u0E49 1 \u0E41\u0E1A\u0E1A"),
                     (selected.UNJAI || selected.CANCERMAX) && (React.createElement("p", { className: "text-[16px] mb-2 px-1 font-medium", style: { color: BRAND.warn } },
                         "\u26A0 ",
                         selected.UNJAI ? "อุ่นใจ โรคร้าย" : "แคนเซอร์ แม็กซ์",
@@ -4645,6 +5207,9 @@ function App() {
                     React.createElement("div", { className: "flex gap-2 flex-wrap" },
                         React.createElement("button", { onClick: () => { setShareNote(""); setShareModal({ id: "QUOTE", mode: "text" }); }, className: "flex-1 min-w-[160px] rounded-xl py-3 text-[21px] font-semibold text-white", style: { background: "#06C755" } }, "💬 ส่งข้อความ LINE (ทุกแบบ)"),
                         React.createElement("button", { onClick: () => { setShareNote(""); setShareModal({ id: "QUOTE", mode: "image" }); }, className: "flex-1 min-w-[160px] rounded-xl py-3 text-[21px] font-semibold text-white", style: { background: "#06C755" } }, "🖼️ ส่งรูป LINE (ทุกแบบ)")),
+                    result.warns && result.warns.length > 0 && (React.createElement("div", { className: "rounded-2xl p-4 mb-4", style: { background: "#FFF6E0", border: "1px solid #F0C36D" } },
+                        React.createElement("p", { className: "text-[21px] font-semibold mb-1", style: { color: BRAND.warn } }, "⚠️ เช็กก่อนเสนอ (เห็นเฉพาะตัวแทน)"),
+                        result.warns.map((w, i) => (React.createElement("p", { key: i, className: "text-[19px]", style: { color: BRAND.warn } }, "• ", w))))),
                     React.createElement(BenefitBoard, { cards: result.cards }),
                     showComm && React.createElement(CommissionPopup, { result, onClose: () => setShowComm(false) }),
                     React.createElement("div", { className: "grid sm:grid-cols-2 gap-4" }, result.cards.map((c) => (React.createElement("div", { key: c.id, className: "rounded-2xl overflow-hidden", style: { background: BRAND.card, boxShadow: "0 6px 20px rgba(11,42,85,0.08)", borderTop: `4px solid ${BRAND.sky}`, position: "relative" } },
@@ -4719,6 +5284,22 @@ function App() {
                     React.createElement("button", { onClick: () => setPensionYearModal(null), className: "w-full mt-4 rounded-xl py-3 text-[24px] font-medium text-white flex items-center justify-center gap-1", style: { background: BRAND.navy } },
                         React.createElement("span", { style: { fontSize: 18 } }, "✕"),
                         " \u0E1B\u0E34\u0E14")))),
+            casesOpen && (React.createElement("div", { className: "fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4", style: { background: "rgba(8,30,62,0.55)" }, onClick: () => setCasesOpen(false) },
+                React.createElement("div", { className: "w-full max-w-md rounded-2xl p-5 max-h-[90vh] overflow-y-auto", style: { background: BRAND.card }, onClick: (e) => e.stopPropagation() },
+                    React.createElement("h3", { className: "text-[24px] font-semibold mb-3", style: { color: BRAND.navy } }, "📁 เคสลูกค้า"),
+                    React.createElement("p", { className: "text-[18px] mb-2", style: { color: BRAND.sub } }, "บันทึกข้อมูลที่กรอกตอนนี้ (อายุ เพศ แบบที่เลือก ทุน งวดชำระ) ไว้ในเครื่องนี้ เปิดกลับมาแก้หรือส่งซ้ำได้"),
+                    React.createElement("div", { className: "flex gap-2 mb-4" },
+                        React.createElement("input", { value: caseName, onChange: (e) => setCaseName(e.target.value), placeholder: "ชื่อลูกค้า / ชื่อเคส", className: "flex-1 rounded-xl px-3 py-2.5 text-[20px]", style: { border: "1px solid #D7E8F0" } }),
+                        React.createElement("button", { onClick: saveCase, className: "rounded-xl px-4 py-2.5 text-[19px] font-semibold text-white shrink-0", style: { background: BRAND.navy } }, "💾 บันทึก")),
+                    cases.length === 0 ? React.createElement("p", { className: "text-[19px] text-center py-4", style: { color: BRAND.sub } }, "ยังไม่มีเคสที่บันทึกไว้")
+                        : cases.map((c) => (React.createElement("div", { key: c.id, className: "rounded-xl p-3 mb-2 flex items-start gap-2", style: { background: BRAND.bg } },
+                            React.createElement("div", { className: "flex-1 min-w-0" },
+                                React.createElement("p", { className: "text-[20px] font-semibold", style: { color: BRAND.navy } }, c.name),
+                                React.createElement("p", { className: "text-[16px]", style: { color: BRAND.sub } }, `${new Date(c.savedAt).toLocaleString("th-TH", { dateStyle: "medium", timeStyle: "short" })} · ${(c.snap && c.snap.gender) === "female" ? "หญิง" : "ชาย"} ${c.snap ? c.snap.age : "-"} ปี`),
+                                c.summary && React.createElement("p", { className: "text-[16px] mt-0.5", style: { color: BRAND.ink } }, c.summary)),
+                            React.createElement("button", { onClick: () => openCase(c), className: "rounded-xl px-3 py-2 text-[18px] font-semibold text-white shrink-0", style: { background: BRAND.greenDeep } }, "เปิด"),
+                            React.createElement("button", { onClick: () => deleteCase(c), className: "rounded-xl px-2.5 py-2 text-[18px] shrink-0", style: { background: "#FFFFFF", color: BRAND.danger, border: "1px solid #F0C9C9" } }, "🗑️")))),
+                    React.createElement("button", { onClick: () => setCasesOpen(false), className: "w-full mt-2 rounded-xl py-2.5 text-[20px] font-medium", style: { background: BRAND.bg, color: BRAND.navy } }, "✕ ปิด")))),
             shareModal && (React.createElement("div", { className: "fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4", style: { background: "rgba(8,30,62,0.55)" }, onClick: () => setShareModal(null) },
                 React.createElement("div", { className: "w-full max-w-md rounded-2xl p-5 max-h-[90vh] overflow-y-auto", style: { background: BRAND.card }, onClick: (e) => e.stopPropagation() },
                     React.createElement("h3", { className: "text-[24px] font-semibold mb-3", style: { color: BRAND.navy } }, !shareModal.id ? "⚙️ ข้อมูลตัวแทน" : shareModal.mode === "text" ? "💬 ส่งข้อความ LINE" : "🖼️ ส่งรูป LINE"),
@@ -4736,6 +5317,18 @@ function App() {
                         React.createElement("div", { className: "flex gap-2 mt-2" },
                             !agentInfo.confirmed && (React.createElement("button", { onClick: () => saveAgent(agentInfo), className: "flex-1 rounded-xl py-2 text-[19px] font-medium text-white", style: { background: BRAND.greenDeep } }, "✓ ถูกต้อง")),
                             React.createElement("button", { onClick: () => setAgentDraft(Object.assign({}, agentInfo)), className: "flex-1 rounded-xl py-2 text-[19px] font-medium", style: { background: "#FFFFFF", color: BRAND.navy, border: "1px solid #D7E8F0" } }, "✎ แก้ไข")))),
+                    shareModal.id && shareDraft && (React.createElement("div", { className: "mb-3" },
+                        React.createElement("div", { className: "flex items-center justify-between gap-2 mb-2" },
+                            React.createElement("p", { className: "text-[19px] font-semibold", style: { color: BRAND.navy } }, shareModal.mode === "text" ? "✏️ ตรวจ/แก้ข้อความก่อนส่ง" : "✏️ ตรวจ/แก้บรรทัดสรุปบนรูป (ตารางแก้ไม่ได้)"),
+                            React.createElement("button", { onClick: () => setShareDraft(makeShareDraft()), className: "text-[17px] px-3 py-1 rounded-full shrink-0", style: { background: BRAND.bg, color: BRAND.navy, border: "1px solid #D7E8F0" } }, "↺ คืนค่าเดิม")),
+                        shareModal.mode === "text"
+                            ? React.createElement("textarea", { value: shareDraft.text || "", onChange: (e) => setShareDraft(Object.assign({}, shareDraft, { text: e.target.value, dirty: true })), rows: 14, className: "w-full rounded-xl px-3 py-2 text-[17px]", style: { border: "1px solid #D7E8F0", lineHeight: 1.5, fontFamily: "inherit" } })
+                            : React.createElement(LineEditor, { groups: shareDraft.groups || [], onChange: (g) => setShareDraft(Object.assign({}, shareDraft, { groups: g, dirty: true })) }),
+                        shareModal.mode === "image" && (React.createElement("div", { className: "mt-3" },
+                            React.createElement("p", { className: "text-[18px] mb-2 font-semibold", style: { color: BRAND.navy } }, `👀 ตัวอย่างรูปที่จะส่ง${shareLive.length > 1 ? ` (${shareLive.length} รูป)` : ""} · มือถือกดค้างที่รูปเพื่อบันทึก`),
+                            shareLive.map((src, i) => (React.createElement("div", { key: i, className: "mb-2" },
+                                React.createElement("img", { src, alt: `รูปที่ ${i + 1}`, className: "w-full rounded-lg", style: { border: "1px solid #D7E8F0", WebkitTouchCallout: "default" } }),
+                                React.createElement("a", { href: src, download: `insurance-summary-${i + 1}.png`, className: "block text-center mt-1 rounded-xl py-1.5 text-[17px]", style: { background: BRAND.bg, color: BRAND.navy } }, `⬇️ ดาวน์โหลดรูปที่ ${i + 1}`)))))))),
                     shareNote && (React.createElement("p", { className: "text-[19px] mb-3", style: { color: BRAND.greenDeep } }, shareNote)),
                     shareModal.id === "QUOTE" && shareModal.mode === "text" && (() => {
                         const q = buildQuoteData();
@@ -4748,12 +5341,7 @@ function App() {
                     shareModal.id && (React.createElement("div", { className: "mt-3 rounded-xl p-3", style: { border: "1px dashed #9FD8B0" } },
                         React.createElement("p", { className: "text-[18px] mb-2", style: { color: BRAND.sub } }, "ส่งผ่าน LINE OA: คัดลอกหรือบันทึกไว้ก่อน แล้วไปวาง/แนบในแชทลูกค้า"),
                         React.createElement("div", { className: "flex gap-2" },
-                            React.createElement("button", { disabled: !agentInfo.confirmed || !!agentDraft, onClick: copyForOA, className: "flex-1 rounded-xl py-2.5 text-[19px] font-medium", style: { background: "#FFFFFF", color: "#06A045", border: "1px solid #06C755", opacity: (!agentInfo.confirmed || agentDraft) ? 0.4 : 1 } }, "📋 คัดลอกข้อความ"),
-                            React.createElement("button", { disabled: !agentInfo.confirmed || !!agentDraft, onClick: saveImageForOA, className: "flex-1 rounded-xl py-2.5 text-[19px] font-medium", style: { background: "#FFFFFF", color: "#06A045", border: "1px solid #06C755", opacity: (!agentInfo.confirmed || agentDraft) ? 0.4 : 1 } }, "💾 บันทึกรูป")),
-                        sharePreview && (React.createElement("div", { className: "mt-3" },
-                            React.createElement("p", { className: "text-[18px] mb-2 font-semibold", style: { color: BRAND.navy } }, "มือถือ: กดค้างที่รูป → บันทึกรูปภาพ · คอม: กดปุ่มดาวน์โหลดด้านล่าง"),
-                            React.createElement("img", { src: sharePreview, alt: "สรุปแบบประกัน", className: "w-full rounded-lg", style: { border: "1px solid #D7E8F0", WebkitTouchCallout: "default" } }),
-                            React.createElement("a", { href: sharePreview, download: "insurance-summary.png", className: "block text-center mt-2 rounded-xl py-2 text-[18px] font-medium", style: { background: BRAND.bg, color: BRAND.navy } }, "⬇️ ดาวน์โหลดรูป"))))),
+                            React.createElement("button", { disabled: !agentInfo.confirmed || !!agentDraft, onClick: copyForOA, className: "flex-1 rounded-xl py-2.5 text-[19px] font-medium", style: { background: "#FFFFFF", color: "#06A045", border: "1px solid #06C755", opacity: (!agentInfo.confirmed || agentDraft) ? 0.4 : 1 } }, "📋 คัดลอกข้อความ")))),
                     React.createElement("button", { onClick: () => { setShareModal(null); setAgentDraft(null); }, className: "w-full mt-2 rounded-xl py-2.5 text-[20px] font-medium", style: { background: BRAND.bg, color: BRAND.navy } }, "✕ ปิด")))),
             React.createElement("footer", { className: "text-center text-[21px] py-6", style: { color: BRAND.sub } }, "\u0E40\u0E1E\u0E37\u0E48\u0E2D\u0E01\u0E32\u0E23\u0E19\u0E33\u0E40\u0E2A\u0E19\u0E2D\u0E40\u0E1A\u0E37\u0E49\u0E2D\u0E07\u0E15\u0E49\u0E19\u0E40\u0E17\u0E48\u0E32\u0E19\u0E31\u0E49\u0E19 \u0E44\u0E21\u0E48\u0E43\u0E0A\u0E48\u0E40\u0E2D\u0E01\u0E2A\u0E32\u0E23\u0E40\u0E2A\u0E19\u0E2D\u0E02\u0E32\u0E22\u0E2D\u0E22\u0E48\u0E32\u0E07\u0E40\u0E1B\u0E47\u0E19\u0E17\u0E32\u0E07\u0E01\u0E32\u0E23")),
         React.createElement("style", null, `
@@ -5571,6 +6159,7 @@ function openLineText(text) {
 }
 const genderTh = (g) => g === "female" ? "\u0E40\u0E1E\u0E28\u0E2B\u0E0D\u0E34\u0E07" : "\u0E40\u0E1E\u0E28\u0E0A\u0E32\u0E22";
 function skCoverage(d) {
+  if (d.ov && d.ov.coverage) return d.ov.coverage;
   return [
     { title: "1. \u0E21\u0E35\u0E0A\u0E35\u0E27\u0E34\u0E15\u0E2D\u0E22\u0E39\u0E48\u0E04\u0E23\u0E1A\u0E2A\u0E31\u0E0D\u0E0D\u0E32", formula: "\u0E23\u0E31\u0E1A\u0E40\u0E1A\u0E35\u0E49\u0E22\u0E2A\u0E30\u0E2A\u0E21 + \u0E40\u0E07\u0E34\u0E19\u0E04\u0E37\u0E19\u0E1E\u0E34\u0E40\u0E28\u0E29", amount: d.maturity, color: C.blue },
     { title: "2. \u0E40\u0E2A\u0E35\u0E22\u0E0A\u0E35\u0E27\u0E34\u0E15\u0E17\u0E31\u0E48\u0E27\u0E44\u0E1B", formula: "\u0E17\u0E38\u0E19\u0E1B\u0E23\u0E30\u0E01\u0E31\u0E19 + \u0E40\u0E1A\u0E35\u0E49\u0E22\u0E2A\u0E30\u0E2A\u0E21 + \u0E40\u0E07\u0E34\u0E19\u0E04\u0E37\u0E19\u0E1E\u0E34\u0E40\u0E28\u0E29", amount: d.deathGeneral, note: "(\u0E2A\u0E39\u0E07\u0E2A\u0E38\u0E14\u0E40\u0E21\u0E37\u0E48\u0E2D\u0E0A\u0E33\u0E23\u0E30\u0E40\u0E1A\u0E35\u0E49\u0E22\u0E1B\u0E23\u0E30\u0E01\u0E31\u0E19\u0E04\u0E23\u0E1A)", color: C.green },
@@ -5578,6 +6167,7 @@ function skCoverage(d) {
   ];
 }
 function skFree(d) {
+  if (d.ov && d.ov.free) return d.ov.free;
   return [
     { label: "\u0E04\u0E48\u0E32\u0E23\u0E31\u0E01\u0E29\u0E32\u0E1E\u0E22\u0E32\u0E1A\u0E32\u0E25\u0E08\u0E32\u0E01\u0E2D\u0E38\u0E1A\u0E31\u0E15\u0E34\u0E40\u0E2B\u0E15\u0E38 (\u0E15\u0E32\u0E21\u0E08\u0E23\u0E34\u0E07)", value: `\u0E44\u0E21\u0E48\u0E40\u0E01\u0E34\u0E19 ${baht(d.medicalCap)}`, sub: "\u0E2A\u0E39\u0E07\u0E2A\u0E38\u0E14 5 \u0E40\u0E17\u0E48\u0E32\u0E02\u0E2D\u0E07\u0E40\u0E1A\u0E35\u0E49\u0E22\u0E23\u0E32\u0E22\u0E40\u0E14\u0E37\u0E2D\u0E19 \u0E15\u0E48\u0E2D\u0E04\u0E23\u0E31\u0E49\u0E07" },
     { label: "\u0E2A\u0E39\u0E0D\u0E40\u0E2A\u0E35\u0E22\u0E21\u0E37\u0E2D/\u0E40\u0E17\u0E49\u0E32 2 \u0E02\u0E49\u0E32\u0E07 \u0E2B\u0E23\u0E37\u0E2D\u0E2A\u0E32\u0E22\u0E15\u0E32 (100%)", value: baht(d.acc100) },
@@ -5586,6 +6176,7 @@ function skFree(d) {
   ];
 }
 function skKids(d) {
+  if (d.ov && d.ov.kids) return d.ov.kids;
   if (!d.isKids) return [];
   return [
     {
@@ -5601,9 +6192,33 @@ function skKids(d) {
   ];
 }
 function skNotes(d) {
-  const n = ["\u0E2A\u0E48\u0E27\u0E19\u0E2D\u0E38\u0E1A\u0E31\u0E15\u0E34\u0E40\u0E2B\u0E15\u0E38\u0E17\u0E35\u0E48\u0E41\u0E16\u0E21\u0E1F\u0E23\u0E35 \u0E44\u0E21\u0E48\u0E04\u0E38\u0E49\u0E21\u0E04\u0E23\u0E2D\u0E07\u0E02\u0E13\u0E30\u0E21\u0E36\u0E19\u0E40\u0E21\u0E32\u0E2B\u0E23\u0E37\u0E2D\u0E43\u0E0A\u0E49\u0E2A\u0E32\u0E23\u0E40\u0E2A\u0E1E\u0E15\u0E34\u0E14\u0E08\u0E19\u0E04\u0E23\u0E2D\u0E07\u0E2A\u0E15\u0E34\u0E44\u0E21\u0E48\u0E44\u0E14\u0E49, \u0E01\u0E32\u0E23\u0E17\u0E33\u0E23\u0E49\u0E32\u0E22\u0E15\u0E31\u0E27\u0E40\u0E2D\u0E07, \u0E01\u0E32\u0E23\u0E17\u0E30\u0E40\u0E25\u0E32\u0E30\u0E27\u0E34\u0E27\u0E32\u0E17, \u0E01\u0E32\u0E23\u0E41\u0E02\u0E48\u0E07\u0E23\u0E16\u0E2B\u0E23\u0E37\u0E2D\u0E41\u0E02\u0E48\u0E07\u0E40\u0E23\u0E37\u0E2D"];
-  if (d.isKids) n.push("4 \u0E42\u0E23\u0E04\u0E23\u0E49\u0E32\u0E22\u0E41\u0E23\u0E07\u0E02\u0E2D\u0E07\u0E40\u0E14\u0E47\u0E01 \u0E21\u0E35\u0E23\u0E30\u0E22\u0E30\u0E40\u0E27\u0E25\u0E32\u0E23\u0E2D\u0E04\u0E2D\u0E22 90 \u0E27\u0E31\u0E19 \u0E19\u0E31\u0E1A\u0E08\u0E32\u0E01\u0E27\u0E31\u0E19\u0E40\u0E23\u0E34\u0E48\u0E21\u0E04\u0E38\u0E49\u0E21\u0E04\u0E23\u0E2D\u0E07");
+  if (d.ov && d.ov.notes) return d.ov.notes;
+  const n = ["ส่วนอุบัติเหตุที่แถมฟรี ไม่คุ้มครองขณะมึนเมาหรือใช้สารเสพติดจนครองสติไม่ได้, การทำร้ายตัวเอง, การทะเลาะวิวาท, การแข่งรถหรือแข่งเรือ"];
+  if (d.isKids) n.push("4 โรคร้ายแรงของเด็ก มีระยะเวลารอคอย 90 วัน นับจากวันเริ่มคุ้มครอง");
+  if (!d.isKids && Number(d.age) >= 18 && d.pay > 0) n.push(`ลดหย่อนภาษีเบี้ยประกันชีวิตได้ตามจ่ายจริง ไม่เกิน 100,000 บาท/ปี (แผนนี้ ${baht(Math.min(Math.round(d.totalPremium / d.pay), 100000))}/ปี)`);
+  n.push("ถ้าเลิกกลางทาง (เวนคืน) ได้มูลค่าเวนคืนตามตารางในกรมธรรม์ ซึ่งในช่วงปีแรกๆ มักได้น้อยกว่าเบี้ยที่จ่ายไป");
   return n;
+}
+// บรรทัดสรุปที่แก้ไขได้ก่อนส่ง (ไม่รวมตาราง)
+function skEditGroups(d) {
+  const g = [
+    { id: "coverage", title: "ความคุ้มครองระหว่างสัญญา", rows: skCoverage(d).map((c) => ({ k: c.title, sub: c.formula, v: c.amountText != null ? c.amountText : (c.amountText != null ? c.amountText : baht(c.amount)), note: c.note, color: c.color })) },
+    { id: "free", title: "แถมฟรี — คุ้มครองอุบัติเหตุ", rows: skFree(d).map((f) => ({ k: f.label, v: f.value, sub: f.sub || "" })) }
+  ];
+  const kids = skKids(d);
+  if (kids.length) g.push({ id: "kids", title: "ความคุ้มครองสำหรับเด็ก", rows: kids.map((k) => ({ k: k.label, v: k.value || "", sub: k.sub || "" })) });
+  g.push({ id: "notes", title: "ข้อควรรู้", rows: skNotes(d).map((n) => ({ v: n })) });
+  return g;
+}
+function skApplyGroups(d, groups) {
+  if (!groups) return d;
+  const get = (id) => (groups.find((x) => x.id === id) || { rows: [] }).rows;
+  return Object.assign({}, d, { ov: {
+    coverage: get("coverage").map((r) => ({ title: r.k, formula: r.sub, amountText: r.v, note: r.note, color: r.color || C.green })),
+    free: get("free").map((r) => ({ label: r.k, value: r.v, sub: r.sub })),
+    kids: get("kids").map((r) => ({ label: r.k, value: r.v, sub: r.sub })),
+    notes: get("notes").map((r) => r.v).filter(Boolean)
+  } });
 }
 function skGreeting(d) {
   const out = [];
@@ -5621,9 +6236,11 @@ function buildSKText(d) {
   out.push(`\u{1F6E1}\uFE0F \u0E17\u0E38\u0E19\u0E1B\u0E23\u0E30\u0E01\u0E31\u0E19 ${baht(d.sumInsured)}`);
   const gain = d.maturity - d.totalPremium;
   out.push("", "\u{1F4AC} \u0E2A\u0E23\u0E38\u0E1B\u0E07\u0E48\u0E32\u0E22\u0E46", `\u0E08\u0E48\u0E32\u0E22\u0E40\u0E1A\u0E35\u0E49\u0E22\u0E23\u0E27\u0E21 ${baht(d.totalPremium)} \u0E04\u0E23\u0E1A ${d.term} \u0E1B\u0E35\u0E23\u0E31\u0E1A\u0E04\u0E37\u0E19 ${baht(d.maturity)}${gain > 0 ? ` \u0E44\u0E14\u0E49\u0E21\u0E32\u0E01\u0E01\u0E27\u0E48\u0E32\u0E17\u0E35\u0E48\u0E08\u0E48\u0E32\u0E22 ${baht(gain)}` : ""}`);
+  out.push(`\u{1F381} เงินคืนพิเศษ ${d.bonusPct}% ของเบี้ยทุกปีที่ชำระ: ${baht(Math.round(d.totalBonus / d.pay))}/ปี × ${d.pay} ปี = ${baht(d.totalBonus)} (สะสมไว้ จ่ายจริงตอนครบสัญญาหรือเสียชีวิต)`);
+  out.push(`⏳ คุ้มครอง ${d.term} ปี ถึงอายุ ${Number(d.age) + d.term} ปี · ชำระเบี้ย ${d.pay} ปี`);
   out.push("", "\u2501\u2501 \u0E04\u0E27\u0E32\u0E21\u0E04\u0E38\u0E49\u0E21\u0E04\u0E23\u0E2D\u0E07\u0E23\u0E30\u0E2B\u0E27\u0E48\u0E32\u0E07\u0E2A\u0E31\u0E0D\u0E0D\u0E32 \u2501\u2501");
   skCoverage(d).forEach((c) => {
-    out.push(c.title, `   ${c.formula} ${baht(c.amount)}`);
+    out.push(c.title, `   ${c.formula} ${(c.amountText != null ? c.amountText : baht(c.amount))}`);
     if (c.note) out.push(`   ${c.note}`);
   });
   out.push("", "\u2501\u2501 \u0E41\u0E16\u0E21\u0E1F\u0E23\u0E35 \u0E04\u0E38\u0E49\u0E21\u0E04\u0E23\u0E2D\u0E07\u0E2D\u0E38\u0E1A\u0E31\u0E15\u0E34\u0E40\u0E2B\u0E15\u0E38 \u2501\u2501");
@@ -5756,7 +6373,7 @@ function drawSKImage(d) {
   const hs = L.ops.length;
   y += L.para(P, y, "\u0E2A\u0E23\u0E38\u0E1B\u0E02\u0E49\u0E2D\u0E40\u0E2A\u0E19\u0E2D\u0E41\u0E1A\u0E1A\u0E1B\u0E23\u0E30\u0E01\u0E31\u0E19 \xB7 \u0E01\u0E23\u0E38\u0E07\u0E40\u0E17\u0E1E\u0E1B\u0E23\u0E30\u0E01\u0E31\u0E19\u0E0A\u0E35\u0E27\u0E34\u0E15", 28, 500, "#BAE6FD", TW, 40) + 6;
   y += L.para(P, y, `${d.productName} ${d.plan}`, 46, 600, "#FFFFFF", TW, 60) + 4;
-  y += L.para(P, y, `${d.freqLabel} ${baht(d.perInstallment)} \xB7 ${d.isKids ? "\u0E1C\u0E39\u0E49\u0E40\u0E2D\u0E32\u0E1B\u0E23\u0E30\u0E01\u0E31\u0E19 " : ""}${genderTh(d.gender)} \u0E2D\u0E32\u0E22\u0E38 ${d.age} \u0E1B\u0E35 \xB7 \u0E0A\u0E33\u0E23\u0E30\u0E40\u0E1A\u0E35\u0E49\u0E22 ${d.pay} \u0E1B\u0E35 \xB7 \u0E04\u0E38\u0E49\u0E21\u0E04\u0E23\u0E2D\u0E07 ${d.term} \u0E1B\u0E35`, 30, 500, "#E0F2FE", TW, 42) + 26;
+  y += L.para(P, y, `${d.freqLabel} ${baht(d.perInstallment)} \xB7 ${d.isKids ? "\u0E1C\u0E39\u0E49\u0E40\u0E2D\u0E32\u0E1B\u0E23\u0E30\u0E01\u0E31\u0E19 " : ""}${genderTh(d.gender)} \u0E2D\u0E32\u0E22\u0E38 ${d.age} \u0E1B\u0E35 \xB7 \u0E0A\u0E33\u0E23\u0E30\u0E40\u0E1A\u0E35\u0E49\u0E22 ${d.pay} \u0E1B\u0E35 \xB7 \u0E04\u0E38\u0E49\u0E21\u0E04\u0E23\u0E2D\u0E07 ${d.term} \u0E1B\u0E35 (ถึงอายุ ${Number(d.age) + d.term} ปี)`, 30, 500, "#E0F2FE", TW, 42) + 26;
   L.ops.splice(hs, 0, { t: "rect", x: 0, y: 0, w: W, h: y, grad: [C.navy, C.navyDeep] });
   y += 24;
   const g = skGreeting(d);
@@ -5769,7 +6386,7 @@ function drawSKImage(d) {
   const headH = 104;
   const heads = [
     ["\u0E2D\u0E32\u0E22\u0E38", "Age"],
-    ["\u0E40\u0E1A\u0E35\u0E49\u0E22\u0E1B\u0E23\u0E30\u0E01\u0E31\u0E19", "Annual Premium"],
+    ["เบี้ยประกันสะสม", "Annual Premium"],
     ["\u0E40\u0E07\u0E34\u0E19\u0E08\u0E48\u0E32\u0E22\u0E04\u0E37\u0E19\u0E1E\u0E34\u0E40\u0E28\u0E29", `${d.bonusPct}% (\u0E2A\u0E30\u0E2A\u0E21 \u0E08\u0E48\u0E32\u0E22\u0E08\u0E23\u0E34\u0E07\u0E15\u0E2D\u0E19\u0E04\u0E23\u0E1A/\u0E40\u0E2A\u0E35\u0E22\u0E0A\u0E35\u0E27\u0E34\u0E15)`]
   ];
   heads.forEach(([h, s], i) => {
@@ -5795,7 +6412,7 @@ function drawSKImage(d) {
     }
     sy += sideL.para(sx, sy, c.title, 25, 600, "#1E293B", sw, 34);
     sy += sideL.para(sx, sy, c.formula, 23, 500, "#475569", sw, 32);
-    sy += sideL.para(sx, sy, baht(c.amount), 32, 700, c.color, sw, 44);
+    sy += sideL.para(sx, sy, (c.amountText != null ? c.amountText : baht(c.amount)), 32, 700, c.color, sw, 44);
     if (c.note) sy += sideL.para(sx, sy, c.note, 19, 500, "#94A3B8", sw, 26);
     sy += 12;
   });
@@ -5908,6 +6525,23 @@ function ShareModal({ mode, isKids, customer, setCustomer, child, setChild, agen
   const [note, setNote] = useState("");
   const [preview, setPreview] = useState("");
   const [imageSent, setImageSent] = useState(false);
+  const [edit, setEdit] = useState(null); // ฉบับแก้ไขก่อนส่ง { dirty, text, groups }
+  const [live, setLive] = useState("");
+  const makeEdit = () => {
+    const d = buildData();
+    return { dirty: false, text: mode === "text" ? buildSKText(d) : null, groups: mode === "image" ? skEditGroups(d) : null };
+  };
+  useEffect(() => {
+    if (mode === "agent") return;
+    setEdit((e) => (e && e.dirty ? e : makeEdit()));
+  }, [mode, customer, child, agent]);
+  const editedData = () => (mode === "image" && edit ? skApplyGroups(buildData(), edit.groups) : buildData());
+  const editedText = () => (mode === "text" && edit && edit.text != null ? edit.text : buildSKText(buildData()));
+  useEffect(() => {
+    if (mode !== "image" || !edit) return;
+    const t = setTimeout(() => { try { setLive(drawSKImage(editedData()).toDataURL("image/png")); } catch (e) { } }, 250);
+    return () => clearTimeout(t);
+  }, [edit, mode, customer, child, agent]);
   useEffect(() => {
     preloadShareFonts();
   }, []);
@@ -5919,9 +6553,9 @@ function ShareModal({ mode, isKids, customer, setCustomer, child, setChild, agen
     setDraft(null);
   };
   const send = () => {
-    const d = buildData();
+    const d = editedData();
     if (mode === "text") {
-      openLineText(buildSKText(d));
+      openLineText(editedText());
       onClose();
     } else {
       const r = shareCanvasImage(drawSKImage(d));
@@ -5937,11 +6571,21 @@ function ShareModal({ mode, isKids, customer, setCustomer, child, setChild, agen
   }, className: "w-full rounded-xl py-2.5 text-base font-semibold text-white bg-blue-900" }, "\u{1F4BE} \u0E1A\u0E31\u0E19\u0E17\u0E36\u0E01\u0E02\u0E49\u0E2D\u0E21\u0E39\u0E25\u0E15\u0E31\u0E27\u0E41\u0E17\u0E19")) : /* @__PURE__ */ React.createElement("div", { className: `rounded-xl p-3 mb-3 ${agent.confirmed ? "bg-sky-50" : "bg-amber-50 border border-amber-300"}` }, !agent.confirmed && /* @__PURE__ */ React.createElement("p", { className: "text-sm font-semibold text-amber-800 mb-1" }, "\u0E01\u0E23\u0E38\u0E13\u0E32\u0E15\u0E23\u0E27\u0E08\u0E2A\u0E2D\u0E1A\u0E02\u0E49\u0E2D\u0E21\u0E39\u0E25\u0E15\u0E31\u0E27\u0E41\u0E17\u0E19\u0E01\u0E48\u0E2D\u0E19\u0E2A\u0E48\u0E07\u0E04\u0E23\u0E31\u0E49\u0E07\u0E41\u0E23\u0E01"), /* @__PURE__ */ React.createElement("p", { className: "text-base font-semibold text-slate-800" }, agent.name || "-"), /* @__PURE__ */ React.createElement("p", { className: "text-sm text-slate-500" }, "\u{1F4DE} ", agent.phone || "-", " \xB7 LINE: ", agent.lineId || "-"), /* @__PURE__ */ React.createElement("div", { className: "flex gap-2 mt-2" }, !agent.confirmed && /* @__PURE__ */ React.createElement("button", { onClick: () => saveAgent(agent), className: "flex-1 rounded-xl py-2 text-sm font-semibold text-white bg-emerald-600" }, "\u2713 \u0E16\u0E39\u0E01\u0E15\u0E49\u0E2D\u0E07"), /* @__PURE__ */ React.createElement("button", { onClick: () => setDraft(Object.assign({}, agent)), className: `${btnOutline} text-blue-900 border-sky-200` }, "\u270E \u0E41\u0E01\u0E49\u0E44\u0E02"))), note && /* @__PURE__ */ React.createElement("p", { className: "text-sm text-emerald-700 mb-3" }, note), imageSent && mode === "image" && /* @__PURE__ */ React.createElement("button", { onClick: () => {
     openLineText(buildSKText(buildData()));
     onClose();
-  }, className: "w-full mb-3 rounded-xl py-3 text-lg font-bold text-white", style: { background: "#06C755" } }, "\u{1F4AC} \u0E2A\u0E48\u0E07\u0E02\u0E49\u0E2D\u0E04\u0E27\u0E32\u0E21\u0E15\u0E48\u0E2D"), mode !== "agent" && /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("button", { disabled: !ready, onClick: send, className: "w-full rounded-xl py-3 text-lg font-bold text-white", style: { background: "#06C755", opacity: ready ? 1 : 0.4 } }, mode === "text" ? "\u{1F4AC} \u0E40\u0E1B\u0E34\u0E14 LINE \u0E40\u0E1E\u0E37\u0E48\u0E2D\u0E2A\u0E48\u0E07\u0E02\u0E49\u0E2D\u0E04\u0E27\u0E32\u0E21" : "\u{1F5BC}\uFE0F \u0E2A\u0E23\u0E49\u0E32\u0E07\u0E23\u0E39\u0E1B\u0E41\u0E25\u0E30\u0E2A\u0E48\u0E07 LINE"), /* @__PURE__ */ React.createElement("div", { className: "mt-3 rounded-xl p-3 border border-dashed border-emerald-300" }, /* @__PURE__ */ React.createElement("p", { className: "text-sm text-slate-500 mb-2" }, "\u0E2A\u0E48\u0E07\u0E1C\u0E48\u0E32\u0E19 LINE OA: \u0E04\u0E31\u0E14\u0E25\u0E2D\u0E01\u0E2B\u0E23\u0E37\u0E2D\u0E1A\u0E31\u0E19\u0E17\u0E36\u0E01\u0E44\u0E27\u0E49\u0E01\u0E48\u0E2D\u0E19 \u0E41\u0E25\u0E49\u0E27\u0E44\u0E1B\u0E27\u0E32\u0E07/\u0E41\u0E19\u0E1A\u0E43\u0E19\u0E41\u0E0A\u0E17\u0E25\u0E39\u0E01\u0E04\u0E49\u0E32"), /* @__PURE__ */ React.createElement("div", { className: "flex gap-2" }, /* @__PURE__ */ React.createElement("button", { disabled: !ready, onClick: () => {
-    const ok = copyTextToClipboard(buildSKText(buildData()));
+  }, className: "w-full mb-3 rounded-xl py-3 text-lg font-bold text-white", style: { background: "#06C755" } }, "\u{1F4AC} \u0E2A\u0E48\u0E07\u0E02\u0E49\u0E2D\u0E04\u0E27\u0E32\u0E21\u0E15\u0E48\u0E2D"), mode !== "agent" && edit && React.createElement("div", { className: "mb-3" },
+    React.createElement("div", { className: "flex items-center justify-between gap-2 mb-2" },
+      React.createElement("p", { className: "text-sm font-semibold text-blue-900" }, mode === "text" ? "✏️ ตรวจ/แก้ข้อความก่อนส่ง" : "✏️ ตรวจ/แก้บรรทัดสรุปบนรูป (ตารางแก้ไม่ได้)"),
+      React.createElement("button", { onClick: () => setEdit(makeEdit()), className: "text-xs px-3 py-1 rounded-full bg-sky-50 text-blue-900 border border-sky-200 shrink-0" }, "↺ คืนค่าเดิม")),
+    mode === "text"
+      ? React.createElement("textarea", { value: edit.text || "", rows: 14, onChange: (e) => setEdit(Object.assign({}, edit, { text: e.target.value, dirty: true })), className: "w-full rounded-xl px-3 py-2 text-sm border border-sky-200", style: { lineHeight: 1.5, fontFamily: "inherit" } })
+      : React.createElement(LineEditor, { groups: edit.groups || [], onChange: (g) => setEdit(Object.assign({}, edit, { groups: g, dirty: true })) }),
+    mode === "image" && live && React.createElement("div", { className: "mt-3" },
+      React.createElement("p", { className: "text-sm font-semibold text-blue-900 mb-2" }, "👀 ตัวอย่างรูปที่จะส่ง · มือถือกดค้างที่รูปเพื่อบันทึก"),
+      React.createElement("img", { src: live, alt: "ตัวอย่างรูป", className: "w-full rounded-lg border border-sky-200", style: { WebkitTouchCallout: "default" } }))),
+  mode !== "agent" && /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("button", { disabled: !ready, onClick: send, className: "w-full rounded-xl py-3 text-lg font-bold text-white", style: { background: "#06C755", opacity: ready ? 1 : 0.4 } }, mode === "text" ? "\u{1F4AC} \u0E40\u0E1B\u0E34\u0E14 LINE \u0E40\u0E1E\u0E37\u0E48\u0E2D\u0E2A\u0E48\u0E07\u0E02\u0E49\u0E2D\u0E04\u0E27\u0E32\u0E21" : "\u{1F5BC}\uFE0F \u0E2A\u0E23\u0E49\u0E32\u0E07\u0E23\u0E39\u0E1B\u0E41\u0E25\u0E30\u0E2A\u0E48\u0E07 LINE"), /* @__PURE__ */ React.createElement("div", { className: "mt-3 rounded-xl p-3 border border-dashed border-emerald-300" }, /* @__PURE__ */ React.createElement("p", { className: "text-sm text-slate-500 mb-2" }, "\u0E2A\u0E48\u0E07\u0E1C\u0E48\u0E32\u0E19 LINE OA: \u0E04\u0E31\u0E14\u0E25\u0E2D\u0E01\u0E2B\u0E23\u0E37\u0E2D\u0E1A\u0E31\u0E19\u0E17\u0E36\u0E01\u0E44\u0E27\u0E49\u0E01\u0E48\u0E2D\u0E19 \u0E41\u0E25\u0E49\u0E27\u0E44\u0E1B\u0E27\u0E32\u0E07/\u0E41\u0E19\u0E1A\u0E43\u0E19\u0E41\u0E0A\u0E17\u0E25\u0E39\u0E01\u0E04\u0E49\u0E32"), /* @__PURE__ */ React.createElement("div", { className: "flex gap-2" }, /* @__PURE__ */ React.createElement("button", { disabled: !ready, onClick: () => {
+    const ok = copyTextToClipboard(editedText());
     setNote(ok ? "\u{1F4CB} \u0E04\u0E31\u0E14\u0E25\u0E2D\u0E01\u0E02\u0E49\u0E2D\u0E04\u0E27\u0E32\u0E21\u0E41\u0E25\u0E49\u0E27 \u2014 \u0E40\u0E1B\u0E34\u0E14\u0E41\u0E0A\u0E17\u0E25\u0E39\u0E01\u0E04\u0E49\u0E32\u0E43\u0E19 LINE OA \u0E41\u0E25\u0E49\u0E27\u0E01\u0E14\u0E27\u0E32\u0E07" : "\u0E04\u0E31\u0E14\u0E25\u0E2D\u0E01\u0E44\u0E21\u0E48\u0E2A\u0E33\u0E40\u0E23\u0E47\u0E08 \u0E25\u0E2D\u0E07\u0E43\u0E2B\u0E21\u0E48\u0E2D\u0E35\u0E01\u0E04\u0E23\u0E31\u0E49\u0E07");
   }, className: `${btnOutline} text-emerald-700 border-emerald-500`, style: { opacity: ready ? 1 : 0.4 } }, "\u{1F4CB} \u0E04\u0E31\u0E14\u0E25\u0E2D\u0E01\u0E02\u0E49\u0E2D\u0E04\u0E27\u0E32\u0E21"), /* @__PURE__ */ React.createElement("button", { disabled: !ready, onClick: () => {
-    setPreview(drawSKImage(buildData()).toDataURL("image/png"));
+    setPreview(drawSKImage(editedData()).toDataURL("image/png"));
     setNote("");
   }, className: `${btnOutline} text-emerald-700 border-emerald-500`, style: { opacity: ready ? 1 : 0.4 } }, "\u{1F4BE} \u0E1A\u0E31\u0E19\u0E17\u0E36\u0E01\u0E23\u0E39\u0E1B")), preview && /* @__PURE__ */ React.createElement("div", { className: "mt-3" }, /* @__PURE__ */ React.createElement("p", { className: "text-sm font-semibold text-blue-900 mb-2" }, "\u0E21\u0E37\u0E2D\u0E16\u0E37\u0E2D: \u0E01\u0E14\u0E04\u0E49\u0E32\u0E07\u0E17\u0E35\u0E48\u0E23\u0E39\u0E1B \u2192 \u0E1A\u0E31\u0E19\u0E17\u0E36\u0E01\u0E23\u0E39\u0E1B\u0E20\u0E32\u0E1E \xB7 \u0E04\u0E2D\u0E21: \u0E01\u0E14\u0E1B\u0E38\u0E48\u0E21\u0E14\u0E32\u0E27\u0E19\u0E4C\u0E42\u0E2B\u0E25\u0E14\u0E14\u0E49\u0E32\u0E19\u0E25\u0E48\u0E32\u0E07"), /* @__PURE__ */ React.createElement("img", { src: preview, alt: "\u0E2A\u0E23\u0E38\u0E1B\u0E41\u0E1A\u0E1A\u0E1B\u0E23\u0E30\u0E01\u0E31\u0E19", className: "w-full rounded-lg border border-sky-200", style: { WebkitTouchCallout: "default" } }), /* @__PURE__ */ React.createElement("a", { href: preview, download: "sudkhum-summary.png", className: "block text-center mt-2 rounded-xl py-2 text-sm font-semibold bg-sky-50 text-blue-900" }, "\u2B07\uFE0F \u0E14\u0E32\u0E27\u0E19\u0E4C\u0E42\u0E2B\u0E25\u0E14\u0E23\u0E39\u0E1B")))), /* @__PURE__ */ React.createElement("button", { onClick: onClose, className: "w-full mt-2 rounded-xl py-2.5 text-base font-semibold bg-sky-50 text-blue-900" }, "\u2715 \u0E1B\u0E34\u0E14")));
 }
