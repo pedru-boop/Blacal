@@ -8,7 +8,7 @@ const BRAND = {
     ink: "#000000", sub: "#404040", danger: "#B93232", warn: "#6B4508",
     label: "#000000", nameBlue: "#1668D6", mainBlue: "#0C2F63", dataBlack: "#000000",
 };
-const APP_VERSION = "v2.26.0 (2569-10-04)";
+const APP_VERSION = "v2.27.0 (2569-10-04)";
 const RATE_SOURCE = "อัตราเบี้ยตามคู่มือตัวแทน V.14 (14-02-2026) · ค่าคอม 10-09-2026";
 const CASES_KEY = "blacal-cases-v1"; // อัปเดตเลขนี้ทุกครั้งที่มีการแก้ไข/เพิ่มแบบประกันใหม่ เพื่อให้รู้ว่าไฟล์ที่ใช้อยู่เป็นเวอร์ชันล่าสุดหรือไม่
 const fmt = (n) => (n === null || n === undefined || isNaN(n) ? "0" : Math.round(n).toLocaleString("th-TH"));
@@ -1346,7 +1346,7 @@ const hs999Schedule = (age, si) => {
     const DEATH = [100, 200, 300, 400, 500, 600, 700, 800, 900, 990];
     const rows = [];
     for (let n = 1; n <= T; n++) {
-        const death = n <= 10 ? DEATH[n - 1] : 695; // คู่มือระบุเงินเพิ่มพิเศษข้อ 1.2 ถึงปีกธ.ที่ 10 · ปีที่ 11 ขึ้นไป 695% (หรือเบี้ยสะสม แล้วแต่มากกว่า)
+        const death = n <= 10 ? DEATH[n - 1] : 990; // ข้อ 1.1 + 1.2: ปีกธ.ที่ 10 เป็นต้นไป 695% + 295% = 990% (หรือเบี้ยสะสม แล้วแต่มากกว่า)
         const cash = n === T ? 990 : 9 + (n % 9 === 0 ? special : 0);
         rows.push([death, cash]);
     }
@@ -2040,7 +2040,20 @@ function App() {
         persistCases([{ id: Date.now(), name, savedAt: new Date().toISOString(), summary, snap }, ...rest].slice(0, 100));
         setCaseName("");
     }
-    function openCase(c) { applySnapshot(c.snap); setCustomerName(c.name); setResult(null); setCasesOpen(false); }
+    const [pendingCalc, setPendingCalc] = useState(false);
+    async function openCasesModal() {
+        const raw = await storageAdapter.get(CASES_KEY); // อ่านใหม่ทุกครั้ง เผื่อบันทึกจากแท็บ/หน้าอื่น
+        if (raw) { try { setCases(JSON.parse(raw) || []); } catch (e) { } }
+        setCaseName(customerName);
+        setCasesOpen(true);
+    }
+    function openCase(c) { applySnapshot(c.snap); setCustomerName(c.name); setResult(null); setCasesOpen(false); setPendingCalc(true); }
+    useEffect(() => {
+        if (!pendingCalc) return;
+        setPendingCalc(false);
+        handleCalculate(); // ค่าใน state เป็นของเคสที่เปิดแล้ว (render รอบนี้)
+        setTimeout(() => { const el = document.getElementById("result-top"); if (el) el.scrollIntoView({ behavior: "smooth", block: "start" }); }, 350);
+    }, [pendingCalc]);
     function deleteCase(c) { if (window.confirm(`ลบเคส "${c.name}"?`)) persistCases(cases.filter((x) => x.id !== c.id)); }
     const [shareDraft, setShareDraft] = useState(null); // ฉบับแก้ไขก่อนส่ง { key, dirty, text, groups }
     const [shareLive, setShareLive] = useState([]); // รูปตัวอย่างก่อนส่ง (dataURL) // dataURL ของรูป สำหรับกดค้างบันทึก (ใช้กับ LINE OA)
@@ -3536,10 +3549,9 @@ function App() {
                 ["ค่าห้อง/ICU, แพทย์, ผ่าตัด, Day Surgery, รถพยาบาล, ผ่าตัดเล็ก", "จ่ายตามจริง (ห้องเดี่ยวราคาเริ่มต้นของ รพ.) ภายในวงเงินต่อครั้ง"],
                 ["ยากลับบ้าน (ไม่เกิน 7 วัน)", baht(HH_BEN.takeHome[hhPlan])],
                 ["ตรวจวินิจฉัยก่อน-หลังนอน รพ. 30 วัน / OPD ต่อเนื่อง", baht(HH_BEN.prePost[hhPlan]) + " ต่อการเข้าพักรักษาครั้งหนึ่ง"],
-                ["ล้างไต / รังสีรักษา / เคมีบำบัด (หมวด 9-11)", baht(HH_BEN.yearly[hhPlan]) + " ต่อรอบปีกรมธรรม์"],
+                ["ล้างไต / รังสีรักษา / เคมีบำบัด (หมวด 9-11)", baht(HH_BEN.yearly[hhPlan]) + " ต่อรอบปีกรมธรรม์ (3 หมวดใช้วงเงินรวมกัน)"],
                 ...(hhPlan === 10000000 ? [["OPD อุบัติเหตุภายใน 24 ชม. (หมวด 7)", baht(10000) + " ต่อครั้ง"]] : []),
                 ["ระยะเวลาคุ้มครอง", "สัญญาปีต่อปี รับประกันอายุ 11-80 ปี ต่ออายุได้ถึงอายุ 98 ปี"],
-                ["หมายเหตุ", "ตัวเลขหมวดย่อยถอดจากตารางในคู่มือ โปรดตรวจกับตารางฉบับเต็มก่อนนำเสนอลูกค้า · ลดหย่อนภาษีสุขภาพสูงสุด 25,000 บาท"],
             ] };
     }
     function calcOPDP() {
@@ -4102,7 +4114,7 @@ function App() {
         BLASAVE168: { minAge: BLASAVE168_MIN_AGE, maxAge: BLASAVE168_MAX_AGE, minSI: BLASAVE168_MIN_SI, payYears: BLASAVE168_PAY_YEARS, schedule: BLASAVE168_SCHEDULE, rate: () => BLASAVE168_RATE, discount: (si, a) => blasave168Discount(si, a), name: "บีแอลเอ เซฟวิ่ง 168" },
         HS999: { deathMaxPremium: true, minAge: HS999_MIN_AGE, maxAge: HS999_MAX_AGE, minSI: HS999_MIN_SI, payYears: HS999_PAY_YEARS, get schedule() { return hs999Schedule(age, getEffectiveSI("HS999")); }, scheduleFor: (si) => hs999Schedule(age, si), rate: (a) => hs999Rate(a), discount: () => 0, name: "แฮปปี้เซฟวิ่ง 999",
             extraLines: (si) => [["แผนที่ได้ (ตามทุน)", hs999PlanName(si) + (si >= HS999_PLAN_B_SI ? " (ทุน 300,000 บาทขึ้นไป) · เงินคืนพิเศษ 59% ทุก 9 ปี" : " (ทุน 100,000-299,999 บาท) · เงินคืนพิเศษ 39% ทุก 9 ปี")],
-                ["แถมฟรี: เอดีบี 999", "เสียชีวิตจากอุบัติเหตุ รับเพิ่ม 100%-900% ของทุน (ปีกรมธรรม์ที่ 1-9) และ 990% ตั้งแต่ปีที่ 10 · ไม่คุ้มครองขณะขับขี่/โดยสารรถจักรยานยนต์"],
+                ["แถมฟรี: เอดีบี 999", `เสียชีวิตจากอุบัติเหตุ รับเพิ่ม 100%-900% ของทุนเอดีบี (ปีกรมธรรม์ที่ 1-9) และ 990% ตั้งแต่ปีที่ 10 · ทุนเอดีบี ${baht(Math.min(si, 10000000))}${si > 10000000 ? " (สูงสุด 10 ล้านบาท รวมทุกฉบับ)" : ""} · ไม่คุ้มครองขณะขับขี่/โดยสารรถจักรยานยนต์`],
                 ["หมายเหตุ", "ถ้าเวนคืนกรมธรรม์ จะไม่ได้เงินคืนพิเศษ (0.5% รายปี, 39%/59% ทุก 9 ปี และ 295% ณ ครบกำหนด)"]] },
         PUNSUK: { deathMaxPremium: true, minAge: PUNSUK_MIN_AGE, maxAge: PUNSUK_MAX_AGE, minSI: PUNSUK_MIN_SI, payYears: PUNSUK_PAY_YEARS, get schedule() { return punsukSchedule(age); }, scheduleFor: () => punsukSchedule(age), rate: (a, g) => (g === "female" ? PUNSUK_FEMALE : PUNSUK_MALE)[a], discount: () => 0, name: "บีแอลเอ ปันสุข 80/20",
             extraLines: (si) => [["แถมฟรี: ทพ.", "ทุพพลภาพสิ้นเชิงถาวร ยกเว้นการชำระเบี้ยสัญญาประกันชีวิต"]] },
@@ -4966,35 +4978,48 @@ function App() {
         }
     }
     // คุ้มครองถึงอายุเท่าไร (ตามอายุที่กรอก) — ใช้แทนข้อความวิชาการ "รับประกันตั้งแต่อายุ X ถึง Y ต่ออายุได้ถึง Z"
-    const COVER_RENEW = { ACC: 98, ACC3: 65, TPD: 74, SUPER: 79, VH: 98, VHKIDS: 98, HHP: 98, HH: 98, PH: 98, OPD: 98, OPDP: 98, RPPR: 65, LLC: 98, SS: 65 };
+    // สัญญาเพิ่มเติมแบบปีต่อปี (คู่มือ V.14): "pay" = ชำระเบี้ยได้ถึงอายุ X · "to" = ต่อเนื่อง/คุ้มครองได้ถึงอายุ X — ทั้งนี้ไม่เกินระยะเวลาเอาประกันของแบบหลัก
+    const RIDER_COVER = { ACC: ["pay", 98], VH: ["pay", 98], VHKIDS: ["pay", 98], HHP: ["pay", 98], HH: ["pay", 98], PH: ["pay", 98], OPD: ["pay", 98], OPDP: ["pay", 98], LLC: ["pay", 98], ACC3: ["to", 65], TPD: ["to", 74], SUPER: ["to", 79], SS: ["to", 65] };
     function coverEndAge(id) {
         if (SAVINGS_DEFS[id]) return age + SAVINGS_DEFS[id].schedule.length;
         const t = { PSAVE104: 10, PSAVE126: 12, PLUS2: plus2Term, CHAK: chakTerm, CHAP: chapTerm }[id];
         if (t) return age + t;
-        if (COVER_RENEW[id]) return COVER_RENEW[id];
+        if (RIDER_COVER[id]) return RIDER_COVER[id][1];
         const p = PRODUCTS.find((x) => x.id === id);
         return p && p.coverAge > age ? p.coverAge : null;
     }
     function coverUntilText(id) {
+        const rc = RIDER_COVER[id];
+        if (rc) {
+            const mainId = MAIN_IDS.find((m) => selected[m]);
+            const mEnd = mainId ? coverEndAge(mainId) : null;
+            if (mEnd && mEnd > age && mEnd < rc[1]) return `ต่ออายุได้ทุกปี ถึงอายุ ${mEnd} ปี (สิ้นสุดพร้อมแบบประกันหลัก)`;
+            return rc[0] === "pay" ? `ต่ออายุได้ทุกปี ชำระเบี้ยได้ถึงอายุ ${rc[1]} ปี` : `ต่ออายุได้ทุกปี คุ้มครองได้ถึงอายุ ${rc[1]} ปี (อีก ${rc[1] - age} ปี)`;
+        }
         const e = coverEndAge(id);
         if (!e || e <= age) return null;
-        return COVER_RENEW[id] ? `ต่ออายุได้ทุกปี คุ้มครองได้ถึงอายุ ${e} ปี (อีก ${e - age} ปี)` : `ถึงอายุ ${e} ปี (อีก ${e - age} ปี)`;
+        return `ถึงอายุ ${e} ปี (อีก ${e - age} ปี)`;
     }
-    const HEALTH_TAX_IDS = ["VH", "VHKIDS", "HHP", "HH", "PH", "OPD", "OPDP", "RPPR"];
+    const HEALTH_TAX_IDS = ["VH", "VHKIDS", "HHP", "HH", "PH", "OPD", "OPDP", "RPPR", "HAPPYCI", "LLC"];
     function finalizeBenefits(id, benefits, annualPremium) {
         let rows = (benefits || []).filter((b) => !(Array.isArray(b) && /^ระยะเวลาคุ้มครอง$/.test(b[0])));
-        const until = coverUntilText(id);
+        let until = coverUntilText(id);
+        if (id === "CS") { // คช.: ระยะเวลาคำนวณจากแบบหลัก/อายุผู้เยาว์/อายุผู้ปกครอง
+            const r = rows.find((b) => /^ระยะเวลาคุ้มครองการชำระเบี้ย/.test(b[0]));
+            const n = r ? parseInt(String(r[1]), 10) : 0;
+            until = n > 0 ? `ถึงผู้เยาว์อายุ ${age + n} ปี (${n} ปี)` : null;
+        }
         if (until) rows.push(["คุ้มครองถึง", until]);
         const p = PRODUCTS.find((x) => x.id === id) || {};
         const yrs = (coverEndAge(id) || 0) - age;
         if (PENSION_IDS.includes(id))
             rows.push(["ลดหย่อนภาษี", "เบี้ยบำนาญลดหย่อนได้ 15% ของเงินได้ ไม่เกิน 200,000 บาท/ปี (รวมกองทุนเพื่อการเกษียณไม่เกิน 500,000 บาท)"]);
-        else if (age >= 18 && p.isMain && yrs >= 10 && annualPremium > 0)
+        else if (p.isMain && yrs >= 10 && annualPremium > 0)
             rows.push(["ลดหย่อนภาษี", `เบี้ยประกันชีวิตลดหย่อนได้ตามจ่ายจริง ไม่เกิน 100,000 บาท/ปี (แผนนี้ลดหย่อนได้ ${baht(Math.min(Math.round(annualPremium), 100000))}/ปี)`]);
-        else if (age >= 18 && HEALTH_TAX_IDS.includes(id) && annualPremium > 0)
+        else if (HEALTH_TAX_IDS.includes(id) && annualPremium > 0)
             rows.push(["ลดหย่อนภาษี", `เบี้ยประกันสุขภาพลดหย่อนได้ไม่เกิน 25,000 บาท/ปี (แผนนี้ ${baht(Math.min(Math.round(annualPremium), 25000))}/ปี) และรวมกับเบี้ยประกันชีวิตไม่เกิน 100,000 บาท`]);
-        if (p.isMain && !["UNJAI", "CANCERMAX", "PLUS2"].includes(id))
-            rows.push(["ถ้าเลิกกลางทาง (เวนคืน)", "ได้มูลค่าเวนคืนตามตารางในกรมธรรม์ ซึ่งในช่วงปีแรกๆ มักได้น้อยกว่าเบี้ยที่จ่ายไป"]);
+        else if (["ACC", "ACC3"].includes(id))
+            rows.push(["ลดหย่อนภาษี", "เบี้ยส่วนค่ารักษาพยาบาลลดหย่อนได้ ไม่เกิน 25,000 บาท/ปี (รวมกับเบี้ยประกันชีวิตไม่เกิน 100,000 บาท)"]);
         return rows.map((b) => (Array.isArray(b) ? [plainKey(String(b[0])), b[1], ...b.slice(2)] : b));
     }
     function handleCalculate() {
@@ -5041,8 +5066,7 @@ function App() {
         const warns = [];
         const lifeYear = cards.filter((c) => c.isMain && !PENSION_IDS.includes(c.id)).reduce((t, c) => t + (c.premium || 0), 0);
         const healthYear = cards.filter((c) => HEALTH_TAX_IDS.includes(c.id)).reduce((t, c) => t + (c.premium || 0), 0);
-        if (age < 18) warns.push("ผู้เอาประกันอายุต่ำกว่า 18 ปี — ผู้ปกครองนำเบี้ยของลูกไปลดหย่อนภาษีตัวเองไม่ได้");
-        else {
+        {
             if (lifeYear > 100000) warns.push(`เบี้ยประกันชีวิตรวม ${baht(Math.round(lifeYear))}/ปี เกินเพดานลดหย่อน 100,000 บาท (ส่วนเกินลดหย่อนไม่ได้)`);
             if (healthYear > 25000) warns.push(`เบี้ยสุขภาพรวม ${baht(Math.round(healthYear))}/ปี ลดหย่อนได้สูงสุด 25,000 บาท`);
             if (lifeYear > 0 && healthYear > 0 && Math.min(lifeYear, 100000) + Math.min(healthYear, 25000) > 100000) warns.push("เบี้ยชีวิต + สุขภาพรวมกัน ลดหย่อนได้ไม่เกิน 100,000 บาท");
@@ -5080,7 +5104,7 @@ function App() {
                         React.createElement("button", { onClick: clearAll, className: "flex items-center gap-1.5 text-[21px] font-medium px-3 py-2 rounded-xl", style: { background: "#FDEAEA", color: BRAND.danger } },
                             React.createElement("span", { style: { fontSize: 16 } }, "🧹"),
                             " \u0E40\u0E04\u0E25\u0E35\u0E22\u0E23\u0E4C\u0E02\u0E49\u0E2D\u0E21\u0E39\u0E25\u0E17\u0E31\u0E49\u0E07\u0E2B\u0E21\u0E14")),
-                    React.createElement("button", { onClick: () => { setCaseName(customerName); setCasesOpen(true); }, className: "w-full mb-3 flex items-center justify-center gap-1.5 text-[21px] font-medium px-3 py-2 rounded-xl", style: { background: BRAND.bg, color: BRAND.navy, border: "1px solid #D7E8F0" } }, `📁 เคสลูกค้า (บันทึก/เปิดเคส)${cases.length ? ` · ${cases.length} เคส` : ""}`),
+                    React.createElement("button", { onClick: openCasesModal, className: "w-full mb-3 flex items-center justify-center gap-1.5 text-[21px] font-medium px-3 py-2 rounded-xl", style: { background: BRAND.bg, color: BRAND.navy, border: "1px solid #D7E8F0" } }, `📁 เคสลูกค้า (บันทึก/เปิดเคส)${cases.length ? ` · ${cases.length} เคส` : ""}`),
                     React.createElement("p", { className: "text-[21px] mb-3", style: { color: BRAND.sub } }, "\u0E02\u0E49\u0E2D\u0E21\u0E39\u0E25\u0E17\u0E35\u0E48\u0E04\u0E35\u0E22\u0E4C\u0E08\u0E30\u0E16\u0E39\u0E01\u0E1A\u0E31\u0E19\u0E17\u0E36\u0E01\u0E44\u0E27\u0E49\u0E2D\u0E31\u0E15\u0E42\u0E19\u0E21\u0E31\u0E15\u0E34\u0E43\u0E19\u0E40\u0E04\u0E23\u0E37\u0E48\u0E2D\u0E07\u0E19\u0E35\u0E49 \u0E41\u0E21\u0E49\u0E1B\u0E34\u0E14\u0E41\u0E2D\u0E1B\u0E41\u0E25\u0E49\u0E27\u0E40\u0E1B\u0E34\u0E14\u0E43\u0E2B\u0E21\u0E48\u0E01\u0E47\u0E22\u0E31\u0E07\u0E2D\u0E22\u0E39\u0E48 \u0E08\u0E19\u0E01\u0E27\u0E48\u0E32\u0E08\u0E30\u0E01\u0E14 \"\u0E40\u0E04\u0E25\u0E35\u0E22\u0E23\u0E4C\u0E02\u0E49\u0E2D\u0E21\u0E39\u0E25\u0E17\u0E31\u0E49\u0E07\u0E2B\u0E21\u0E14\""),
                     React.createElement("div", { className: "grid grid-cols-2 sm:grid-cols-4 gap-4" },
                         React.createElement(Field, { label: "\u0E40\u0E1E\u0E28" },
@@ -5207,6 +5231,7 @@ function App() {
                     React.createElement("div", { className: "flex gap-2 flex-wrap" },
                         React.createElement("button", { onClick: () => { setShareNote(""); setShareModal({ id: "QUOTE", mode: "text" }); }, className: "flex-1 min-w-[160px] rounded-xl py-3 text-[21px] font-semibold text-white", style: { background: "#06C755" } }, "💬 ส่งข้อความ LINE (ทุกแบบ)"),
                         React.createElement("button", { onClick: () => { setShareNote(""); setShareModal({ id: "QUOTE", mode: "image" }); }, className: "flex-1 min-w-[160px] rounded-xl py-3 text-[21px] font-semibold text-white", style: { background: "#06C755" } }, "🖼️ ส่งรูป LINE (ทุกแบบ)")),
+                    React.createElement("div", { id: "result-top", style: { scrollMarginTop: 12 } }),
                     result.warns && result.warns.length > 0 && (React.createElement("div", { className: "rounded-2xl p-4 mb-4", style: { background: "#FFF6E0", border: "1px solid #F0C36D" } },
                         React.createElement("p", { className: "text-[21px] font-semibold mb-1", style: { color: BRAND.warn } }, "⚠️ เช็กก่อนเสนอ (เห็นเฉพาะตัวแทน)"),
                         result.warns.map((w, i) => (React.createElement("p", { key: i, className: "text-[19px]", style: { color: BRAND.warn } }, "• ", w))))),
@@ -5287,7 +5312,7 @@ function App() {
             casesOpen && (React.createElement("div", { className: "fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4", style: { background: "rgba(8,30,62,0.55)" }, onClick: () => setCasesOpen(false) },
                 React.createElement("div", { className: "w-full max-w-md rounded-2xl p-5 max-h-[90vh] overflow-y-auto", style: { background: BRAND.card }, onClick: (e) => e.stopPropagation() },
                     React.createElement("h3", { className: "text-[24px] font-semibold mb-3", style: { color: BRAND.navy } }, "📁 เคสลูกค้า"),
-                    React.createElement("p", { className: "text-[18px] mb-2", style: { color: BRAND.sub } }, "บันทึกข้อมูลที่กรอกตอนนี้ (อายุ เพศ แบบที่เลือก ทุน งวดชำระ) ไว้ในเครื่องนี้ เปิดกลับมาแก้หรือส่งซ้ำได้"),
+                    React.createElement("p", { className: "text-[18px] mb-2", style: { color: BRAND.sub } }, "บันทึกข้อมูลที่กรอกตอนนี้ (อายุ เพศ แบบที่เลือก ทุน งวดชำระ) ไว้ในเครื่องนี้ · กด \"เปิด\" แล้วแอปจะใส่ข้อมูลและคำนวณให้ทันที"),
                     React.createElement("div", { className: "flex gap-2 mb-4" },
                         React.createElement("input", { value: caseName, onChange: (e) => setCaseName(e.target.value), placeholder: "ชื่อลูกค้า / ชื่อเคส", className: "flex-1 rounded-xl px-3 py-2.5 text-[20px]", style: { border: "1px solid #D7E8F0" } }),
                         React.createElement("button", { onClick: saveCase, className: "rounded-xl px-4 py-2.5 text-[19px] font-semibold text-white shrink-0", style: { background: BRAND.navy } }, "💾 บันทึก")),
@@ -6195,8 +6220,7 @@ function skNotes(d) {
   if (d.ov && d.ov.notes) return d.ov.notes;
   const n = ["ส่วนอุบัติเหตุที่แถมฟรี ไม่คุ้มครองขณะมึนเมาหรือใช้สารเสพติดจนครองสติไม่ได้, การทำร้ายตัวเอง, การทะเลาะวิวาท, การแข่งรถหรือแข่งเรือ"];
   if (d.isKids) n.push("4 โรคร้ายแรงของเด็ก มีระยะเวลารอคอย 90 วัน นับจากวันเริ่มคุ้มครอง");
-  if (!d.isKids && Number(d.age) >= 18 && d.pay > 0) n.push(`ลดหย่อนภาษีเบี้ยประกันชีวิตได้ตามจ่ายจริง ไม่เกิน 100,000 บาท/ปี (แผนนี้ ${baht(Math.min(Math.round(d.totalPremium / d.pay), 100000))}/ปี)`);
-  n.push("ถ้าเลิกกลางทาง (เวนคืน) ได้มูลค่าเวนคืนตามตารางในกรมธรรม์ ซึ่งในช่วงปีแรกๆ มักได้น้อยกว่าเบี้ยที่จ่ายไป");
+  if (d.pay > 0) n.push(`ลดหย่อนภาษีเบี้ยประกันชีวิตได้ตามจ่ายจริง ไม่เกิน 100,000 บาท/ปี (แผนนี้ ${baht(Math.min(Math.round(d.totalPremium / d.pay), 100000))}/ปี)`);
   return n;
 }
 // บรรทัดสรุปที่แก้ไขได้ก่อนส่ง (ไม่รวมตาราง)
