@@ -8,7 +8,7 @@ const BRAND = {
     ink: "#000000", sub: "#404040", danger: "#B93232", warn: "#6B4508",
     label: "#000000", nameBlue: "#1668D6", mainBlue: "#0C2F63", dataBlack: "#000000",
 };
-const APP_VERSION = "v2.27.0 (2569-10-04)";
+const APP_VERSION = "v2.33.0 (2569-10-04)";
 const RATE_SOURCE = "อัตราเบี้ยตามคู่มือตัวแทน V.14 (14-02-2026) · ค่าคอม 10-09-2026";
 const CASES_KEY = "blacal-cases-v1"; // อัปเดตเลขนี้ทุกครั้งที่มีการแก้ไข/เพิ่มแบบประกันใหม่ เพื่อให้รู้ว่าไฟล์ที่ใช้อยู่เป็นเวอร์ชันล่าสุดหรือไม่
 const fmt = (n) => (n === null || n === undefined || isNaN(n) ? "0" : Math.round(n).toLocaleString("th-TH"));
@@ -114,18 +114,19 @@ function cashBackLines(items, si) {
     });
 }
 // 4 คำถามที่ลูกค้าอยากรู้ + เรื่องที่ควรรู้ก่อนตัดสินใจ
-const SEC = { pay: "💳 จ่ายเท่าไร นานแค่ไหน", get: "💰 ได้อะไรคืน เมื่อไร", protect: "🛡️ ถ้าเสียชีวิต / เจ็บป่วย / อุบัติเหตุ ได้เท่าไร", until: "⏳ คุ้มครองถึงเมื่อไร", know: "📌 ควรรู้ก่อนตัดสินใจ" };
+const SEC = { pay: "💳 จ่ายเบี้ยเท่าไร กี่ปี", alive: "💚 ระหว่างมีชีวิตอยู่ ได้อะไร", maturity: "🎁 อยู่ครบสัญญา ได้อะไร", death: "❤️ เสียชีวิต ได้อะไร", until: "⏳ คุ้มครองถึงเมื่อไร", know: "📌 ควรรู้ก่อนตัดสินใจ" };
 function benefitSection(k) {
     if (/^คุ้มครองถึง/.test(k)) return "until";
-    if (/เสียชีวิต|ทุพพลภาพ/.test(k)) return "protect";
-    if (/ลดหย่อนภาษี|เวนคืน|^หมายเหตุ|^เงื่อนไข/.test(k)) return "know";
-    if (/^ทุนประกัน|ระยะเวลาชำระ|ส่วนลด|งวดชำระ|^แผน|^แบบที่เลือก|^ทุน /.test(k)) return "pay";
-    if (/เงินคืน|ครบกำหนด|ครบสัญญา|บำนาญ|มีชีวิตอยู่|ผลประโยชน์รวม|ปันผล/.test(k)) return "get";
-    return "protect";
+    if (/หมายถึง|^ข้อยกเว้น|ลดหย่อนภาษี|เวนคืน/.test(k)) return "know";
+    if (/เสียชีวิต|ระยะสุดท้าย/.test(k)) return "death";
+    if (/^หมายเหตุ|^เงื่อนไข/.test(k)) return "know";
+        if (/^ทุนประกัน|ระยะเวลาชำระ|งวดชำระ|^แผน|^แบบที่เลือก|^ทุน |^พื้นที่ความคุ้มครอง/.test(k)) return "pay";
+    if (/ครบกำหนด|ครบสัญญา|ผลประโยชน์รวม|รวมเงินคืนตลอดสัญญา/.test(k)) return "maturity";
+    return "alive";
 }
 // เรียงบรรทัดผลประโยชน์ตาม 4 คำถาม และแทรกแถวหัวข้อ ["§", ชื่อหัวข้อ] (ถ้ามีมากกว่า 1 หมวด)
 function groupBenefits(rows) {
-    const order = ["pay", "get", "protect", "until", "know"], by = {};
+    const order = ["pay", "alive", "maturity", "death", "until", "know"], by = {};
     rows.forEach((r) => { const k = benefitSection(r[0]); (by[k] = by[k] || []).push(r); });
     const present = order.filter((k) => by[k]);
     if (present.length <= 1) return rows;
@@ -142,10 +143,15 @@ function shareKeyLines(d) {
     lines.push(["🛡️", "ทุนประกัน", baht(d.si)]);
     lines.push(["💳", "เบี้ยประกัน", `${fmt(d.premium)} บาท/ปี · ชำระ ${d.payYears} ปี`]);
     lines.push(["🧾", "รวมเบี้ยทั้งหมด", baht(d.totalPremium)]);
-    sec(SEC.get);
+    const prot = (d.protectLines || []).slice();
+    if (d.ciPerYear > 0 && !prot.some(([k]) => /โรคร้ายแรง/.test(k))) prot.push(["แถมฟรี 8 โรคร้ายแรง", `${baht(d.ciPerYear)}/ปี`]);
+    const protAlive = prot.filter(([k]) => !/เสียชีวิต|ระยะสุดท้าย/.test(k)), protDeath = prot.filter(([k]) => /เสียชีวิต|ระยะสุดท้าย/.test(k));
+    sec(SEC.alive);
     if (d.type === "savings") {
         cashBackLines(d.rows.slice(0, -1).map((r) => ({ pct: r.cashPct, age: r.age + 1 })), d.si).forEach(([k, v]) => lines.push(["💰", k, v]));
+        protAlive.forEach(([k, v]) => lines.push(["•", k, v]));
         const last = d.rows[d.rows.length - 1];
+        sec(SEC.maturity);
         lines.push(["🏁", `ครบสัญญา ปีกรมธรรม์ที่ ${d.rows.length} (อายุครบ ${last.age + 1} ปี)`, `${baht(last.cashBaht)} (${last.cashPct}% ของทุน)`]);
         lines.push(["💵", "รับรวมตลอดสัญญา (การันตี)", baht(d.totalCash)]);
         lines.push(["📈", "ส่วนต่างเงินรับ − เบี้ย", (d.totalCash - d.totalPremium >= 0 ? "+" : "") + baht(d.totalCash - d.totalPremium)]);
@@ -159,9 +165,8 @@ function shareKeyLines(d) {
         lines.push(["💰", "รวมบำนาญตลอดสัญญา", baht(pr.reduce((t, r) => t + r.pension, 0))]);
         if (d.breakEvenAge) lines.push(["✅", "จุดคุ้มทุน", `อายุ ${d.breakEvenAge} ปี`]);
     }
-    const prot = (d.protectLines || []).slice();
-    if (d.ciPerYear > 0 && !prot.some(([k]) => /โรคร้ายแรง/.test(k))) prot.push(["แถมฟรี 8 โรคร้ายแรง", `${baht(d.ciPerYear)}/ปี`]);
-    if (prot.length) { sec(SEC.protect); prot.forEach(([k, v]) => lines.push(["•", k, v])); }
+    if (d.type !== "savings") protAlive.forEach(([k, v]) => lines.push(["•", k, v]));
+    if (protDeath.length) { sec(SEC.death); protDeath.forEach(([k, v]) => lines.push(["•", k, v])); }
     if (d.coverUntil) { sec(SEC.until); lines.push(["⏳", "คุ้มครองถึง", d.coverUntil]); }
     if (d.knowLines && d.knowLines.length) { sec(SEC.know); d.knowLines.forEach(([k, v]) => lines.push(["•", k, v])); }
     return lines;
@@ -503,18 +508,22 @@ function plainKey(k) {
     let t = k.replace("(ผู้ป่วยใน)", "(นอนโรงพยาบาล)").replace("(ผู้ป่วยนอก)", "(ไม่ต้องนอนโรงพยาบาล)");
     if (/ผู้ป่วยใน/.test(t) && !/นอนโรงพยาบาล/.test(t)) t = t.replace("ผู้ป่วยใน", "นอนโรงพยาบาล (ผู้ป่วยใน)");
     if (/ผู้ป่วยนอก/.test(t) && !/นอนโรงพยาบาล/.test(t)) t = t.replace("ผู้ป่วยนอก", "ไม่ต้องนอนโรงพยาบาล (ผู้ป่วยนอก)");
-    if (/ทุพพลภาพถาวรสิ้นเชิง/.test(t) && !/ทำงานไม่ได้/.test(t)) t = t.replace("ทุพพลภาพถาวรสิ้นเชิง", "ทุพพลภาพถาวรจนทำงานไม่ได้ (ทุพพลภาพถาวรสิ้นเชิง)");
     t = t.replace(/ความรับผิดส่วนแรก \(Deductible\)|ความรับผิดส่วนแรก(?! \()/, "ส่วนที่ลูกค้าจ่ายเองก่อน (ความรับผิดส่วนแรก)");
     if (/Day Surgery/.test(t) && !/กลับบ้าน/.test(t)) t = t.replace("Day Surgery", "ผ่าตัดแล้วกลับบ้านได้ (Day Surgery)");
     t = t.replace("มะเร็งระยะไม่ลุกลาม", "มะเร็งระยะเริ่มต้น (ไม่ลุกลาม)");
     return t;
 }
 // ตัดบรรทัดที่เป็นหมายเหตุสำหรับตัวแทน (ไม่ควรถึงมือลูกค้า)
+// บรรทัดที่เป็นเรื่องของตัวแทน (วงเงิน/เพดาน/ส่วนลด/เงื่อนไขการแนบ/ไส้ในแพ็กเกจ) — ไม่ส่งถึงลูกค้า
+const AGENT_KEY_RE = /^ส่วนลด|ซื้อร่วมได้|วงเงินสูงสุดที่ซื้อได้|^เงื่อนไขทุนประกันหลัก|^ที่มาของการคำนวณ|^แนบกับ|^เพดานสูงสุด|^แผนที่ได้|^อายุผู้เยาว์|ใช้คำนวณเบี้ย|^สัญญาเพิ่มเติม$|^ทุน[^:]*\(สัญญา|^ทุน(?:เฟิสต์|เดย์ลี่|เอ็นดิ้ง)|\(ตัวแทน\)|^เงื่อนไขการซื้อ/;
 const AGENT_ONLY_RE = /โปรดตรวจสอบ|ก่อนนำเสนอ|ค่าคอม|ค่านายหน้า|ค่าบำเหน็จ|FYC|เครดิตผลงาน/;
 function customerBenefits(benefits) {
     return (benefits || []).filter((b) => Array.isArray(b) && b.length >= 2)
         .map(([k, v]) => [String(k), typeof v === "string" || typeof v === "number" ? String(v) : ""])
-        .filter(([k, v]) => v !== "" && !AGENT_ONLY_RE.test(k) && !AGENT_ONLY_RE.test(v) && !UNDERWRITING_RE.test(k) && k !== "เงินปันผล");
+        .filter(([k, v]) => v !== "" && !AGENT_ONLY_RE.test(k) && !AGENT_ONLY_RE.test(v) && !UNDERWRITING_RE.test(k) && !AGENT_KEY_RE.test(k) && k !== "เงินปันผล")
+        // แพ็กเกจ/สัญญาแถม: ลูกค้าเห็นเป็นแผนเดียว ไม่ต้องรู้ว่าสัญญาไหนจ่าย
+        .map(([k, v]) => [k.replace(/\s*\((?:ผ่าน)?สัญญา[^)]*\)/g, ""),
+            v.replace(/\s*\((?:ผ่าน)?สัญญาเพิ่มเติม[^)]*\)/g, "")]);
 }
 function buildQuoteText(q) {
     const out = [];
@@ -1463,7 +1472,7 @@ const VH_BENEFITS = {
 };
 // ตารางผลประโยชน์ครบทุกหมวด (หมวดที่ 1-13 ตามเอกสาร รวมหมวดย่อยที่มีวงเงินของตัวเอง)
 const VH_CATS = [
-    { no: "1", desc: "ค่าห้อง ค่าอาหาร และค่าบริการโรงพยาบาล (ผู้ป่วยใน) — ICU จ่าย 2 เท่า สูงสุดรวม 125 วัน", unit: "ต่อวัน", vals: { 2000: 2000, 3000: 3000, 4000: 4000, 5000: 5000 } },
+    { no: "1", desc: "ค่าห้อง ค่าอาหาร และค่าบริการโรงพยาบาล (ผู้ป่วยใน) สูงสุด 125 วัน — ห้อง ICU จ่าย 2 เท่า สูงสุด 15 วัน (นับรวมใน 125 วัน)", unit: "ต่อวัน", vals: { 2000: 2000, 3000: 3000, 4000: 4000, 5000: 5000 } },
     { no: "2", desc: "ค่าตรวจวินิจฉัย/บำบัดรักษา/โลหิตและส่วนประกอบ/พยาบาล/ยา/เวชภัณฑ์ (รวมหมวดย่อย 2.1-2.4)", unit: "", vals: { 2000: 25000, 3000: 30000, 4000: 200000, 5000: 400000 }, sharedPlans: [4000, 5000], sharedWithNo: "4" },
     { no: "2.4", desc: "ค่ายาและเวชภัณฑ์สิ้นเปลืองสำหรับกลับบ้าน (สูงสุด 7 วัน)", unit: "", vals: { 2000: 1000, 3000: 1000, 4000: 1000, 5000: 1000 } },
     { no: "3", desc: "ค่าแพทย์ตรวจรักษา สูงสุด 125 วัน", unit: "ต่อวัน", vals: { 2000: 800, 3000: 800, 4000: 1000, 5000: 1200 } },
@@ -1488,7 +1497,7 @@ function catRows(cats, planKey) {
 }
 // บีแอลเอ แฮปปี้ เฮลธ์ พรีเมียร์ — ตารางผลประโยชน์ครบทุกหมวด
 const HHP_CATS = [
-    { no: "1", desc: "ค่าห้อง ค่าอาหาร และค่าบริการโรงพยาบาล (ผู้ป่วยใน) สูงสุด 180 วัน", unit: "", vals: { 1000000: "ห้องเดี่ยวมาตรฐาน (จ่ายตามจริง)", 5000000: "ห้องเดี่ยวมาตรฐาน (จ่ายตามจริง)", 10000000: "ห้องเดี่ยวมาตรฐาน (จ่ายตามจริง)" } },
+    { no: "1", desc: "ค่าห้อง ค่าอาหาร และค่าบริการโรงพยาบาล (ผู้ป่วยใน) สูงสุด 180 วัน — ห้อง ICU จ่ายตามจริง สูงสุด 60 วัน (นับรวมใน 180 วัน)", unit: "", vals: { 1000000: "3,000 บาทต่อวัน หรือค่าห้องเดี่ยวราคาเริ่มต้นของ รพ. แล้วแต่อย่างใดสูงกว่า", 5000000: "3,000 บาทต่อวัน หรือค่าห้องเดี่ยวราคาเริ่มต้นของ รพ. แล้วแต่อย่างใดสูงกว่า", 10000000: "5,000 บาทต่อวัน หรือค่าห้องเดี่ยวราคาเริ่มต้นของ รพ. แล้วแต่อย่างใดสูงกว่า" } },
     { no: "2", desc: "ค่าตรวจวินิจฉัย/บำบัดรักษา/โลหิตและส่วนประกอบ/พยาบาล/ยา/เวชภัณฑ์", unit: "", vals: { 1000000: "จ่ายตามจริง", 5000000: "จ่ายตามจริง", 10000000: "จ่ายตามจริง" } },
     { no: "2.4", desc: "ค่ายาและเวชภัณฑ์สิ้นเปลืองสำหรับกลับบ้าน (สูงสุด 7 วัน)", unit: "", vals: { 1000000: 20000, 5000000: 20000, 10000000: 50000 } },
     { no: "3", desc: "ค่าแพทย์ตรวจรักษา สูงสุด 180 วัน", unit: "", vals: { 1000000: "จ่ายตามจริง", 5000000: "จ่ายตามจริง", 10000000: "จ่ายตามจริง" } },
@@ -1710,7 +1719,7 @@ const VHKIDS_MALE = [
     [123307, 134070, 158536], [146563, 150216, 178135], [157758, 161844, 193068], [168974, 174843, 209763], [183979, 190601, 230000],
 ];
 const VHKIDS_CATS = [
-    { no: "1", desc: "ค่าห้อง ค่าอาหาร และค่าบริการโรงพยาบาล (ผู้ป่วยใน) — ICU จ่าย 2 เท่า สูงสุดรวม 125 วัน", unit: "ต่อวัน", vals: { 3000: 3000, 4000: 4000, 5000: 5000 } },
+    { no: "1", desc: "ค่าห้อง ค่าอาหาร และค่าบริการโรงพยาบาล (ผู้ป่วยใน) สูงสุด 125 วัน — ห้อง ICU จ่าย 2 เท่า สูงสุด 15 วัน (นับรวมใน 125 วัน)", unit: "ต่อวัน", vals: { 3000: 3000, 4000: 4000, 5000: 5000 } },
     { no: "2", desc: "ค่าตรวจวินิจฉัย/บำบัดรักษา/โลหิตและส่วนประกอบ/พยาบาล/ยา/เวชภัณฑ์ (รวมหมวดย่อย 2.1-2.4)", unit: "", vals: { 3000: 200000, 4000: 200000, 5000: 400000 }, sharedPlans: [4000, 5000], sharedWithNo: "4" },
     { no: "2.4", desc: "ค่ายาและเวชภัณฑ์สิ้นเปลืองสำหรับกลับบ้าน (สูงสุด 7 วัน)", unit: "", vals: { 3000: 1000, 4000: 1000, 5000: 1000 } },
     { no: "3", desc: "ค่าแพทย์ตรวจรักษา สูงสุด 125 วัน", unit: "ต่อวัน", vals: { 3000: 800, 4000: 1000, 5000: 1200 } },
@@ -1807,19 +1816,19 @@ const CONCERNS = [
     { id: "accident", icon: "🚑", label: "ห่วงเรื่องอุบัติเหตุ", products: ["ACC", "ACC3", "ACC1", "ACC2"] },
 ];
 const PRODUCTS = [
-    { id: "CS", name: "คช. คุ้มครองการชำระเบี้ย", tag: "คุ้มครองผู้ชำระเบี้ย (ผู้ปกครอง 20-55 ปี) สำหรับผู้เยาว์ 0-14 ปี · ระยะคุ้มครองตามระยะชำระเบี้ยของแบบหลัก", ageMin: 0, ageMax: 14, coverAge: 21, isTop: true, renewalNote: "ปรับตามเบี้ยที่คุ้มครอง",
+    { id: "CS", name: "คุ้มครองการชำระเบี้ย (คช.)", tag: "คุ้มครองผู้ชำระเบี้ย (ผู้ปกครอง 20-55 ปี) สำหรับผู้เยาว์ 0-14 ปี · ระยะคุ้มครองตามระยะชำระเบี้ยของแบบหลัก", ageMin: 0, ageMax: 14, coverAge: 21, isTop: true, renewalNote: "ปรับตามเบี้ยที่คุ้มครอง",
         occNote: "ไม่ขึ้นกับชั้นอาชีพ", siNote: "เบี้ยคิดจากผลรวมเบี้ยประกันภัยของทุกแบบที่เลือกไว้" },
     { id: "SUD", name: "ตลอดชีพ สุดคุ้ม", tag: "แบบประกันหลัก · ชำระเบี้ย 20 ปี", ageMin: 0, ageMax: 70, coverAge: 99, isMain: true, renewalNote: "เบี้ยคงที่",
         occNote: "รับประกันเฉพาะชั้นอาชีพ 1-2 เท่านั้น (ไม่รับชั้นอาชีพ 3)", siNote: "ทุนประกันขั้นต่ำ 100,000 บาท · ถ้าทุนต่ำกว่า 500,000 บาท ต้องซื้อสัญญาเพิ่มเติมอย่างน้อย 1 รายการควบคู่ด้วย (ทุนตั้งแต่ 500,000 บาทขึ้นไป ซื้อเดี่ยวได้) · เลือกได้เพียง 1 แบบ จาก 30 แบบทุนประกันหลัก" },
-    { id: "LIFE99", name: "ตลอดชีพ 99/99", tag: "แบบประกันหลัก · ชำระเบี้ยถึงอายุ 99 ปี", ageMin: 0, ageMax: 80, coverAge: 99, isMain: true, renewalNote: "เบี้ยคงที่",
+    { id: "LIFE99", name: "บีแอลเอ ตลอดชีพ 99/99", tag: "แบบประกันหลัก · ชำระเบี้ยถึงอายุ 99 ปี", ageMin: 0, ageMax: 80, coverAge: 99, isMain: true, renewalNote: "เบี้ยคงที่",
         occNote: "รับได้ทุกชั้นอาชีพ", siNote: "ทุนประกันขั้นต่ำ 50,000 บาท ไม่จำกัดสูงสุด · เลือกได้เพียง 1 แบบ จาก 30 แบบทุนประกันหลัก" },
-    { id: "PRESTIGE", name: "เพรสทีจ ไลฟ์", tag: "แบบประกันหลัก · เลือกระยะชำระเบี้ย 5/10/15/20 ปี ทุนสูง", ageMin: 0, ageMax: 70, coverAge: 99, isMain: true, renewalNote: "เบี้ยคงที่",
+    { id: "PRESTIGE", name: "เพรสทีจ ไลฟ์ และเพรสทีจ ไลฟ์ 99/20", tag: "แบบประกันหลัก · เลือกระยะชำระเบี้ย 5/10/15/20 ปี ทุนสูง", ageMin: 0, ageMax: 70, coverAge: 99, isMain: true, renewalNote: "เบี้ยคงที่",
         occNote: "รับประกันเฉพาะชั้นอาชีพ 1-2 เท่านั้น (ไม่รับชั้นอาชีพ 3)", siNote: "ทุนประกันขั้นต่ำ 5,000,000 บาท ไม่จำกัดสูงสุด · ระยะ 5/10 ปี อายุรับประกันถึง 70 ปี · ระยะ 15/20 ปี อายุรับประกันถึง 65 ปี · ไม่สามารถซื้อ คช. ร่วมกับแบบนี้ได้ · เลือกได้เพียง 1 แบบ จาก 30 แบบทุนประกันหลัก" },
-    { id: "UNJAI", name: "อุ่นใจ โรคร้าย", tag: "แบบประกันหลัก · แพ็กเกจชีวิต + โรคร้ายแรง 11 โรค", ageMin: 20, ageMax: 75, coverAge: 90, isMain: true, renewalNote: "เบี้ยคงที่",
+    { id: "UNJAI", name: "บีแอลเอ อุ่นใจ โรคร้าย", tag: "แบบประกันหลัก · แพ็กเกจชีวิต + โรคร้ายแรง 11 โรค", ageMin: 20, ageMax: 75, coverAge: 90, isMain: true, renewalNote: "เบี้ยคงที่",
         occNote: "รับได้ทุกชั้นอาชีพ", siNote: "แพ็กเกจปิด 7 แผนสำเร็จรูป (ทุนชีวิต 50,000 บาทคงที่ + ทุนอีซีแคร์ 100,000-1,000,000 บาท) · ไม่สามารถซื้อสัญญาเพิ่มเติมอื่นเพิ่มได้ · เลือกได้เพียง 1 แบบ จาก 30 แบบทุนประกันหลัก" },
-    { id: "CANCERMAX", name: "แคนเซอร์ แม็กซ์", tag: "แบบประกันหลัก · แพ็กเกจชีวิต + คุ้มครองมะเร็ง 3 สัญญา", ageMin: 0, ageMax: 70, coverAge: 90, isMain: true, renewalNote: "เบี้ยคงที่",
+    { id: "CANCERMAX", name: "บีแอลเอ แคนเซอร์ แม็กซ์", tag: "แบบประกันหลัก · แพ็กเกจชีวิต + คุ้มครองมะเร็ง 3 สัญญา", ageMin: 0, ageMax: 70, coverAge: 90, isMain: true, renewalNote: "เบี้ยคงที่",
         occNote: "รับได้ทุกชั้นอาชีพ", siNote: "แพ็กเกจปิด 5 แผน (Bronze/Silver/Gold/Emerald/Diamond) · ไม่สามารถซื้อสัญญาเพิ่มเติมอื่นเพิ่มได้ ยกเว้น คช. (ผู้เยาว์อายุ 0-14 ปี ต้องซื้อ คช. เพิ่มด้วย) · เลือกได้เพียง 1 แบบ จาก 30 แบบทุนประกันหลัก" },
-    { id: "PLUS2", name: "คุ้มครอง 2 พลัส", tag: "แบบประกันหลัก · ชีวิต + ทุพพลภาพ 3 เท่า เลือกระยะชำระเบี้ย 10/15/20 ปี", ageMin: 20, ageMax: 65, coverAge: 65, isMain: true, renewalNote: "เบี้ยคงที่",
+    { id: "PLUS2", name: "บีแอลเอ คุ้มครอง 2 พลัส", tag: "แบบประกันหลัก · ชีวิต + ทุพพลภาพ 3 เท่า เลือกระยะชำระเบี้ย 10/15/20 ปี", ageMin: 20, ageMax: 65, coverAge: 65, isMain: true, renewalNote: "เบี้ยคงที่",
         occNote: "รับประกันเฉพาะชั้นอาชีพ 1-2 เท่านั้น (ไม่รับชั้นอาชีพ 3)", siNote: "ทุนประกันขั้นต่ำ 1,000,000 บาท · ทุพพลภาพถาวรสิ้นเชิงจ่าย 3 เท่าของทุนชีวิต สูงสุดไม่เกิน 30,000,000 บาท · อายุรับประกันสูงสุดขึ้นกับระยะที่เลือก (10 ปี→65, 15 ปี→60, 20 ปี→55) · เลือกได้เพียง 1 แบบ จาก 30 แบบทุนประกันหลัก" },
     { id: "HAPPYPENSION", name: "แฮปปี้ เพนชั่น (มีเงินปันผล)", tag: "แบบประกันหลัก · บำนาญตลอดชีพ 60", ageMin: 20, ageMax: 55, coverAge: 99, isMain: true, renewalNote: "เบี้ยคงที่",
         occNote: "รับได้ทุกชั้นอาชีพ (เบี้ยเท่ากันทุกชั้น)", siNote: "เลือกงวดชำระเบี้ยได้ 4 แบบ (ครั้งเดียว/5ปี/10ปี/ถึงอายุ60) แต่ละงวดมีช่วงอายุรับประกันและอัตราบำนาญต่างกัน · เลือกได้เพียง 1 แบบ จาก 30 แบบทุนประกันหลัก" },
@@ -1827,35 +1836,35 @@ const PRODUCTS = [
         occNote: "รับได้ทุกชั้นอาชีพ (ชั้น 1-2 เบี้ยเดียวกัน / ชั้น 3 เบี้ยสูงกว่า)", siNote: "ต้องมีทุนประกันหลักขั้นต่ำ 50,000 บาท จึงซื้อได้ · ซื้อได้เพียง 1 สัญญา ระหว่าง แวลู เฮลธ์ หรือ แวลู เฮลธ์ คิดส์ พรีเมียร์" },
     { id: "VHKIDS", name: "แวลู เฮลธ์ คิดส์ พรีเมียร์", tag: "สุขภาพเด็ก", ageMin: 0, ageMax: 10, coverAge: 98, renewalNote: "ปรับทุก 5 ปี",
         occNote: "ไม่ขึ้นกับชั้นอาชีพ", siNote: "ต้องมีทุนประกันหลักขั้นต่ำ 50,000 บาท จึงซื้อได้ · มีความรับผิดส่วนแรก 10,000 บาท/ครั้ง (เฉพาะช่วงอายุแรกเข้า 1 เดือน-10 ปี) · ซื้อได้เพียง 1 สัญญา ระหว่าง แวลู เฮลธ์ หรือ แวลู เฮลธ์ คิดส์ พรีเมียร์" },
-    { id: "HHP", name: "แฮปปี้ เฮลธ์ พรีเมียร์", tag: "สุขภาพเหมาจ่าย", ageMin: 11, ageMax: 80, coverAge: 98, renewalNote: "ปรับทุก 5 ปี",
+    { id: "HHP", name: "บีแอลเอ แฮปปี้ เฮลธ์ พรีเมียร์", tag: "สุขภาพเหมาจ่าย", ageMin: 11, ageMax: 80, coverAge: 98, renewalNote: "ปรับทุก 5 ปี",
         occNote: "รับได้ทุกชั้นอาชีพ (ชั้น 1-2 เบี้ยเดียวกัน / ชั้น 3 เบี้ยสูงกว่า)", siNote: "ต้องมีทุนประกันหลักขั้นต่ำ 50,000 บาท จึงซื้อได้" },
-    { id: "OPD", name: "OPD สบายใจ (แบบปกติ)", tag: "บันทึกสลักหลังผู้ป่วยนอก", ageMin: 1, ageMax: 80, coverAge: 98, renewalNote: "ปรับเป็นช่วงอายุ",
+    { id: "OPD", name: "โอพีดี สบายใจ", tag: "บันทึกสลักหลังผู้ป่วยนอก", ageMin: 1, ageMax: 80, coverAge: 98, renewalNote: "ปรับเป็นช่วงอายุ",
         occNote: "ไม่ขึ้นกับชั้นอาชีพ", siNote: "ต้องซื้อคู่กับ แวลู เฮลธ์ / แวลู เฮลธ์ คิดส์ พรีเมียร์ / แฮปปี้ เฮลธ์ (พรีเมียร์) / เพรสทีจ เฮลธ์ ปลดล็อค 20-30 ล้าน อย่างใดอย่างหนึ่งก่อน · วงเงินสูงสุดที่ซื้อได้ขึ้นกับค่าห้องของสัญญาหลักที่แนบ · OPD ทุกฉบับรวมกันไม่เกิน 2,000/ครั้ง" },
-    { id: "HH", name: "แฮปปี้ เฮลธ์", tag: "สุขภาพเหมาจ่าย (มีความรับผิดส่วนแรก)", ageMin: 11, ageMax: 80, coverAge: 98, renewalNote: "ปรับทุก 5 ปี",
+    { id: "HH", name: "บีแอลเอ แฮปปี้ เฮลธ์", tag: "สุขภาพเหมาจ่าย (มีความรับผิดส่วนแรก)", ageMin: 11, ageMax: 80, coverAge: 98, renewalNote: "ปรับทุก 5 ปี",
         occNote: "รับได้ทุกชั้นอาชีพ (ชั้น 1-2 เบี้ยเดียวกัน / ชั้น 3 เบี้ยสูงกว่า)", siNote: "ขายได้เฉพาะแผน 2/3/4 (1/5/10 ล้านบาทต่อครั้ง) แบบมีความรับผิดส่วนแรก 30,000 หรือ 100,000 บาท · ซื้อ OPD สบายใจ เพิ่มได้ (สูงสุด 2,000/ครั้ง) · ลดหย่อนภาษีสุขภาพสูงสุด 25,000 บาท" },
-    { id: "OPDP", name: "OPD สบายใจ เพรสทีจ", tag: "บันทึกสลักหลังผู้ป่วยนอก แบบแพ็กเกจ", ageMin: 11, ageMax: 80, coverAge: 98, renewalNote: "ปรับเป็นช่วงอายุ",
+    { id: "OPDP", name: "โอพีดี สบายใจ เพรสทีจ", tag: "บันทึกสลักหลังผู้ป่วยนอก แบบแพ็กเกจ", ageMin: 11, ageMax: 80, coverAge: 98, renewalNote: "ปรับเป็นช่วงอายุ",
         occNote: "ไม่ขึ้นกับชั้นอาชีพ (ถ้า เพรสทีจ เฮลธ์ มีเบี้ยเพิ่มตามอาชีพ/สุขภาพ ซื้อไม่ได้)", siNote: "แนบได้เฉพาะ เพรสทีจ เฮลธ์ ปลดล็อค แผน 20 ล้าน (1,500 บาท/ครั้ง) หรือ 30 ล้าน (2,000 บาท/ครั้ง) · วงเงิน OPD ทุกฉบับรวมกันไม่เกิน 2,000 บาท/ครั้ง" },
     { id: "ACC", name: "แอคซิเดนท์ แคร์", tag: "อุบัติเหตุ", ageMin: 0, ageMax: 70, coverAge: 98, renewalNote: "ปรับเป็นช่วงอายุ",
         occNote: "รับได้ทุกชั้นอาชีพ (เบี้ยต่างกันตามชั้นอาชีพ)", siNote: "ต้องมีทุนประกันหลักขั้นต่ำ 50,000 บาท จึงซื้อได้" },
-    { id: "ACC3", name: "อบ.3 พลัส", tag: "ค่ารักษาอุบัติเหตุ", ageMin: 0, ageMax: 64, coverAge: 65, renewalNote: "เบี้ยคงที่",
+    { id: "ACC3", name: "ค่ารักษาพยาบาลเนื่องจากอุบัติเหตุ (อบ.3 พลัส)", tag: "ค่ารักษาอุบัติเหตุ", ageMin: 0, ageMax: 64, coverAge: 65, renewalNote: "เบี้ยคงที่",
         occNote: "รับได้ทุกชั้นอาชีพ (เบี้ยต่างกันตามชั้นอาชีพ)", siNote: "ทุนหลักตั้งแต่ 50,000 บาท → ซื้อได้สูงสุด 10,000 บาท / ทุนหลักตั้งแต่ 100,000 บาท → สูงสุด 15,000 บาท" },
-    { id: "ACC1", name: "อบ.1 + ฆจ.1", tag: "อุบัติเหตุ (เสียชีวิต/สูญเสียอวัยวะ)", ageMin: 0, ageMax: 64, coverAge: 65, renewalNote: "เบี้ยคงที่",
+    { id: "ACC1", name: "การประกันภัยอุบัติเหตุ แบบ อบ.1 และ ฆจ.1", tag: "อุบัติเหตุ (เสียชีวิต/สูญเสียอวัยวะ)", ageMin: 0, ageMax: 64, coverAge: 65, renewalNote: "เบี้ยคงที่",
         occNote: "รับได้ทุกชั้นอาชีพ (เบี้ยต่างกันตามชั้นอาชีพ) · แม่บ้าน/พระ คิดชั้น 1 · นักเรียน/เด็กก่อนวัยเรียน คิดชั้น 2", siNote: "ทุนขั้นต่ำ 50,000 บาท · ไม่เกิน 5 เท่าของทุนชีวิต (รวม อบ.1+อบ.2 ไม่เกิน 10 ล้าน) · ผู้เยาว์ต่ำกว่า 15 ปี ไม่เกิน 1 ล้าน · ฆจ.1 ทุนเท่า อบ.1 แต่ไม่เกิน 2 ล้าน (บังคับซื้อคู่)" },
-    { id: "ACC2", name: "อบ.2 + ฆจ.2", tag: "อุบัติเหตุ (รวมค่าชดเชยทุพพลภาพ/นอน รพ.)", ageMin: 15, ageMax: 64, coverAge: 65, renewalNote: "เบี้ยคงที่",
+    { id: "ACC2", name: "การประกันภัยอุบัติเหตุ แบบ อบ.2 และ ฆจ.2", tag: "อุบัติเหตุ (รวมค่าชดเชยทุพพลภาพ/นอน รพ.)", ageMin: 15, ageMax: 64, coverAge: 65, renewalNote: "เบี้ยคงที่",
         occNote: "ขายเฉพาะผู้มีอาชีพ/รายได้ประจำ (ไม่ขายนักเรียน แม่บ้าน พระ) · เบี้ยต่างกันตามชั้นอาชีพ", siNote: "ทุนขั้นต่ำ 50,000 บาท · ไม่เกิน 5 เท่าของทุนชีวิต (รวม อบ.1+อบ.2 ไม่เกิน 10 ล้าน) · ฆจ.2 ทุนเท่า อบ.2 แต่ไม่เกิน 2 ล้าน (รวม ฆจ.1+ฆจ.2 ไม่เกิน 2 ล้าน, บังคับซื้อคู่)" },
-    { id: "RPPR", name: "รพ.ปร. (ปัญจรักษ์)", tag: "ค่ารักษารายวัน", ageMin: 6, ageMax: 64, coverAge: 65, renewalNote: "ปรับเป็นช่วงอายุ",
+    { id: "RPPR", name: "ค่ารักษาพยาบาลรายวัน แบบปัญจรักษ์ (รพ.ปร)", tag: "ค่ารักษารายวัน", ageMin: 6, ageMax: 64, coverAge: 65, renewalNote: "ปรับเป็นช่วงอายุ",
         occNote: "รับได้ทุกชั้นอาชีพ (เบี้ยเท่ากันทุกชั้น)", siNote: "วงเงินต่อวันที่ซื้อได้ขึ้นกับทุนหลัก (เริ่มจาก): 50,000→300-500 / 100,000→300-2,000 / 500,000→300-2,500 / 750,000→300-3,000 / 1,000,000→300-4,000 / 3,000,000→300-5,000 บาท/วัน" },
-    { id: "TPD", name: "ทุพพลภาพ โพรเทค", tag: "ทุพพลภาพ", ageMin: 15, ageMax: 65, coverAge: 74, renewalNote: "ปรับทุกปี",
+    { id: "TPD", name: "บีแอลเอ ทุพพลภาพ โพรเทค", tag: "ทุพพลภาพ", ageMin: 15, ageMax: 65, coverAge: 74, renewalNote: "ปรับทุกปี",
         occNote: "รับได้ทุกชั้นอาชีพ (เบี้ยเท่ากันทุกชั้น)", siNote: "ซื้อได้ไม่เกิน 10 เท่าของทุนประกันหลัก และไม่เกิน 30,000,000 บาท" },
-    { id: "SUPER", name: "ซูเปอร์แคร์", tag: "โรคร้ายแรง 47 โรค", ageMin: 1, ageMax: 65, coverAge: 79, renewalNote: "ปรับทุกปี",
+    { id: "SUPER", name: "บีแอลเอ ซูเปอร์แคร์", tag: "โรคร้ายแรง 47 โรค", ageMin: 1, ageMax: 65, coverAge: 79, renewalNote: "ปรับทุกปี",
         occNote: "รับได้ทุกชั้นอาชีพ (เบี้ยเท่ากันทุกชั้น)", siNote: "ทุนประกัน 100,000-3,000,000 บาทต่อกรมธรรม์ (ไม่ผูกกับทุนหลัก แต่รวมทุกฉบับต้องไม่เกิน 5,000,000 บาท)" },
     { id: "HAPPYCI", name: "แฮปปี้ ซีไอ", tag: "โรคร้ายแรง 14 โรค", ageMin: 0, ageMax: 75, coverAge: 99, renewalNote: "ปรับทุกปี",
         occNote: "รับได้ทุกชั้นอาชีพ (เบี้ยเท่ากันทุกชั้น)", siNote: "ทุนประกัน 100,000-5,000,000 บาทต่อกรมธรรม์ (รวมทุกกรมธรรม์โรคร้ายแรงไม่เกิน 10,000,000 บาท) · ซื้อได้เฉพาะกับสัญญาประกันชีวิตที่คุ้มครองถึงอายุ 99 ปี (สุดคุ้ม / 99/99 / เพรสทีจ ไลฟ์ / แฮปปี้เซฟวิ่ง 99 / แฮปปี้ โฮลไลฟ์ / ห่วงรัก ทุกแบบ / แฮปปี้ คิดส์) เท่านั้น" },
-    { id: "LLC", name: "ลองไลฟ์แคร์", tag: "ภาวะพึ่งพิงระยะยาว 8 โรค · เลือกแบบ (10) หรือ พลัส (99)", ageMin: 15, ageMax: 65, coverAge: 98, renewalNote: "ปรับทุกปี",
+    { id: "LLC", name: "บีแอลเอ ลองไลฟ์แคร์ และ ลองไลฟ์แคร์ พลัส", tag: "ภาวะพึ่งพิงระยะยาว 8 โรค · เลือกแบบ (10) หรือ พลัส (99)", ageMin: 15, ageMax: 65, coverAge: 98, renewalNote: "ปรับทุกปี",
         occNote: "รับได้ทุกชั้นอาชีพ (เบี้ยเท่ากันทุกชั้น)", siNote: "ทุนประกัน 500,000-5,000,000 บาทต่อกรมธรรม์ (Alzheimer's, Stroke, Parkinson's, บาดเจ็บสมองรุนแรง, โรคเซลล์ประสาทสั่งการ, กล้ามเนื้อเสื่อม, รูมาตอยด์รุนแรง, ทุพพลภาพถาวรสิ้นเชิง) · ไม่อนุญาตให้ซื้อร่วมกับ คุ้มครอง 2 พลัส" },
     { id: "SS", name: "คุ้มครองโรคร้ายแรงและมรณกรรม (รร.)", tag: "โรคร้ายแรง 17 โรค + เสียชีวิต", ageMin: 15, ageMax: 55, coverAge: 65, renewalNote: "ปรับทุก 5 ปี",
         occNote: "รับได้ทุกชั้นอาชีพ (เบี้ยเท่ากันทุกชั้น)", siNote: "ทุนประกันขั้นต่ำ 50,000 บาท ไม่ผูกกับทุนหลัก" },
-    { id: "HAPPYSAVING", name: "แฮปปี้เซฟวิ่ง (มีเงินปันผล)", tag: "แบบประกันหลัก · สร้างมูลค่าออม เลือกชำระเบี้ย 5/10 ปี", ageMin: 0, ageMax: 70, coverAge: 99, isMain: true, renewalNote: "เบี้ยคงที่",
+    { id: "HAPPYSAVING", name: "บีแอลเอ แฮปปี้เซฟวิ่ง 99/5 และ 99/10 (มีเงินปันผล)", tag: "แบบประกันหลัก · สร้างมูลค่าออม เลือกชำระเบี้ย 5/10 ปี", ageMin: 0, ageMax: 70, coverAge: 99, isMain: true, renewalNote: "เบี้ยคงที่",
         occNote: "รับได้ทุกชั้นอาชีพ", siNote: "ทุนประกันขั้นต่ำ 50,000 บาท ไม่จำกัดสูงสุด · รับเงินคืนรายปี 4% ของทุนประกันภัยทุกปี + คุ้มครองชีวิตเพิ่มขึ้นตามปีกรมธรรม์ (100%→700%) · เลือกได้เพียง 1 แบบ จาก 30 แบบทุนประกันหลัก" },
     { id: "HAPPYWL", name: "แฮปปี้ โฮลไลฟ์ (มีเงินปันผล)", tag: "แบบประกันหลัก · เลือกระยะชำระเบี้ย 5/10/15 ปี ทุนสูง", ageMin: 0, ageMax: 65, coverAge: 99, isMain: true, renewalNote: "เบี้ยคงที่",
         occNote: "รับประกันเฉพาะชั้นอาชีพ 1-2 เท่านั้น (ไม่รับชั้นอาชีพ 3)", siNote: "ทุนประกันขั้นต่ำ 500,000 บาท สูงสุด 100,000,000 บาท (รวมทุกกรมธรรม์ตระกูลเพรสทีจา ไลฟ์/แฮปปี้ โฮลไลฟ์) · เลือกได้เพียง 1 แบบ จาก 30 แบบทุนประกันหลัก" },
@@ -2034,7 +2043,7 @@ function App() {
     function persistCases(list) { setCases(list); storageAdapter.set(CASES_KEY, JSON.stringify(list)); }
     function saveCase() {
         const name = (caseName || customerName || "").trim() || `เคส ${new Date().toLocaleDateString("th-TH")}`;
-        const summary = PRODUCTS.filter((p) => selected[p.id]).map((p) => p.name).join(", ");
+        const summary = PRODUCTS.filter((p) => selected[p.id]).map((p) => nameFor(p)).join(", ");
         const snap = Object.assign(currentSnapshot(), { savingsMode, savingsPremiumInput });
         const rest = cases.filter((c) => c.name !== name);
         persistCases([{ id: Date.now(), name, savedAt: new Date().toISOString(), summary, snap }, ...rest].slice(0, 100));
@@ -2403,6 +2412,12 @@ function App() {
     const MAIN_IDS = ["SUD", "LIFE99", "UNJAI", "CANCERMAX", "PLUS2", "PRESTIGE", "HAPPYPENSION", "HAPPYSAVING", "HAPPYWL", "HRP9920", "HRPDIV", "HRP9901", "HAPPYWL9901", "HAPPYKID", "PSAVE104", "PSAVE126", "HS208", "HS126", "HS157", "HS147", "HS168", "HS1810", "HS2515", "TAXSAVER105", "BLASAVE168", "HS999", "PUNSUK", "PENSION888", "SAVECARE168", "PENSIONCARE888"];
     const SAVINGS_IDS = ["PSAVE104", "PSAVE126", "HS208", "HS126", "HS157", "HS147", "HS168", "HS1810", "HS2515", "TAXSAVER105", "HAPPYSAVING", "BLASAVE168", "HS999", "PUNSUK", "SAVECARE168"]; // เฉพาะแบบประกันสะสมทรัพย์ชุดใหม่ + แฮปปี้เซฟวิ่ง (มีเงินปันผล) — แบบเดิมอื่นๆ ยังคงอยู่ในคอลัมน์ทุนประกันหลักตามเดิม
     const PENSION_IDS = ["HAPPYPENSION", "PENSION888", "PENSIONCARE888"]; // แบบบำนาญทั้งหมด — ใช้ตารางการจ่ายบำนาญ+จุดคุ้มทุนร่วมกัน
+    // ชื่อตามคู่มือ ตามระยะชำระ/แบบที่เลือก
+    const nameFor = (p) => {
+        if (p.id === "HAPPYSAVING" && happysavingTerm) return `บีแอลเอ แฮปปี้เซฟวิ่ง 99/${happysavingTerm} (มีเงินปันผล)`;
+        if (p.id === "LLC" && llcVariant) return llcVariant === "99" ? "บีแอลเอ ลองไลฟ์แคร์ พลัส" : "บีแอลเอ ลองไลฟ์แคร์";
+        return p.name;
+    };
     const otherMainSelected = (id) => MAIN_IDS.some((m) => m !== id && selected[m]);
     // เช็คว่าแบบทุนประกันหลักแต่ละตัวเลือกได้จริงหรือไม่ ตามอายุปัจจุบัน (ใช้ช่วงอายุกว้างสุดของแต่ละแบบเป็นตัวกรองเบื้องต้น)
     // และล็อกไม่ให้เลือกซ้อนกับทุนหลักตัวอื่นที่เลือกไว้แล้ว
@@ -2700,10 +2715,9 @@ function App() {
                 React.createElement(PlanRow, { label: "\u0E17\u0E38\u0E19\u0E1B\u0E23\u0E30\u0E01\u0E31\u0E19\u0E20\u0E31\u0E22 (\u0E1A\u0E32\u0E17)" },
                     React.createElement(NumInput, { value: plus2SI, onChange: setPlus2SI, min: 0, step: 100000 }))));
             case "PRESTIGE": return selected.PRESTIGE && (React.createElement(React.Fragment, null,
-                React.createElement(PlanRow, { label: "\u0E23\u0E30\u0E22\u0E30\u0E40\u0E27\u0E25\u0E32\u0E0A\u0E33\u0E23\u0E30\u0E40\u0E1A\u0E35\u0E49\u0E22" },
-                    React.createElement(Chips, { options: PRESTIGE_TERMS, value: prestigeTerm, onChange: setPrestigeTerm, fmt: (t) => t + " ปี" })),
-                React.createElement(PlanRow, { label: "\u0E17\u0E38\u0E19\u0E1B\u0E23\u0E30\u0E01\u0E31\u0E19\u0E20\u0E31\u0E22 (\u0E1A\u0E32\u0E17)" },
-                    React.createElement(NumInput, { value: prestigeSI, onChange: setPrestigeSI, min: 0, step: 500000 }))));
+                React.createElement(PlanRow, { label: "ทุนประกันภัย (บาท) — ใช้เทียบทุกระยะชำระพร้อมกัน" },
+                    React.createElement(NumInput, { value: prestigeSI, onChange: setPrestigeSI, min: 0, step: 500000 })),
+                renderTermCompare(prestigeOpt(), prestigeTerm, setPrestigeTerm)));
             case "HAPPYPENSION": return selected.HAPPYPENSION && (React.createElement(React.Fragment, null,
                 React.createElement(PlanRow, { label: "\u0E27\u0E34\u0E18\u0E35\u0E01\u0E23\u0E2D\u0E01\u0E02\u0E49\u0E2D\u0E21\u0E39\u0E25" },
                     React.createElement(SegButton, { options: [{ k: "premium", l: "กรอกเบี้ยประกัน" }, { k: "pension", l: "กรอกบำนาญที่ต้องการ" }], value: happypensionMode, onChange: setHappypensionMode })),
@@ -2749,17 +2763,15 @@ function App() {
                 happysavingTerm > 0 && getEffectiveSI("HAPPYSAVING") >= HAPPYSAVING_MIN_SI && (React.createElement("button", { onClick: () => setSavingsScheduleOpen((o) => (Object.assign(Object.assign({}, o), { HAPPYSAVING: !o.HAPPYSAVING }))), className: "w-full text-[21px] font-semibold px-4 py-2.5 rounded-xl mt-1", style: { background: BRAND.bg, color: BRAND.navy, border: "1px solid #D7E8F0" } }, savingsScheduleOpen.HAPPYSAVING ? "▴ ซ่อนตารางเงินคืนตลอดสัญญา" : "▾ ดูตารางเงินคืนตลอดสัญญา (การันตี)")),
                 savingsScheduleOpen.HAPPYSAVING && (() => { const s = buildSavingsSchedule("HAPPYSAVING"); return React.createElement(SavingsScheduleTable, { rows: s.rows, irr: s.irr, title: "\u0E41\u0E2E\u0E1B\u0E1B\u0E35\u0E49\u0E40\u0E0B\u0E1F\u0E27\u0E34\u0E48\u0E07 (\u0E21\u0E35\u0E40\u0E07\u0E34\u0E19\u0E1B\u0E31\u0E19\u0E1C\u0E25) \u2014 \u0E15\u0E32\u0E23\u0E32\u0E07\u0E40\u0E07\u0E34\u0E19\u0E04\u0E37\u0E19\u0E15\u0E25\u0E2D\u0E14\u0E2A\u0E31\u0E0D\u0E0D\u0E32", onPrint: handlePrintTable, onShare: (pl) => handleShareLine("HAPPYSAVING", pl) }); })()));
             case "HAPPYWL": return selected.HAPPYWL && (React.createElement(React.Fragment, null,
-                React.createElement(PlanRow, { label: "\u0E23\u0E30\u0E22\u0E30\u0E40\u0E27\u0E25\u0E32\u0E0A\u0E33\u0E23\u0E30\u0E40\u0E1A\u0E35\u0E49\u0E22" },
-                    React.createElement(Chips, { options: HAPPYWL_TERMS, value: happywlTerm, onChange: setHappywlTerm, fmt: (t) => t + " ปี" })),
-                React.createElement(PlanRow, { label: "\u0E17\u0E38\u0E19\u0E1B\u0E23\u0E30\u0E01\u0E31\u0E19\u0E20\u0E31\u0E22 (\u0E1A\u0E32\u0E17)" },
-                    React.createElement(NumInput, { value: happywlSI, onChange: setHappywlSI, min: 0, step: 500000 }))));
+                React.createElement(PlanRow, { label: "ทุนประกันภัย (บาท) — ใช้เทียบทุกระยะชำระพร้อมกัน" },
+                    React.createElement(NumInput, { value: happywlSI, onChange: setHappywlSI, min: 0, step: 500000 })),
+                renderTermCompare(happywlOpt(), happywlTerm, setHappywlTerm)));
             case "HRP9920": return selected.HRP9920 && (React.createElement(PlanRow, { label: "\u0E17\u0E38\u0E19\u0E1B\u0E23\u0E30\u0E01\u0E31\u0E19\u0E20\u0E31\u0E22 (\u0E1A\u0E32\u0E17)" },
                 React.createElement(NumInput, { value: hrp9920SI, onChange: setHrp9920SI, min: 0, step: 100000 })));
             case "HRPDIV": return selected.HRPDIV && (React.createElement(React.Fragment, null,
-                React.createElement(PlanRow, { label: "\u0E23\u0E30\u0E22\u0E30\u0E40\u0E27\u0E25\u0E32\u0E0A\u0E33\u0E23\u0E30\u0E40\u0E1A\u0E35\u0E49\u0E22" },
-                    React.createElement(Chips, { options: HRPDIV_TERMS, value: hrpdivTerm, onChange: setHrpdivTerm, fmt: (t) => t + " ปี" })),
-                React.createElement(PlanRow, { label: "\u0E17\u0E38\u0E19\u0E1B\u0E23\u0E30\u0E01\u0E31\u0E19\u0E20\u0E31\u0E22 (\u0E1A\u0E32\u0E17)" },
-                    React.createElement(NumInput, { value: hrpdivSI, onChange: setHrpdivSI, min: 0, step: 100000 }))));
+                React.createElement(PlanRow, { label: "ทุนประกันภัย (บาท) — ใช้เทียบทุกระยะชำระพร้อมกัน" },
+                    React.createElement(NumInput, { value: hrpdivSI, onChange: setHrpdivSI, min: 0, step: 100000 })),
+                renderTermCompare(hrpdivOpt(), hrpdivTerm, setHrpdivTerm)));
             case "HRP9901": return selected.HRP9901 && (React.createElement(PlanRow, { label: "\u0E17\u0E38\u0E19\u0E1B\u0E23\u0E30\u0E01\u0E31\u0E19\u0E20\u0E31\u0E22 (\u0E1A\u0E32\u0E17)" },
                 React.createElement(NumInput, { value: hrp9901SI, onChange: setHrp9901SI, min: 0, step: 100000 })));
             case "HAPPYWL9901": return selected.HAPPYWL9901 && (React.createElement(PlanRow, { label: "\u0E17\u0E38\u0E19\u0E1B\u0E23\u0E30\u0E01\u0E31\u0E19\u0E20\u0E31\u0E22 (\u0E1A\u0E32\u0E17)" },
@@ -3156,10 +3168,12 @@ function App() {
         return { ok: true, premium, benefits: [
                 ["เสียชีวิตทุกกรณี", baht(sudSI) + " (หรือเบี้ยสะสม แล้วแต่มากกว่า)"],
                 ...(sudFreeEnd > age ? [
-                    ["แถมฟรี: เสียชีวิตจากอุบัติเหตุ รับเพิ่ม", baht(Math.round(sudSI * 0.5)) + " (รวมเป็น " + baht(Math.round(sudSI * 1.5)) + `) · คุ้มครองถึงอายุ ${sudFreeEnd} ปี (อีก ${sudFreeEnd - age} ปี)`],
-                    ["แถมฟรี: ทุพพลภาพถาวรสิ้นเชิง", baht(Math.min(Math.round(sudSI * 0.5), 5000000)) + ` (สูงสุด 5,000,000 บาท) · คุ้มครองถึงอายุ ${sudFreeEnd} ปี (อีก ${sudFreeEnd - age} ปี)`],
+                    ["เสียชีวิตจากอุบัติเหตุ: รับเพิ่ม (แถมฟรี)", baht(Math.round(sudSI * 0.5)) + " (รวมเป็น " + baht(Math.round(sudSI * 1.5)) + `) · คุ้มครองถึงอายุ ${sudFreeEnd} ปี (อีก ${sudFreeEnd - age} ปี)`],
+                    ["ทุพพลภาพถาวรสิ้นเชิง: รับเงิน (แถมฟรี)", baht(Math.min(Math.round(sudSI * 0.5), 5000000)) + ` · คุ้มครองถึงอายุ ${sudFreeEnd} ปี (อีก ${sudFreeEnd - age} ปี)`],
                 ] : [["แถมฟรี: อุบัติเหตุ/ทุพพลภาพ", "ไม่ได้รับ เพราะคุ้มครองได้ไม่เกินอายุ 60 ปี"]]),
-                ["มีชีวิตอยู่จนครบกำหนดสัญญา (อายุ 99 ปี)", "รับ " + baht(sudSI)],
+                ["มีชีวิตอยู่จนครบกำหนดสัญญา (อายุ 99 ปี)", "รับ " + baht(sudSI) + " หรือเบี้ยที่ชำระแล้วสะสม แล้วแต่จำนวนใดมากกว่า"],
+                ...tpWaiverLines(20),
+                ...(sudFreeEnd > age ? [TPD_DEF_LINE] : []),
                 ["ระยะเวลาคุ้มครอง", "รับประกันตั้งแต่อายุแรกเกิด (0 ปี) ถึง 70 ปี ชำระเบี้ย 20 ปี คุ้มครองตลอดชีพจนถึงอายุ 99 ปี"],
             ] };
     }
@@ -3175,6 +3189,7 @@ function App() {
         return { ok: true, premium, benefits: [
                 ["เสียชีวิตทุกกรณี (ทุกปีกรมธรรม์)", baht(life99SI) + " หรือเบี้ยประกันชีวิตที่ชำระแล้วสะสม แล้วแต่จำนวนใดมากกว่า"],
                 ["มีชีวิตอยู่จนครบกำหนดสัญญา (อายุ 99 ปี)", "รับ " + baht(life99SI) + " หรือเบี้ยที่ชำระแล้วสะสม แล้วแต่จำนวนใดมากกว่า"],
+                ...tpWaiverLines(99 - age),
                 ["ระยะเวลาชำระเบี้ย", "ชำระเบี้ยถึงอายุ 99 ปี (ไม่ใช่แบบชำระเบี้ยจำกัดระยะเวลา)"],
                 ["ระยะเวลาคุ้มครอง", "รับประกันตั้งแต่อายุแรกเกิด (0 ปี) ถึง 80 ปี คุ้มครองตลอดชีพจนถึงอายุ 99 ปี"],
                 ["สัญญาเพิ่มเติมที่ซื้อร่วมได้", "แฮปปี้ เฮลธ์ พรีเมียร์, เพรสทีจ เฮลธ์, แวลู เฮลธ์, แวลู เฮลธ์ คิดส์, คช. และบันทึกสลักหลัง OPD ต่างๆ"],
@@ -3194,11 +3209,12 @@ function App() {
                 ["ทุนประกันชีวิต (สัญญาหลัก บีแอลเอ อุ่นใจ)", baht(UNJAI_LIFE_SI) + " (คงที่ทุกแผน)"],
                 ["ทุนประกันโรคร้ายแรง (สัญญาเพิ่มเติม อีซี แคร์)", baht(unjaiPlan)],
                 ["เสียชีวิตทุกกรณี", "รับ 100% ของทุนประกันชีวิต = " + baht(UNJAI_LIFE_SI)],
-                ["เจ็บป่วยด้วยโรคร้ายแรง 11 โรค (ไม่ใช่มะเร็งระยะไม่ลุกลาม)", "รับ 100% ของทุนอีซีแคร์ = " + baht(unjaiPlan)],
-                ["มะเร็งระยะไม่ลุกลาม (Carcinoma in Situ)", "รับ 20% ของทุนอีซีแคร์ต่อครั้งที่เจ็บป่วย (คุ้มครองรวมสูงสุด 100% ของทุนอีซีแคร์)"],
+                ["เจ็บป่วยด้วยโรคร้ายแรง 10 โรค (มะเร็งระยะลุกลาม เนื้องอกในสมอง โรคหัวใจ 4 กลุ่ม หลอดเลือดสมอง 2 กลุ่ม ปลอกประสาทอักเสบ MS สมองอักเสบ)", "รับ " + baht(unjaiPlan) + " (หักส่วนที่จ่ายมะเร็งระยะไม่ลุกลามไปแล้ว ถ้ามี)"],
+                ["มะเร็งระยะไม่ลุกลาม (Carcinoma in Situ)", "รับ " + baht(Math.round(unjaiPlan * 0.2)) + " ต่อครั้งที่ตรวจพบใหม่ (20% ของทุนโรคร้ายแรง)"],
+                ...tpWaiverLines(90 - age),
                 ["ครบกำหนดสัญญา (อายุ 90 ปี)", "รับคืน 100% ของทุนประกันชีวิต = " + baht(UNJAI_LIFE_SI)],
                 ["ระยะเวลาคุ้มครอง", "รับประกันตั้งแต่อายุ 20 ถึง 75 ปี ชำระเบี้ยและคุ้มครองถึงอายุ 90 ปี"],
-                ["เงื่อนไขสำคัญ", "แพ็กเกจปิด ไม่สามารถซื้อสัญญาเพิ่มเติมอื่นเพิ่มได้ · ซื้อได้มากกว่า 1 กรมธรรม์ แต่ทุนอีซีแคร์รวมทุกฉบับต้องไม่เกิน 1,000,000 บาท"],
+                ["เงื่อนไขสำคัญ", "แพ็กเกจปิด ไม่สามารถซื้อสัญญาเพิ่มเติมอื่นเพิ่มได้ · ซื้อได้มากกว่า 1 กรมธรรม์ แต่ทุนอีซีแคร์รวมทุกฉบับต้องไม่เกิน 3,000,000 บาท"],
             ] };
     }
     function calcCANCERMAX() {
@@ -3222,10 +3238,12 @@ function App() {
                 ["ทุนเดย์ลี่ แคนเซอร์ (ชดเชยรายวันรักษามะเร็ง)", baht(plan.daily) + " ต่อวัน"],
                 ["ทุนเอ็นดิ้ง แคนเซอร์ (เสียชีวิตจากมะเร็ง)", baht(plan.ending)],
                 ["เสียชีวิตทุกกรณี", "รับ 100% ของทุนประกันชีวิต = " + baht(plan.life)],
-                ["เสียชีวิตจากโรคมะเร็ง", "รับเพิ่มอีก 100% ของทุนเอ็นดิ้ง แคนเซอร์ = " + baht(plan.ending)],
-                ["เข้ารักษาตัวเป็นผู้ป่วยในเพราะมะเร็ง", "รับ 100% ของทุนเดย์ลี่ แคนเซอร์ต่อวัน (สูงสุด 100 วัน/ครั้ง ไม่เกิน 500 วันตลอดสัญญา)"],
-                ["ตรวจพบมะเร็งระยะไม่ลุกลามเป็นครั้งแรก", "รับ 20% ของทุนเฟิสต์ แคนเซอร์"],
-                ["ตรวจพบมะเร็งระยะลุกลามเป็นครั้งแรก", "รับ 100% ของทุนเฟิสต์ แคนเซอร์ (รวม 2 กรณีคุ้มครองสูงสุด 100%)"],
+                ["เสียชีวิตจากโรคมะเร็ง", "รับเพิ่มอีก " + baht(plan.ending) + " (รวมเป็น " + baht(plan.life + plan.ending) + ")"],
+                ["นอนโรงพยาบาลเพราะมะเร็ง", baht(plan.daily) + " ต่อวัน · สูงสุด 100 วันต่อครั้ง ไม่เกิน 500 วันตลอดสัญญา · ทำเคมีบำบัด/ฉายแสงที่อยู่ รพ. เกิน 6 ชม. นับเป็น 1 วัน"],
+                ["ตรวจพบมะเร็งระยะไม่ลุกลาม", "รับ " + baht(Math.round(plan.first * 0.2)) + " ต่อชนิดของมะเร็ง (20%)"],
+                ["ตรวจพบมะเร็งระยะลุกลาม", "รับ " + baht(plan.first) + " (หักส่วนที่จ่ายมะเร็งระยะไม่ลุกลามไปแล้ว ถ้ามี)"],
+                ["หมายเหตุ", "ความคุ้มครองมะเร็งเริ่มหลังพ้น 90 วันนับจากวันเริ่มสัญญา"],
+                ...tpWaiverLines(90 - age),
                 ["ครบกำหนดสัญญา (อายุ 90 ปี)", "รับคืน 100% ของทุนประกันชีวิต = " + baht(plan.life)],
                 ["ระยะเวลาคุ้มครอง", "รับประกันตั้งแต่อายุแรกเกิด (0 ปี) ถึง 70 ปี ชำระเบี้ยและคุ้มครองถึงอายุ 90 ปี"],
                 ["เงื่อนไขสำคัญ", "แพ็กเกจปิด ไม่สามารถซื้อสัญญาเพิ่มเติมอื่นเพิ่มได้ ยกเว้น คช. ซึ่งผู้เยาว์อายุ 0-14 ปี ต้องซื้อเพิ่มด้วย"],
@@ -3257,9 +3275,44 @@ function App() {
                 ["เสียชีวิตทุกกรณี", "รับ 100% ของทุนประกันชีวิต = " + baht(plus2SI)],
                 ["ทุพพลภาพถาวรสิ้นเชิง (สัญญาเพิ่มเติม คุ้มครองทุพพลภาพ 2)", "รับ 3 เท่า ของทุนประกันชีวิต = " + baht(tpdPayout) + (plus2SI * 3 > 30000000 ? " (ชนเพดานสูงสุด 30,000,000 บาท)" : "")],
                 ["เพดานสูงสุดผลประโยชน์ทุพพลภาพ", "30,000,000 บาท (รวมทุกกรมธรรม์ทุพพลภาพถาวรสิ้นเชิง)"],
+                ...tpWaiverLines(plus2Term),
+                TPD_DEF_LINE,
                 ["ระยะเวลาคุ้มครอง", `รับประกันตั้งแต่อายุ 20 ถึง ${maxAge} ปี (สำหรับระยะ ${plus2Term} ปี) คุ้มครองตลอดระยะเวลาที่ชำระเบี้ย`],
             ] };
     }
+    // แบบตลอดชีพที่เลือกระยะชำระได้: เทียบเบี้ยทุกระยะที่ทุนเดียวกัน (เหมือนตารางบำนาญ)
+    function termRow(t, opt) {
+        const label = t + " ปี";
+        const maxAge = opt.maxAge(t);
+        if (age < opt.minAge || age > maxAge) return { ok: false, label, msg: `รับอายุ ${opt.minAge}-${maxAge} ปี` };
+        if (opt.si < opt.minSI) return { ok: false, label, msg: `กรอกทุนประกัน (ขั้นต่ำ ${baht(opt.minSI)})` };
+        if (opt.maxSI && opt.si > opt.maxSI) return { ok: false, label, msg: `ทุนเกิน ${baht(opt.maxSI)}` };
+        const base = opt.table[age] ? opt.table[age][opt.terms.indexOf(t)] : null;
+        if (base === null || base === undefined) return { ok: false, label, msg: "ไม่มีอัตราเบี้ยที่อายุนี้" };
+        const premium = ((base - (opt.discount ? opt.discount(opt.si, t) : 0)) * opt.si) / 1000;
+        return { ok: true, label, premium, totalPremium: premium * t };
+    }
+    function renderTermCompare(opt, value, onChange) {
+        return React.createElement(React.Fragment, null,
+            React.createElement("div", { className: "rounded-xl overflow-hidden border mt-2 overflow-x-auto", style: { borderColor: "#D7E8F0" } },
+                React.createElement("div", { className: "grid text-[16px] font-semibold", style: { gridTemplateColumns: "1.1fr 1fr 1.2fr", background: BRAND.bg, color: BRAND.navy } },
+                    React.createElement("div", { className: "px-2 py-2" }, "ระยะชำระ"),
+                    React.createElement("div", { className: "px-2 py-2" }, "เบี้ย/ปี"),
+                    React.createElement("div", { className: "px-2 py-2" }, "เบี้ยรวมทั้งหมด")),
+                opt.terms.map((t) => {
+                    const row = termRow(t, opt);
+                    return (React.createElement("div", { key: t, className: "grid text-[16px] border-t", style: { gridTemplateColumns: "1.1fr 1fr 1.2fr", borderColor: "#EEF3F7", background: value === t ? "#F3FBEF" : "transparent" } },
+                        React.createElement("div", { className: "px-2 py-2 font-medium", style: { color: BRAND.navy } }, row.label),
+                        row.ok ? (React.createElement(React.Fragment, null,
+                            React.createElement("div", { className: "px-2 py-2", style: { color: BRAND.dataBlack } }, baht(Math.round(row.premium))),
+                            React.createElement("div", { className: "px-2 py-2", style: { color: BRAND.dataBlack } }, baht(Math.round(row.totalPremium))))) : (React.createElement("div", { className: "px-2 py-2 col-span-2", style: { color: BRAND.sub } }, row.msg))));
+                })),
+            React.createElement(PlanRow, { label: "เลือกระยะชำระที่จะใช้คำนวณรวมกับสัญญาเพิ่มเติมอื่น" },
+                React.createElement(Chips, { options: opt.terms, value, onChange, fmt: (t) => t + " ปี" })));
+    }
+    const prestigeOpt = () => ({ terms: PRESTIGE_TERMS, minAge: PRESTIGE_MIN_AGE, maxAge: (t) => PRESTIGE_MAX_AGE_BY_TERM[t], minSI: PRESTIGE_MIN_SI, si: prestigeSI, table: gender === "female" ? PRESTIGE_FEMALE : PRESTIGE_MALE });
+    const hrpdivOpt = () => ({ terms: HRPDIV_TERMS, minAge: HRPDIV_MIN_AGE, maxAge: () => HRPDIV_MAX_AGE, minSI: HRPDIV_MIN_SI, si: hrpdivSI, table: gender === "female" ? HRPDIV_FEMALE : HRPDIV_MALE, discount: hrpdivDiscount });
+    const happywlOpt = () => ({ terms: HAPPYWL_TERMS, minAge: HAPPYWL_MIN_AGE, maxAge: () => HAPPYWL_MAX_AGE, minSI: HAPPYWL_MIN_SI, maxSI: HAPPYWL_MAX_SI, si: happywlSI, table: gender === "female" ? HAPPYWL_FEMALE : HAPPYWL_MALE, discount: happywlDiscount });
     function calcPRESTIGE() {
         const ti = PRESTIGE_TERMS.indexOf(prestigeTerm);
         if (ti < 0)
@@ -3302,8 +3355,9 @@ function App() {
                 ["สูญเสียอวัยวะ 1 ข้าง / ตาบอด 1 ข้าง", baht(b.loss1) + " (60%)"],
                 ["นิ้วหัวแม่มือ + นิ้วชี้", baht(b.fingers) + " (25%)"],
                 ["ค่ารักษาพยาบาลอุบัติเหตุ ต่อครั้ง", baht(b.medExpense)],
-                ["กระดูกแตกหัก / ไฟไหม้ / น้ำร้อนลวก", baht(b.fracture)],
-                ["อุบัติเหตุวันหยุดนักขัตฤกษ์ / รถสาธารณะ", "รับเพิ่มอีก 1 เท่าของผลประโยชน์ข้างต้น"],
+                ["กระดูกแตกหัก / ไฟไหม้ / น้ำร้อนลวก / บาดเจ็บอวัยวะภายใน", baht(b.fracture)],
+                ["อุบัติเหตุวันหยุดนักขัตฤกษ์ / ขณะเดินทางด้วยรถยนต์ส่วนบุคคล / อุบัติเหตุสาธารณะ", "แต่ละกรณีรับเพิ่มอีก 1 เท่าของเงินกรณีเสียชีวิตหรือสูญเสียอวัยวะ"],
+                ["หมายเหตุ", "รวมกรณีถูกฆาตกรรม ถูกทำร้ายร่างกาย สงครามกลางเมือง กบฏ จลาจล ตามเงื่อนไขบริษัท"],
                 ["ระยะเวลาคุ้มครอง", "รับประกันตั้งแต่อายุแรกเกิด (0 ปี) ถึง 70 ปี และสามารถต่ออายุความคุ้มครองต่อเนื่องได้ถึงอายุ 98 ปี"],
             ] };
     }
@@ -3338,7 +3392,8 @@ function App() {
         const premium = (rate * tpdSI) / 1000;
         return { ok: true, premium, benefits: [
                 ["จำนวนเงินเอาประกันภัย", baht(tpdSI)],
-                ["เงื่อนไขจ่ายผลประโยชน์", "ทุพพลภาพถาวรสิ้นเชิง ต่อเนื่อง ≥180 วัน จ่าย 100% ของทุนประกัน"],
+                ["ทุพพลภาพถาวรสิ้นเชิง", "รับ " + baht(tpdSI) + " (100% ของทุน)"],
+                TPD_DEF_LINE,
                 ["ระยะเวลาคุ้มครอง", "รับประกันตั้งแต่อายุ 15 ถึง 65 ปี และสามารถต่ออายุความคุ้มครองต่อเนื่องได้ถึงอายุ 74 ปี"],
                 ["เงื่อนไขทุนประกันหลัก", `ซื้อได้ไม่เกิน 10 เท่าของทุนประกันหลัก (สูงสุด ${baht(maxSI)}) และไม่เกิน 30,000,000 บาทรวมทุกกรมธรรม์`],
             ] };
@@ -3417,10 +3472,10 @@ function App() {
         const rate100 = (gender === "female" ? RPPR_FEMALE : RPPR_MALE)[bi];
         const premium = (rate100 * rpprDaily) / 100;
         return { ok: true, premium, benefits: [
-                ["ผลประโยชน์ต่อวัน (ผู้ป่วยใน)", baht(rpprDaily)],
-                ["เข้ารักษาใน ICU และโรคร้ายแรง 4 โรค (มะเร็ง/หัวใจ/หลอดเลือดสมอง)", "จ่าย 2 เท่า"],
-                ["ผ่าตัดใหญ่/ผ่าตัดซับซ้อน", "จ่ายเพิ่มอีก 10 เท่า สูงสุด 3 ครั้ง/ปี"],
-                ["เปลี่ยนอวัยวะสำคัญ (หัวใจ ปอด ตับ ไต)", "จ่ายเพิ่มอีก 200 เท่า"],
+                ["ผลประโยชน์ต่อวัน (ผู้ป่วยใน)", baht(rpprDaily) + " ต่อวัน (นอน รพ. ไม่ต่ำกว่า 6 ชม.) · สูงสุด 1,250 วัน"],
+                ["อยู่ห้อง ICU หรือรักษาโรคร้ายแรง 4 โรค (มะเร็ง, อัมพาตจากหลอดเลือดสมอง, ผ่าตัดเส้นเลือดเลี้ยงหัวใจ, กล้ามเนื้อหัวใจตาย)", baht(rpprDaily * 2) + " ต่อวัน (2 เท่า) · สูงสุด 365 วัน"],
+                ["ผ่าตัดใหญ่/ผ่าตัดซับซ้อน", "รับเพิ่ม " + baht(rpprDaily * 10) + " ต่อการผ่าตัด (10 เท่า) · สูงสุด 3 ครั้ง/ปี"],
+                ["เปลี่ยนอวัยวะสำคัญ (หัวใจ ปอด ตับ ไต) หรือปลูกถ่ายไขกระดูก", "รับเพิ่ม " + baht(rpprDaily * 200) + " (200 เท่า)"],
                 ["ระยะเวลาคุ้มครอง", "รับประกันตั้งแต่อายุ 6 ถึง 64 ปี และสามารถต่ออายุความคุ้มครองต่อเนื่องได้ถึงอายุ 65 ปี"],
             ] };
     }
@@ -3565,7 +3620,7 @@ function App() {
                 ["ผลประโยชน์ต่อครั้ง", baht(amt) + " (สูงสุด 1 ครั้ง/วัน ไม่เกิน 30 ครั้ง/รอบปีกรมธรรม์)"],
                 ["แนบกับ", `เพรสทีจ เฮลธ์ ปลดล็อค แผน ${baht(phPlan)} (แผน 20 ล้าน = 1,500 / 30 ล้าน = 2,000)`],
                 ["ความคุ้มครอง", "ค่าแพทย์ ค่าบริการพยาบาลและโรงพยาบาลกรณีผู้ป่วยนอก ค่ายา ค่าตรวจทางเทคนิคการแพทย์และรังสีวิทยา ค่ากายภาพบำบัด ค่าเครื่องมือและอุปกรณ์การแพทย์"],
-                ["เงื่อนไข", "ซื้อได้ 1 ฉบับต่อคน · วงเงิน OPD ทุกฉบับรวมกันไม่เกิน 2,000 บาท · ถ้า เพรสทีจ เฮลธ์ มีเบี้ยเพิ่มตามอาชีพ/สุขภาพ ซื้อไม่ได้"],
+                ["เงื่อนไขการซื้อ", "ซื้อได้ 1 ฉบับต่อคน · วงเงิน OPD ทุกฉบับรวมกันไม่เกิน 2,000 บาท · ถ้า เพรสทีจ เฮลธ์ มีเบี้ยเพิ่มตามอาชีพ/สุขภาพ ซื้อไม่ได้"],
                 ["ระยะเวลาคุ้มครอง", "1 ปี ต่ออายุพร้อม เพรสทีจ เฮลธ์ ได้ถึงอายุ 98 ปี"],
             ] };
     }
@@ -3583,7 +3638,7 @@ function App() {
         ["เสียชีวิต / สูญเสียมือ เท้า สายตา 2 ข้าง หรือ 2 อย่าง", "100% ของทุน"],
         ["สูญเสียมือ 1 ข้าง หรือเท้า 1 ข้าง หรือสายตา 1 ข้าง", "60% ของทุน"],
         ["สูญเสียนิ้วหัวแม่มือและนิ้วชี้ของมือข้างเดียวกัน", "25% ของทุน"],
-        ["จ่าย 2 เท่า", "อุบัติเหตุในยานพาหนะสาธารณะ / ลิฟท์ / ไฟไหม้โรงมหรสพ โรงแรม อาคารสาธารณะ"],
+        ["อุบัติเหตุบนยานพาหนะสาธารณะ / ในลิฟต์ / ไฟไหม้โรงมหรสพ โรงแรม อาคารสาธารณะ", "รับ 2 เท่าของข้างต้น"],
     ];
     function calcACC1() {
         if (age < 0 || age > 64)
@@ -3597,10 +3652,10 @@ function App() {
             return { ok: false, msg: `ทุน อบ.1 สูงสุดสำหรับเคสนี้ ${baht(max)} (รวม อบ.1+อบ.2 ไม่เกิน 5 เท่าของทุนหลัก ${baht(mainSI)} และไม่เกิน 10 ล้าน${age < 15 ? " · ผู้เยาว์ต่ำกว่า 15 ปี ไม่เกิน 1 ล้าน" : ""})` };
         const premium = (acc1SI * ACC1_RATE[occClass] + kj1SI * KJ1_RATE) / 1000;
         return { ok: true, premium, benefits: [
-                ["ทุน อบ.1", baht(acc1SI) + ` (อัตรา ${ACC1_RATE[occClass]} บาท/ทุน 1,000 · ชั้นอาชีพ ${occClass})`],
-                ["ทุน ฆจ.1 (บังคับซื้อคู่)", baht(kj1SI) + " (อัตรา 0.75 บาท/ทุน 1,000)"],
+                ["ทุนประกันอุบัติเหตุ", baht(acc1SI)],
+                ["อัตราเบี้ย (ตัวแทน)", `อบ.1 ${ACC1_RATE[occClass]} บาท/ทุน 1,000 · ชั้นอาชีพ ${occClass} · ฆจ.1 ทุน ${baht(kj1SI)} อัตรา 0.75 บาท/ทุน 1,000 (บังคับซื้อคู่)`],
                 ...ACC_LOSS_ROWS,
-                ["ฆจ.1 คุ้มครองเพิ่ม", "ถูกฆาตกรรม/ทำร้ายร่างกาย (ไม่ได้ยั่วยุหรือร่วมทะเลาะวิวาท), สงครามกลางเมือง ปฏิวัติ รัฐประหาร กบฏ, จลาจล นัดหยุดงาน"],
+                ["คุ้มครองเพิ่ม (ถูกฆาตกรรม/จลาจล ฯลฯ)", `ทุน ${baht(kj1SI)} · ` +  "ถูกฆาตกรรม/ทำร้ายร่างกาย (ไม่ได้ยั่วยุหรือร่วมทะเลาะวิวาท), สงครามกลางเมือง ปฏิวัติ รัฐประหาร กบฏ, จลาจล นัดหยุดงาน"],
                 ["ระยะเวลาคุ้มครอง", "ถึงอายุ 65 ปี (ชำระเบี้ยถึงอายุ 64 ปี) เบี้ยคงที่"],
             ] };
     }
@@ -3616,13 +3671,13 @@ function App() {
             return { ok: false, msg: `ทุน อบ.2 สูงสุดสำหรับเคสนี้ ${baht(max)} (รวม อบ.1+อบ.2 ไม่เกิน 5 เท่าของทุนหลัก ${baht(mainSI)} และไม่เกิน 10 ล้าน)` };
         const premium = (acc2SI * ACC2_RATE[occClass] + kj2SI * KJ2_RATE) / 1000;
         return { ok: true, premium, benefits: [
-                ["ทุน อบ.2", baht(acc2SI) + ` (อัตรา ${ACC2_RATE[occClass]} บาท/ทุน 1,000 · ชั้นอาชีพ ${occClass})`],
-                ["ทุน ฆจ.2 (บังคับซื้อคู่)", baht(kj2SI) + " (อัตรา 1.35 บาท/ทุน 1,000" + (kj2SI < Math.min(acc2SI, KJ_MAX_TOTAL) ? " · ลดลงเพราะรวม ฆจ.1+ฆจ.2 ไม่เกิน 2 ล้าน)" : ")")],
+                ["ทุนประกันอุบัติเหตุ", baht(acc2SI)],
+                ["อัตราเบี้ย (ตัวแทน)", `อบ.2 ${ACC2_RATE[occClass]} บาท/ทุน 1,000 · ชั้นอาชีพ ${occClass} · ฆจ.2 ทุน ${baht(kj2SI)} อัตรา 1.35 บาท/ทุน 1,000 (บังคับซื้อคู่)` + (kj2SI < Math.min(acc2SI, KJ_MAX_TOTAL) ? " · ลดลงเพราะรวม ฆจ.1+ฆจ.2 ไม่เกิน 2 ล้าน" : "")],
                 ...ACC_LOSS_ROWS,
                 ["ทุพพลภาพชั่วคราวสิ้นเชิง / บางส่วน", `${baht(acc2SI * 0.006)} / ${baht(acc2SI * 0.002)} ต่อสัปดาห์ (0.6% / 0.2% ของทุน รวมไม่เกิน 52 สัปดาห์)`],
                 ["ทุพพลภาพถาวรสิ้นเชิง (หลังรับชดเชยครบ 52 สัปดาห์)", `${baht(acc2SI * 0.1)} ต่อปี (10% ของทุน ไม่เกิน 10 ปี)`],
                 ["ชดเชยนอนโรงพยาบาล (ผู้ป่วยใน)", `${baht(acc2SI * 0.003)} ต่อสัปดาห์ (0.3% ของทุน ไม่เกิน 20 สัปดาห์)`],
-                ["ฆจ.2 คุ้มครองเพิ่ม", "ถูกฆาตกรรม/ทำร้ายร่างกาย (ไม่ได้ยั่วยุหรือร่วมทะเลาะวิวาท), สงครามกลางเมือง ปฏิวัติ รัฐประหาร กบฏ, จลาจล นัดหยุดงาน"],
+                ["คุ้มครองเพิ่ม (ถูกฆาตกรรม/จลาจล ฯลฯ)", `ทุน ${baht(kj2SI)} · ` +  "ถูกฆาตกรรม/ทำร้ายร่างกาย (ไม่ได้ยั่วยุหรือร่วมทะเลาะวิวาท), สงครามกลางเมือง ปฏิวัติ รัฐประหาร กบฏ, จลาจล นัดหยุดงาน"],
                 ["ระยะเวลาคุ้มครอง", "ถึงอายุ 65 ปี (ชำระเบี้ยถึงอายุ 64 ปี) เบี้ยคงที่ · ขายเฉพาะผู้มีอาชีพ/รายได้ประจำ"],
             ] };
     }
@@ -3643,9 +3698,9 @@ function App() {
                 ["ระยะเวลาชำระเบี้ยที่เลือก", happyciTerm === 20 ? "20 ปี" : "ถึงอายุ 99 ปี"],
                 ["ทุนประกันภัย", baht(happyciSI)],
                 ["เจ็บป่วยด้วยมะเร็งระยะไม่ลุกลาม (ต่อครั้ง)", `รับ ${baht(partialAmt)} (20% ของทุนประกันภัย) — เป็นมะเร็งต่างชนิด/อวัยวะกันเคลมซ้ำได้อีก แต่รวมกันไม่เกิน ${baht(happyciSI)}`],
-                ["เจ็บป่วยด้วยโรคร้ายแรงอื่นๆ หรือมะเร็งระยะลุกลาม", `รับ ${baht(happyciSI)} (100% ของทุนประกันภัย) หักด้วยยอดที่เคยเบิกกรณีมะเร็งระยะไม่ลุกลามไปแล้ว (ถ้ามี) — เมื่อรับผลประโยชน์ครบ ${baht(happyciSI)}แล้ว สัญญาเพิ่มเติมนี้สิ้นผลบังคับทันที`],
-                ["ครบกำหนดสัญญา (อายุ 99 ปี หากยังไม่เคยเบิกครบ 100%)", `รับคืน ${baht(happyciSI)} หรือเบี้ยที่ชำระแล้วสะสม หรือมูลค่าเวนคืนกรมธรรม์ แล้วแต่จำนวนใดมากกว่า หักด้วยผลประโยชน์โรคร้ายแรงที่เคยได้รับไปแล้ว (ถ้ามี)`],
-                ["เสียชีวิต (กรณีทั่วไป ไม่เกี่ยวกับโรคร้ายแรง)", "รับมูลค่าเวนคืนกรมธรรม์ของสัญญาเพิ่มเติมนี้ (ถ้ามี)"],
+                ["เจ็บป่วยด้วยโรคร้ายแรงอื่นๆ หรือมะเร็งระยะลุกลาม", `รับ ${baht(happyciSI)} (100% ของทุน) หรือเบี้ยที่ชำระสะสม แล้วแต่จำนวนใดมากกว่า หักยอดที่เคยรับกรณีมะเร็งระยะไม่ลุกลามไปแล้ว (ถ้ามี) — รับครบแล้วความคุ้มครองนี้สิ้นสุด`],
+                ["ครบกำหนดสัญญา (อายุ 99 ปี)", `รับ ${baht(happyciSI)} หรือเบี้ยที่ชำระแล้วสะสม แล้วแต่จำนวนใดมากกว่า หักผลประโยชน์โรคร้ายแรงที่เคยรับไปแล้ว (ถ้ามี)`],
+                ["เสียชีวิต", "รับมูลค่าเวนคืนกรมธรรม์ (ถ้ามี)"],
                 ["เสียชีวิตระหว่างบริษัทกำลังพิจารณาจ่ายเคลมโรคร้ายแรง", `รับผลประโยชน์โรคร้ายแรงที่กำลังพิจารณาแทน สูงสุด ${baht(happyciSI)} ให้แก่ผู้รับประโยชน์`],
                 ["ระยะเวลาคุ้มครอง", "รับประกันตั้งแต่อายุแรกเกิด (0 ปี) ถึง 75 ปี คุ้มครองถึงอายุ 99 ปี"],
             ] };
@@ -3673,6 +3728,7 @@ function App() {
                 ["ระยะเวลาจ่ายเงินชดเชย", llcVariant === "10"
                         ? "จ่ายต่อเนื่อง 10 ปี หรือไม่เกินจนถึงอายุ 99 ปี แล้วแต่อย่างใดจะถึงก่อน"
                         : "จ่ายต่อเนื่องทุกปีจนถึงอายุ 99 ปี ตราบเท่าที่ยังมีชีวิตอยู่ (ไม่จำกัดจำนวนปี)"],
+                TPD_DEF_LINE,
                 ["รวมเงินชดเชยสูงสุดที่อาจได้รับตลอดสัญญา", llcVariant === "10"
                         ? baht(annualPayout * 10) + " (กรณีมีชีวิตอยู่ครบ 10 ปีหลังเริ่มรับเงินชดเชย)"
                         : "ไม่จำกัดตายตัว ขึ้นอยู่กับอายุขัย (จ่ายต่อเนื่องจนถึงอายุ 99 ปี)"],
@@ -3690,6 +3746,7 @@ function App() {
         return { ok: true, premium, benefits: [
                 ["ทุนประกันภัย", baht(ssSI)],
                 ["ช่วงที่ 1: ภายใน 90 วันแรกนับจากวันเริ่มสัญญา", "คุ้มครองเฉพาะกรณีเสียชีวิตด้วยสาเหตุใดๆ ยกเว้นเสียชีวิตจากโรคร้ายแรง 17 โรค — จ่าย 100% ของทุนประกันภัยให้ผู้รับประโยชน์ (ยังไม่คุ้มครองกรณีเจ็บป่วยด้วยโรคร้ายแรงในช่วงนี้)"],
+                ["17 โรคร้ายแรงที่คุ้มครอง", "กล้ามเนื้อหัวใจตายเฉียบพลัน, ผ่าตัดเส้นเลือดเลี้ยงหัวใจ, หลอดเลือดสมองแตกหรืออุดตัน, มะเร็ง, ไตวายเรื้อรัง, ปลอกประสาทอักเสบ (MS), ผ่าตัดลิ้นหัวใจ, ผ่าตัดเปลี่ยนอวัยวะหรือปลูกถ่ายไขกระดูก, อัมพาตแขนหรือขา, กล้ามเนื้อเสื่อม, ผ่าตัดเส้นเลือดแดงใหญ่เอออร์ตา, ไวรัสตับอักเสบขั้นรุนแรง, เส้นเลือดหัวใจตีบ, ตาบอด, โคม่า, บาดเจ็บที่ศีรษะอย่างรุนแรง, แผลไหม้ฉกรรจ์"],
                 ["ช่วงที่ 2: หลังพ้น 90 วันนับจากวันเริ่มสัญญา", "คุ้มครอง (ก) เจ็บป่วยด้วยโรคร้ายแรง 1 ใน 17 โรค จ่าย 100% ของทุนประกันภัยให้ผู้เอาประกันภัย หรือ (ข) เสียชีวิตด้วยสาเหตุใดๆ จ่าย 100% ของทุนประกันภัยให้ผู้รับประโยชน์ — จ่ายเพียงกรณีใดกรณีหนึ่งเท่านั้น แล้วสัญญาสิ้นผลบังคับทันที"],
                 ["ระยะเวลาคุ้มครอง", "รับประกันตั้งแต่อายุ 15 ถึง 55 ปี ต่ออายุความคุ้มครองต่อเนื่องได้ถึงอายุ 65 ปี"],
             ] };
@@ -3779,7 +3836,7 @@ function App() {
         const deathAfterPensionNote = "รับเงินเท่ากับเบี้ยประกันชีวิตที่ชำระสะสมจริง หักด้วยเงินบำนาญที่ได้รับไปแล้วทั้งหมด (ไม่รวมเงินบำนาญเพิ่มพิเศษจากเงินปันผล) ให้แก่ผู้รับประโยชน์ — หากเงินบำนาญที่ได้รับไปแล้วมากกว่าเบี้ยที่ชำระสะสม จะไม่มีเงินคืนเพิ่มเติม และกรมธรรม์สิ้นผลบังคับทันที";
         return { ok: true, premium: row.premium, benefits: [
                 ["งวดชำระเบี้ยที่เลือกใช้คำนวณรวม", row.label],
-                ["บำนาญรายปีที่จะได้รับ (อายุครบ 60 ถึงก่อน 99 ปี)", baht(Math.round(row.pension)) + " ต่อปี"],
+                ["บำนาญรายปีที่จะได้รับ (อายุครบ 60-99 ปี)", baht(Math.round(row.pension)) + " ต่อปี"],
                 ["รวมบำนาญที่จะได้รับตลอดโครงการ (40 ปี)", baht(Math.round(row.totalPensionPaid))],
                 ["หากเสียชีวิตก่อนอายุ 60 ปี", "รับเงินคืนสูงสุดระหว่าง 110% ของเบี้ยที่ชำระสะสม หรือมูลค่าเวนคืนกรมธรรม์ แล้วแต่จำนวนใดมากกว่า"],
                 ["หากเสียชีวิตระหว่างรับบำนาญ (อายุ 60-98 ปี)", deathAfterPensionNote],
@@ -3808,6 +3865,7 @@ function App() {
                 ["เสียชีวิต ปีกรมธรรม์ที่ 1-5", [1, 2, 3, 4, 5].map((k) => `ปี ${k}: ${baht(si * k)} (${k * 100}%)`).join(" · ") + " — หรือ 105% ของเบี้ยสะสม แล้วแต่อย่างใดมากกว่า"],
                 ["เสียชีวิต ปีกรมธรรม์ที่ 6 เป็นต้นไป", `เพิ่มปีละ 10% ของทุน (${baht(Math.round(si * 0.1))}) จาก 500% (${baht(si * 5)}) จนถึง 700% (${baht(si * 7)}) แล้วคงที่ถึงอายุ 99 ปี`],
                 ["ครบกำหนดสัญญา (อายุ 99 ปี)", `${baht(si * 7)} (700% ของทุน) หรือเบี้ยสะสมตามจริง แล้วแต่อย่างใดมากกว่า`],
+                ...tpWaiverLines(happysavingTerm),
                 ["เงินปันผล", "ไม่รับประกัน ขึ้นอยู่กับผลตอบแทนการลงทุนของบริษัทในแต่ละปี"],
             ] };
     }
@@ -3852,6 +3910,7 @@ function App() {
                 ["ทุนประกันภัย", baht(hrp9920SI)],
                 ["เสียชีวิต", baht(hrp9920SI) + " หรือเบี้ยที่ชำระแล้วสะสม แล้วแต่จำนวนใดมากกว่า"],
                 ["ครบกำหนดสัญญา (อายุ 99 ปี)", baht(hrp9920SI) + " หรือเบี้ยประกันชีวิตสะสมตามจริง แล้วแต่จำนวนใดมากกว่า"],
+                ...tpWaiverLines(20),
             ] };
     }
     function calcHRPDIV() {
@@ -3873,6 +3932,7 @@ function App() {
                 ["ทุนประกันภัย", baht(hrpdivSI)],
                 ["เสียชีวิต", baht(hrpdivSI) + " หรือเบี้ยที่ชำระแล้วสะสม แล้วแต่จำนวนใดมากกว่า"],
                 ["ครบกำหนดสัญญา (อายุ 99 ปี)", baht(hrpdivSI) + " หรือเบี้ยประกันชีวิตสะสมตามจริง แล้วแต่จำนวนใดมากกว่า"],
+                ...tpWaiverLines(hrpdivTerm),
                 ["เงินปันผล", "ไม่รับประกัน ขึ้นอยู่กับผลตอบแทนการลงทุนของบริษัทในแต่ละปี"],
             ] };
     }
@@ -3930,6 +3990,8 @@ function App() {
                 ["เงินคืนรายปี", baht(Math.round(happykidSI * 0.01)) + " ต่อปี (1% ของทุนประกันภัย) ทุกปีกรมธรรม์ ถึงอายุครบ 98 ปี"],
                 ["เงินคืนพิเศษ ปีกรมธรรม์ที่ 21", baht(Math.round(happykidSI * 0.2)) + " (20% ของทุนประกันภัย)"],
                 ["ครบกำหนดสัญญา (อายุ 99 ปี)", baht(Math.round(happykidSI * 2.2)) + " (220% ของทุนประกันภัย)"],
+                ["เงื่อนไขกรณีเสียชีวิต", "จ่ายตามข้างต้น หรือเบี้ยที่ชำระสะสม หักเงินคืนที่รับไปแล้ว แล้วแต่จำนวนใดมากกว่า"],
+                ["คุ้มครองผู้ชำระเบี้ย (แถมฟรี)", `ถ้าผู้ชำระเบี้ย (พ่อแม่/ผู้ปกครอง) เสียชีวิตหรือทุพพลภาพถาวรสิ้นเชิง รับ ${baht(Math.round(happykidSI * 0.5))} (50% ของทุน) และไม่ต้องจ่ายเบี้ยที่เหลือ`],
                 ["สัญญาเพิ่มเติม", "แถมฟรี เพเยอร์ โพรเทค (ทุพพลภาพผู้ชำระเบี้ย) · ต้องซื้อ คช. (คุ้มครองการชำระเบี้ย) เพิ่ม"],
             ] };
     }
@@ -4069,7 +4131,7 @@ function App() {
                 ["เสียชีวิต ปีกรมธรรม์ที่ 3", baht(si * 3) + " (300% ของทุนประกันภัย)"],
                 ["เสียชีวิต ปีกรมธรรม์ที่ 4-10", baht(si * 4) + " (400% ของทุนประกันภัย)"],
                 ["หมายเหตุกรณีเสียชีวิต", "จ่ายตาม % ข้างต้น หรือเบี้ยประกันชีวิตสะสม แล้วแต่อย่างใดมากกว่า"],
-                ["เสียชีวิตจากอุบัติเหตุ (เพิ่มเติมจากข้างต้น)", "+100% ของทุนประกันภัย สูงสุดไม่เกิน 10,000,000 บาท (ผ่านสัญญาเพิ่มเติม บีแอลเอ อดีบี ที่แถมมาให้)"],
+                ["เสียชีวิตจากอุบัติเหตุ (แถมฟรี)", `รับเพิ่มอีก ${baht(Math.min(si, 10000000))} จากข้างต้น เมื่อเสียชีวิตภายใน 180 วันหลังเกิดอุบัติเหตุ · ไม่คุ้มครองขณะขับขี่หรือโดยสารรถจักรยานยนต์`],
                 ["เงินคืน 4% ของทุน ทุกปี (การันตี)", `${baht(Math.round(si * 0.04))}/ปี ปีกรมธรรม์ที่ 1-9 · รวม 9 ครั้ง = ${baht(Math.round(si * 0.04) * 9)}`],
                 ["ครบกำหนดสัญญา (ปีกรมธรรม์ที่ 10)", baht(Math.round(si * 4.24)) + " (284% เงินคืนครบกำหนด + 140% เงินคืนพิเศษ = 424%)"],
                 ["ผลประโยชน์รวมตลอดสัญญา (การันตี)", baht(Math.round(si * 4.6)) + " (460% ของทุนประกันภัย หากมีชีวิตอยู่ครบสัญญา)"],
@@ -4095,29 +4157,39 @@ function App() {
                 ["เสียชีวิต ปีกรมธรรม์ที่ 5", baht(si * 5) + " (500% ของทุนประกันภัย)"],
                 ["เสียชีวิต ปีกรมธรรม์ที่ 6-12", baht(si * 6) + " (600% ของทุนประกันภัย)"],
                 ["หมายเหตุกรณีเสียชีวิต", "จ่ายตาม % ข้างต้น หรือเบี้ยประกันชีวิตสะสม แล้วแต่อย่างใดมากกว่า"],
-                ["เสียชีวิตจากอุบัติเหตุ (เพิ่มเติมจากข้างต้น)", "+300% ของทุนประกันภัย สูงสุดไม่เกิน 6,000,000 บาท (ผ่านสัญญาเพิ่มเติม บีแอลเอ อดีบี ที่แถมมาให้)"],
+                ["เสียชีวิตจากอุบัติเหตุ (แถมฟรี)", `รับเพิ่มอีก ${baht(Math.min(si * 3, 6000000))} จากข้างต้น เมื่อเสียชีวิตภายใน 180 วันหลังเกิดอุบัติเหตุ · ไม่คุ้มครองขณะขับขี่หรือโดยสารรถจักรยานยนต์`],
                 ["เงินคืน 6% ของทุน ทุกปี (การันตี)", `${baht(Math.round(si * 0.06))}/ปี ปีกรมธรรม์ที่ 1-11 · รวม 11 ครั้ง = ${baht(Math.round(si * 0.06) * 11)}`],
                 ["ครบกำหนดสัญญา (ปีกรมธรรม์ที่ 12)", baht(Math.round(si * 6.2)) + " (440% เงินคืนครบกำหนด + 180% เงินคืนพิเศษ = 620%)"],
                 ["ผลประโยชน์รวมตลอดสัญญา (การันตี)", baht(Math.round(si * 6.86)) + " (686% ของทุนประกันภัย หากมีชีวิตอยู่ครบสัญญา)"],
             ] };
     }
     // ตารางอ้างอิงสำหรับแบบสะสมทรัพย์ชุดใหม่ 8 แบบ (HS208...TAXSAVER105) ใช้เครื่องยนต์คำนวณกลางร่วมกัน ลดความเสี่ยงพิมพ์ผิด
+    // แถมฟรี ทพ. (ยกเว้นเบี้ยกรณีทุพพลภาพสิ้นเชิงถาวร): รับเฉพาะอายุ 15-55 ปี คุ้มครองตามระยะชำระเบี้ย ไม่เกินอายุ 60 ปี
+    const tpWaiverLines = (payYears) => (age < 15 || age > 55) ? [] : [["ทุพพลภาพถาวรสิ้นเชิง: ไม่ต้องจ่ายเบี้ยที่เหลือ (แถมฟรี)", `กรมธรรม์ยังคุ้มครองและได้ผลประโยชน์ครบตามเดิม · คุ้มครองระหว่างชำระเบี้ย ถึงอายุ ${Math.min(age + payYears, 60)} ปี`]];
+    // คำนิยามตามคู่มือ (ใช้เฉพาะแบบที่คู่มือเขียนคำนิยามนี้ไว้)
+    const TPD_DEF_LINE = ["ทุพพลภาพถาวรสิ้นเชิง หมายถึง", "ทำกิจวัตรประจำวันด้วยตนเองไม่ได้ตั้งแต่ 3 อย่างขึ้นไป และทำงานหรือประกอบอาชีพใดๆ หาเงินไม่ได้ ต่อเนื่องอย่างน้อย 180 วัน หรือสูญเสียสายตา 2 ข้าง / มือ 2 ข้าง / เท้า 2 ข้าง / มือ 1 ข้างกับเท้า 1 ข้าง / สายตา 1 ข้างกับมือหรือเท้า 1 ข้าง"];
+    // เงินจ่ายล่วงหน้ากรณีเจ็บป่วยระยะสุดท้าย (เซฟวิ่ง 168 / เซฟวิ่ง แอนด์ แคร์ 168 — มีคำนิยามในเอกสารแนบท้าย 1)
+    const TERMINAL_LINE = ["เจ็บป่วยระยะสุดท้าย", "รับเงินเท่ากรณีเสียชีวิตล่วงหน้า (ตามตารางเสียชีวิตข้างต้น) แล้วกรมธรรม์สิ้นสุด"];
+    const TERMINAL_DEF_LINE = ["เจ็บป่วยระยะสุดท้าย หมายถึง", "ป่วยหรือบาดเจ็บรุนแรงจนรักษาไม่หาย แพทย์ไม่มีแผนรักษาให้หายอีก รักษาได้เพียงประคับประคอง และแพทย์ผู้เชี่ยวชาญประเมินว่าจะเสียชีวิตภายใน 12 เดือน"];
     const SAVINGS_DEFS = {
         HS208: { minAge: HS208_MIN_AGE, maxAge: HS208_MAX_AGE, minSI: HS208_MIN_SI, payYears: HS208_PAY_YEARS, schedule: HS208_SCHEDULE, rate: () => HS208_RATE, discount: () => 0, name: "บีแอลเอ แฮปปี้เซฟวิ่ง 208" },
         HS126: { deathMaxPremium: true, minAge: HS126_MIN_AGE, maxAge: HS126_MAX_AGE, minSI: HS126_MIN_SI, payYears: HS126_PAY_YEARS, schedule: HS126_SCHEDULE, rate: () => HS126_RATE, discount: (si) => hs126Discount(si), name: "บีแอลเอ แฮปปี้เซฟวิ่ง 126" },
         HS157: { minAge: HS157_MIN_AGE, maxAge: HS157_MAX_AGE, minSI: HS157_MIN_SI, payYears: HS157_PAY_YEARS, schedule: HS157_SCHEDULE, rate: () => HS157_RATE, discount: (si, a) => hs157Discount(si, a), name: "แฮปปี้เซฟวิ่ง 15/7" },
         HS147: { deathMaxPremium: true, minAge: HS147_MIN_AGE, maxAge: HS147_MAX_AGE, minSI: HS147_MIN_SI, payYears: HS147_PAY_YEARS, schedule: HS147_SCHEDULE, rate: (a) => hs147Rate(a), discount: (si) => hs147Discount(si), name: "บีแอลเอ แฮปปี้เซฟวิ่ง 14/7 (มีเงินปันผล)" },
         HS168: { deathMaxPremium: true, minAge: HS168_MIN_AGE, maxAge: HS168_MAX_AGE, minSI: HS168_MIN_SI, payYears: HS168_PAY_YEARS, schedule: HS168_SCHEDULE, rate: () => HS168_RATE, discount: () => 0, name: "บีแอลเอ แฮปปี้เซฟวิ่ง 16/8 (มีเงินปันผล)" },
-        HS1810: { deathMaxPremium: true, minAge: HS1810_MIN_AGE, maxAge: HS1810_MAX_AGE, minSI: HS1810_MIN_SI, payYears: HS1810_PAY_YEARS, schedule: HS1810_SCHEDULE, rate: (a, g) => (g === "female" ? HS1810_FEMALE : HS1810_MALE)[a], discount: (si) => hs1810Discount(si), name: "บีแอลเอ แฮปปี้เซฟวิ่ง 18/10 (มีเงินปันผล)" },
-        HS2515: { minAge: HS2515_MIN_AGE, maxAge: HS2515_MAX_AGE, minSI: HS2515_MIN_SI, payYears: HS2515_PAY_YEARS, schedule: HS2515_SCHEDULE, rate: () => HS2515_RATE, discount: () => 0, name: "บีแอลเอ แฮปปี้เซฟวิ่ง 2515 (มีเงินปันผล)" },
+        HS1810: { deathMaxPremium: true, minAge: HS1810_MIN_AGE, maxAge: HS1810_MAX_AGE, minSI: HS1810_MIN_SI, payYears: HS1810_PAY_YEARS, schedule: HS1810_SCHEDULE, rate: (a, g) => (g === "female" ? HS1810_FEMALE : HS1810_MALE)[a], discount: (si) => hs1810Discount(si), name: "บีแอลเอ แฮปปี้เซฟวิ่ง 18/10 (มีเงินปันผล)",
+            extraLines: () => tpWaiverLines(HS1810_PAY_YEARS) },
+        HS2515: { minAge: HS2515_MIN_AGE, maxAge: HS2515_MAX_AGE, minSI: HS2515_MIN_SI, payYears: HS2515_PAY_YEARS, schedule: HS2515_SCHEDULE, rate: () => HS2515_RATE, discount: () => 0, name: "บีแอลเอ แฮปปี้เซฟวิ่ง 2515 (มีเงินปันผล)",
+            extraLines: (si) => [["เสียชีวิตจากอุบัติเหตุ (แถมฟรี)", `รับเพิ่มอีก ${baht(si)} (เท่าทุนประกัน) เมื่อเสียชีวิตภายใน 180 วันหลังเกิดอุบัติเหตุ · ไม่คุ้มครองขณะขับขี่หรือโดยสารรถจักรยานยนต์`], ...tpWaiverLines(HS2515_PAY_YEARS)] },
         TAXSAVER105: { minAge: TAXSAVER105_MIN_AGE, maxAge: TAXSAVER105_MAX_AGE, minSI: TAXSAVER105_MIN_SI, payYears: TAXSAVER105_PAY_YEARS, schedule: TAXSAVER105_SCHEDULE, rate: (a) => taxsaver105Rate(a), discount: (si, a) => taxsaver105Discount(si, a), name: "แท็กซ์ เซฟเวอร์ 10/5 (มีเงินปันผล)" },
-        BLASAVE168: { minAge: BLASAVE168_MIN_AGE, maxAge: BLASAVE168_MAX_AGE, minSI: BLASAVE168_MIN_SI, payYears: BLASAVE168_PAY_YEARS, schedule: BLASAVE168_SCHEDULE, rate: () => BLASAVE168_RATE, discount: (si, a) => blasave168Discount(si, a), name: "บีแอลเอ เซฟวิ่ง 168" },
+        BLASAVE168: { minAge: BLASAVE168_MIN_AGE, maxAge: BLASAVE168_MAX_AGE, minSI: BLASAVE168_MIN_SI, payYears: BLASAVE168_PAY_YEARS, schedule: BLASAVE168_SCHEDULE, rate: () => BLASAVE168_RATE, discount: (si, a) => blasave168Discount(si, a), name: "บีแอลเอ เซฟวิ่ง 168",
+            extraLines: () => [TERMINAL_LINE, TERMINAL_DEF_LINE] },
         HS999: { deathMaxPremium: true, minAge: HS999_MIN_AGE, maxAge: HS999_MAX_AGE, minSI: HS999_MIN_SI, payYears: HS999_PAY_YEARS, get schedule() { return hs999Schedule(age, getEffectiveSI("HS999")); }, scheduleFor: (si) => hs999Schedule(age, si), rate: (a) => hs999Rate(a), discount: () => 0, name: "แฮปปี้เซฟวิ่ง 999",
             extraLines: (si) => [["แผนที่ได้ (ตามทุน)", hs999PlanName(si) + (si >= HS999_PLAN_B_SI ? " (ทุน 300,000 บาทขึ้นไป) · เงินคืนพิเศษ 59% ทุก 9 ปี" : " (ทุน 100,000-299,999 บาท) · เงินคืนพิเศษ 39% ทุก 9 ปี")],
                 ["แถมฟรี: เอดีบี 999", `เสียชีวิตจากอุบัติเหตุ รับเพิ่ม 100%-900% ของทุนเอดีบี (ปีกรมธรรม์ที่ 1-9) และ 990% ตั้งแต่ปีที่ 10 · ทุนเอดีบี ${baht(Math.min(si, 10000000))}${si > 10000000 ? " (สูงสุด 10 ล้านบาท รวมทุกฉบับ)" : ""} · ไม่คุ้มครองขณะขับขี่/โดยสารรถจักรยานยนต์`],
                 ["หมายเหตุ", "ถ้าเวนคืนกรมธรรม์ จะไม่ได้เงินคืนพิเศษ (0.5% รายปี, 39%/59% ทุก 9 ปี และ 295% ณ ครบกำหนด)"]] },
         PUNSUK: { deathMaxPremium: true, minAge: PUNSUK_MIN_AGE, maxAge: PUNSUK_MAX_AGE, minSI: PUNSUK_MIN_SI, payYears: PUNSUK_PAY_YEARS, get schedule() { return punsukSchedule(age); }, scheduleFor: () => punsukSchedule(age), rate: (a, g) => (g === "female" ? PUNSUK_FEMALE : PUNSUK_MALE)[a], discount: () => 0, name: "บีแอลเอ ปันสุข 80/20",
-            extraLines: (si) => [["แถมฟรี: ทพ.", "ทุพพลภาพสิ้นเชิงถาวร ยกเว้นการชำระเบี้ยสัญญาประกันชีวิต"]] },
+            extraLines: () => tpWaiverLines(PUNSUK_PAY_YEARS) },
         SAVECARE168: { minAge: SAVECARE168_MIN_AGE, maxAge: SAVECARE168_MAX_AGE, minSI: SAVECARE168_MIN_SI, maxSI: SAVECARE168_MAX_SI, payYears: SAVECARE168_PAY_YEARS, schedule: SAVECARE168_SCHEDULE, rate: () => SAVECARE168_RATE, discount: (si) => savecare168Discount(si), name: "บีแอลเอ เซฟวิ่ง แอนด์ แคร์ 168", ciPct: SAVECARE168_CI_PCT, ciYears: SAVECARE168_CI_YEARS },
     };
     const mainSI = selectedMainId ? mainSIOf(selectedMainId) : 0; // ต้องอยู่หลัง SAVINGS_DEFS (ใช้ย้อนคำนวณทุนจากเบี้ย)
@@ -4169,7 +4241,8 @@ function App() {
                 ...(def.extraLines ? def.extraLines(si) : []),
                 ...(def.ciPct ? [
                     ["แถมฟรี: คุ้มครอง 8 โรคร้ายแรง", baht(Math.round(si * def.ciPct / 100)) + ` ต่อปี (${def.ciPct}% ของทุน) จ่ายทุกปีหลังตรวจพบครั้งแรก ตราบที่มีชีวิต ไม่เกินปีกรมธรรม์ที่ ${def.ciYears} (ถึงอายุ ${age + def.ciYears} ปี) · รอคอย 90 วัน · จ่ายได้ 1 โรคตลอดสัญญา`],
-                    ["เจ็บป่วยระยะสุดท้าย", "เร่งจ่ายผลประโยชน์กรณีเสียชีวิตล่วงหน้า แล้วกรมธรรม์สิ้นผลบังคับ"],
+                    TERMINAL_LINE,
+                    TERMINAL_DEF_LINE,
                 ] : []),
             ] };
     }
@@ -4625,7 +4698,7 @@ function App() {
             const cf = new Array(totalYears + 1).fill(0);
             rows.forEach((r) => { if (r.premium > 0)
                 cf[r.year - 1] -= r.premium; cf[r.year] += r.cashBaht; });
-            results.push({ id: "HAPPYSAVING", name: "แฮปปี้เซฟวิ่ง (มีเงินปันผล, เบี้ย 5 ปี)", premium: yearlyPremium, payYears: term, totalYears, irr: calcIRR(cf) });
+            results.push({ id: "HAPPYSAVING", name: "บีแอลเอ แฮปปี้เซฟวิ่ง 99/5 (มีเงินปันผล)", premium: yearlyPremium, payYears: term, totalYears, irr: calcIRR(cf) });
         }
         Object.keys(SAVINGS_DEFS).forEach((id) => {
             const def = SAVINGS_DEFS[id];
@@ -4752,13 +4825,13 @@ function App() {
             ];
             case "UNJAI": return [
                 { icon: "❤️", value: baht(UNJAI_LIFE_SI), label: "เสียชีวิตทุกกรณี" },
-                { icon: "🎗️", value: baht(unjaiPlan), label: "โรคร้ายแรง 11 โรค (อีซี แคร์)" },
+                { icon: "🎗️", value: baht(unjaiPlan), label: "โรคร้ายแรง 11 โรค" },
             ];
             case "CANCERMAX": {
                 const plan = CANCERMAX_PLANS.find((p) => p.key === cancermaxPlan);
                 return [
                     { icon: "❤️", value: plan ? baht(plan.life) : "-", label: "เสียชีวิตทุกกรณี" },
-                    { icon: "🎗️", value: plan ? baht(plan.first) : "-", label: "ตรวจพบมะเร็งครั้งแรก (เฟิสต์ แคนเซอร์)" },
+                    { icon: "🎗️", value: plan ? baht(plan.first) : "-", label: "ตรวจพบมะเร็งระยะลุกลาม" },
                 ];
             }
             case "PLUS2": return [
@@ -5030,10 +5103,10 @@ function App() {
                 continue;
             const r = CALC[p.id]();
             if (!r.ok) {
-                errs.push({ product: p.name, msg: r.msg });
+                errs.push({ product: nameFor(p), msg: r.msg });
                 continue;
             }
-            cards.push({ id: p.id, name: p.name, tag: p.tag, isMain: !!p.isMain, renewalNote: p.renewalNote, premium: r.premium, benefits: finalizeBenefits(p.id, r.benefits, r.premium), highlights: highlightsFor(p.id), category: CATEGORY[p.id] });
+            cards.push({ id: p.id, name: nameFor(p), tag: p.tag, isMain: !!p.isMain, renewalNote: p.renewalNote, premium: r.premium, benefits: finalizeBenefits(p.id, r.benefits, r.premium), highlights: highlightsFor(p.id), category: CATEGORY[p.id] });
         }
         if (csRequired && !selected.CS)
             errs.push({ product: "คช. คุ้มครองการชำระเบี้ย", msg: `แบบ ${(PRODUCTS.find((x) => x.id === csRequiredMainId) || {}).name} กำหนดให้ผู้เยาว์ต้องซื้อ คช. ด้วย` });
@@ -5213,7 +5286,7 @@ function App() {
                             ")")))),
                 PRODUCTS.some((p) => selected[p.id] && openProductCards[p.id]) && (React.createElement("section", { className: "space-y-3" },
                     React.createElement("h2", { className: "text-[24px] font-bold px-1", style: { color: BRAND.mainBlue } }, "\uD83D\uDCDD \u0E01\u0E23\u0E2D\u0E01\u0E02\u0E49\u0E2D\u0E21\u0E39\u0E25\u0E41\u0E1A\u0E1A\u0E1B\u0E23\u0E30\u0E01\u0E31\u0E19\u0E17\u0E35\u0E48\u0E40\u0E25\u0E37\u0E2D\u0E01"),
-                    PRODUCTS_DISPLAY.filter((p) => selected[p.id] && openProductCards[p.id]).map((p) => (React.createElement(ProductRow, { key: p.id, product: p, checked: selected[p.id], onToggle: () => toggle(p.id), age: age, live: liveResults[p.id], pending: PRIMARY_FIELD_ZERO[p.id], disabled: productDisabled(p), recommended: recommendedProductIds.has(p.id), recommendedReason: autoMainReason[p.id] ? `companion-${autoMainReason[p.id]}` : undefined, expanded: true, onToggleExpand: () => toggleProductCard(p.id), onShowSchedule: () => setScheduleModal({ name: p.name, rows: buildPremiumSchedule(p.id) }) }, renderProductChildren(p)))))),
+                    PRODUCTS_DISPLAY.filter((p) => selected[p.id] && openProductCards[p.id]).map((p) => (React.createElement(ProductRow, { key: p.id, product: p, checked: selected[p.id], onToggle: () => toggle(p.id), age: age, live: liveResults[p.id], pending: PRIMARY_FIELD_ZERO[p.id], disabled: productDisabled(p), recommended: recommendedProductIds.has(p.id), recommendedReason: autoMainReason[p.id] ? `companion-${autoMainReason[p.id]}` : undefined, expanded: true, onToggleExpand: () => toggleProductCard(p.id), onShowSchedule: () => setScheduleModal({ name: nameFor(p), rows: buildPremiumSchedule(p.id) }) }, renderProductChildren(p)))))),
                 React.createElement("button", { onClick: handleCalculate, className: "w-full rounded-2xl py-4 font-semibold text-white text-[27px] flex items-center justify-center gap-2 transition active:scale-[0.99]", style: { background: `linear-gradient(120deg, ${BRAND.skyDeep}, ${BRAND.navy})`, boxShadow: "0 8px 20px rgba(11,42,85,0.25)" } },
                     React.createElement("span", { style: { fontSize: 22 } }, "🧮"),
                     " \u0E04\u0E33\u0E19\u0E27\u0E13\u0E40\u0E1A\u0E35\u0E49\u0E22\u0E1B\u0E23\u0E30\u0E01\u0E31\u0E19\u0E41\u0E25\u0E30\u0E04\u0E27\u0E32\u0E21\u0E04\u0E38\u0E49\u0E21\u0E04\u0E23\u0E2D\u0E07"),
