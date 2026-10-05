@@ -8,7 +8,7 @@ const BRAND = {
     ink: "#000000", sub: "#404040", danger: "#B93232", warn: "#6B4508",
     label: "#000000", nameBlue: "#1668D6", mainBlue: "#0C2F63", dataBlack: "#000000",
 };
-const APP_VERSION = "v2.34.0 (2569-10-05)";
+const APP_VERSION = "v2.36.0 (2569-10-05)";
 const RATE_SOURCE = "อัตราเบี้ยตามคู่มือตัวแทน V.14 (14-02-2026) · ค่าคอม 10-09-2026";
 const CASES_KEY = "blacal-cases-v1"; // อัปเดตเลขนี้ทุกครั้งที่มีการแก้ไข/เพิ่มแบบประกันใหม่ เพื่อให้รู้ว่าไฟล์ที่ใช้อยู่เป็นเวอร์ชันล่าสุดหรือไม่
 const fmt = (n) => (n === null || n === undefined || isNaN(n) ? "0" : Math.round(n).toLocaleString("th-TH"));
@@ -145,7 +145,8 @@ function shareKeyLines(d) {
     lines.push(["🧾", "รวมเบี้ยทั้งหมด", baht(d.totalPremium)]);
     const prot = (d.protectLines || []).slice();
     if (d.ciPerYear > 0 && !prot.some(([k]) => /โรคร้ายแรง/.test(k))) prot.push(["แถมฟรี 8 โรคร้ายแรง", `${baht(d.ciPerYear)}/ปี`]);
-    const protAlive = prot.filter(([k]) => !/เสียชีวิต|ระยะสุดท้าย/.test(k)), protDeath = prot.filter(([k]) => /เสียชีวิต|ระยะสุดท้าย/.test(k));
+    const isDeath = ([k, v]) => /เสียชีวิต|ระยะสุดท้าย/.test(k) || /^เสียชีวิต/.test(v || "");
+    const protAlive = prot.filter((r) => !isDeath(r)), protDeath = prot.filter(isDeath);
     sec(SEC.alive);
     if (d.type === "savings") {
         cashBackLines(d.rows.slice(0, -1).map((r) => ({ pct: r.cashPct, age: r.age + 1 })), d.si).forEach(([k, v]) => lines.push(["💰", k, v]));
@@ -560,13 +561,32 @@ const CUSTOMER_NOTES_RAW = (() => {
     m.SAVECARE168 = CN_LIFE.concat(["ถ้ายกเลิก (เวนคืน) ก่อนครบสัญญา จะไม่ได้เงินจ่ายคืนพิเศษ", CN_FREE_CI]);
     ["HAPPYPENSION", "PENSION888"].forEach((id) => { m[id] = CN_PENSION; });
     m.PENSIONCARE888 = CN_PENSION.concat([CN_FREE_CI]);
+    // โอพีดี สบายใจ / เพรสทีจ (คู่มือ V.14 หน้า 142, 146)
+    ["OPD", "OPDP"].forEach((id) => { m[id] = [
+        "จ่ายตามจริงเฉพาะการรักษาที่จำเป็นทางการแพทย์ ตามค่าบริการอัตราทั่วไป",
+        "ไม่จ่ายซ้ำกับค่ารักษาที่ประกันสุขภาพที่แนบอยู่จ่ายให้แล้ว",
+        "ใช้เงื่อนไขความคุ้มครองและข้อยกเว้นเดียวกับประกันสุขภาพที่แนบอยู่",
+        "ลดหย่อนภาษีได้สูงสุด 25,000 บาท",
+    ]; });
+    // บีแอลเอ ทุพพลภาพ โพรเทค (คู่มือ V.14 หน้า 39)
+    m.TPD = [
+        "จ่ายครั้งเดียวเต็มทุน แล้วสัญญานี้สิ้นสุด (ถ้ามีเงินกู้ค้างกับกรมธรรม์ จะหักก่อนจ่าย)",
+        "ไม่คุ้มครองทุพพลภาพจากโรคหรือการบาดเจ็บที่เป็นมาก่อนทำประกันและยังรักษาไม่หาย เว้นแต่แถลงไว้และบริษัทรับ",
+        "ไม่คุ้มครองการทำร้ายตัวเอง, ขณะเมาสุรา (แอลกอฮอล์ในเลือด 150 มก.% ขึ้นไป) หรือใช้สารเสพติดจนครองสติไม่ได้, สงคราม/จลาจล/ก่อการร้าย, ขณะก่ออาชญากรรมร้ายแรง, การปฏิเสธการรักษาตามคำแนะนำแพทย์ และโรคเอดส์",
+    ];
+    // คุ้มครองการชำระเบี้ย คช. (คู่มือ V.14 หน้า 31)
+    m.CS = [
+        "หลังสิ้นสุดช่วงที่บริษัทชำระเบี้ยแทน ต้องชำระเบี้ยต่อเองจนครบ",
+        "การฆ่าตัวตายภายใน 2 ปี ไม่คุ้มครอง (คืนเบี้ย คช. ที่ชำระแล้ว)",
+        "ไม่คุ้มครองทุพพลภาพจากการทำร้ายตัวเอง, ขณะเมาสุรา (แอลกอฮอล์ในเลือด 150 มก.% ขึ้นไป) หรือใช้สารเสพติดจนครองสติไม่ได้, สงคราม/จลาจล, ขณะก่ออาชญากรรมร้ายแรง, โรคเอดส์ และการเดินทางด้วยอากาศยานที่ไม่ใช่สายการบินพาณิชย์",
+    ];
     ["CHAK", "CHAP"].forEach((id) => { m[id] = ["การฆ่าตัวตายภายใน 1 ปี และการปกปิดข้อมูลสุขภาพ ไม่คุ้มครอง"]; });
     return m;
 })();
 // เรื่องลดหย่อนภาษีคำนวณเป็นตัวเลขจริงในบรรทัด "ลดหย่อนภาษี" ของแต่ละแบบแล้ว จึงตัดข้อความกว้างๆ ออก
-// แบบสะสมทรัพย์: ลูกค้ากำลังจะซื้อ ไม่พูดถึงเรื่องเวนคืน (ทั้งบรรทัดผลประโยชน์และข้อควรรู้)
-const SAVINGS_NO_SURRENDER_IDS = new Set(["PSAVE104", "PSAVE126", "HS208", "HS126", "HS157", "HS147", "HS168", "HS1810", "HS2515", "TAXSAVER105", "HAPPYSAVING", "BLASAVE168", "HS999", "PUNSUK", "SAVECARE168"]);
-const CUSTOMER_NOTES = Object.fromEntries(Object.entries(CUSTOMER_NOTES_RAW).map(([k, v]) => [k, v.filter((n) => !/^ลดหย่อนภาษี/.test(n) && !(SAVINGS_NO_SURRENDER_IDS.has(k) && /เวนคืน/.test(n)))]));
+// ไม่ส่งข้อความเชิงลบเรื่องยกเลิก/เวนคืน (เช่น "ถ้าเวนคืนก่อนครบสัญญาจะไม่ได้...") ถึงลูกค้า — เงื่อนไขกรมธรรม์ที่เป็นประโยชน์ (มูลค่าเวนคืน/กู้ได้) ยังแสดงตามปกติ
+const SURRENDER_PENALTY_RE = /(ถ้า|หาก|กรณี).{0,20}(เวนคืน|ยกเลิก).*(ไม่ได้|หาย|สูญ|ลดลง|ต่ำกว่า|ขาดทุน)/;
+const CUSTOMER_NOTES = Object.fromEntries(Object.entries(CUSTOMER_NOTES_RAW).map(([k, v]) => [k, v.filter((n) => !/^ลดหย่อนภาษี/.test(n) && !SURRENDER_PENALTY_RE.test(n))]));
 // เงื่อนไขการรับประกัน (เรื่องของตัวแทน) — ไม่ส่งถึงลูกค้า
 const UNDERWRITING_RE = /อายุรับประกัน|ทุนขั้นต่ำ|ทุนสูงสุด|ชั้นอาชีพ|ใบคำขอ|ตรวจสุขภาพ|เงื่อนไขการรับประกัน/;
 // ภาษาที่ลูกค้าอ่านเข้าใจ: ใช้ชื่อสถานการณ์ และวงเล็บศัพท์ประกันไว้ท้าย
@@ -591,13 +611,11 @@ function stripPurchase(v) {
     return t.split(" · ").map((x) => x.trim()).filter((x) => x && !PURCHASE_RE.test(x)).join(" · ");
 }
 function customerBenefits(benefits, id) {
-    const noSurrender = SAVINGS_NO_SURRENDER_IDS.has(id);
     return (benefits || []).filter((b) => Array.isArray(b) && b.length >= 2)
         .map(([k, v]) => [String(k), typeof v === "string" || typeof v === "number" ? String(v) : ""])
         .filter(([k]) => !PURCHASE_RE.test(k) || /^ความรับผิดส่วนแรก/.test(k))
         .map(([k, v]) => [k, stripPurchase(v)])
-        .map(([k, v]) => [k, noSurrender ? v.split(" · ").filter((x) => !/เวนคืน/.test(x)).join(" · ").replace(/\s*หรือมูลค่าเวนคืน(?:กรมธรรม์)?/g, "") : v])
-        .filter(([k, v]) => !(noSurrender && /เวนคืน/.test(k)))
+        .map(([k, v]) => [k, v.split(" · ").filter((x) => !SURRENDER_PENALTY_RE.test(x)).join(" · ")])
         .filter(([k, v]) => v !== "" && !AGENT_ONLY_RE.test(k) && !AGENT_ONLY_RE.test(v) && !UNDERWRITING_RE.test(k) && !AGENT_KEY_RE.test(k) && k !== "เงินปันผล")
         // แพ็กเกจ/สัญญาแถม: ลูกค้าเห็นเป็นแผนเดียว ไม่ต้องรู้ว่าสัญญาไหนจ่าย
         .map(([k, v]) => [k.replace(/\s*\((?:ผ่าน)?สัญญา[^)]*\)/g, ""),
@@ -2167,7 +2185,7 @@ function App() {
         const calc = CALC[id] ? CALC[id]() : null;
         const fb = calc && calc.ok ? customerBenefits(finalizeBenefits(id, calc.benefits, calc.premium), id) : [];
         return {
-            protectLines: fb.filter(([k]) => benefitSection(k) === "protect"), knowLines: fb.filter(([k]) => benefitSection(k) === "know"), coverUntil: coverUntilText(id),
+            protectLines: fb.filter(([k]) => /^(alive|death)$/.test(benefitSection(k)) && !/^เงินคืน|^รวมเงินคืน|บำนาญ|^จุดคุ้มทุน/.test(k)), knowLines: fb.filter(([k]) => benefitSection(k) === "know"), coverUntil: coverUntilText(id),
             type: pl.type, rows, breakEvenAge: pl.breakEvenAge, productName: prod ? prod.name : (pl.title || ""),
             customer: customerName.trim(), gender, age, si: mainSIOf(id),
             premium: premiumRows.length ? premiumRows[0].premium : 0, payYears: premiumRows.length,
@@ -3472,7 +3490,8 @@ function App() {
                 ["จำนวนเงินเอาประกันภัย", baht(tpdSI)],
                 ["ทุพพลภาพถาวรสิ้นเชิง", "รับ " + baht(tpdSI) + " (100% ของทุน)"],
                 TPD_DEF_LINE,
-                ["ระยะเวลาคุ้มครอง", "รับประกันตั้งแต่อายุ 15 ถึง 65 ปี และสามารถต่ออายุความคุ้มครองต่อเนื่องได้ถึงอายุ 74 ปี"],
+                ["หากเสียชีวิตก่อนได้รับเงินทุพพลภาพ", "บริษัทจ่ายเงินทุพพลภาพ " + baht(tpdSI) + " ให้ผู้รับประโยชน์หรือทายาท"],
+                ["ระยะเวลาคุ้มครอง", "สัญญาปีต่อปี ต่ออายุได้ต่อเนื่องถึงอายุ 74 ปี (ไม่เกินระยะเวลาของกรมธรรม์หลัก)"],
                 ["เงื่อนไขทุนประกันหลัก", `ซื้อได้ไม่เกิน 10 เท่าของทุนประกันหลัก (สูงสุด ${baht(maxSI)}) และไม่เกิน 30,000,000 บาทรวมทุกกรมธรรม์`],
             ] };
     }
@@ -3615,7 +3634,7 @@ function App() {
                 ["ระยะเวลาคุ้มครองการชำระเบี้ย (คำนวณอัตโนมัติ)", csDuration + " ปี"],
                 ["ที่มาของการคำนวณ", `ค่าต่ำสุดของ: ชำระเบี้ยกรมธรรม์หลัก ${termMain} ปี / 21-อายุผู้เยาว์ = ${termChild} ปี / 65-อายุผู้ปกครอง = ${termPayor} ปี`],
                 ["เบี้ยประกันภัยรวมที่คุ้มครอง", baht(baseSum) + " ต่อปี (รวมทุกแบบที่เลือกไว้)"],
-                ["เงื่อนไข", "หากผู้ชำระเบี้ยเสียชีวิต/ทุพพลภาพถาวรสิ้นเชิง บริษัทชำระเบี้ยแทนจนครบกำหนดระยะเวลาข้างต้น"],
+                ["หากผู้ชำระเบี้ย (ผู้ปกครอง) เสียชีวิต หรือทุพพลภาพโดยสิ้นเชิง", `บริษัทยกเว้นการชำระเบี้ย (ไม่ต้องจ่ายเบี้ย) ของกรมธรรม์นี้ จนผู้ปกครองอายุครบ 65 ปี หรือเด็กอายุครบ 21 ปี หรือสิ้นสุดระยะชำระเบี้ยของกรมธรรม์หลัก แล้วแต่ถึงก่อน (แผนนี้ ${csDuration} ปี)`],
             ] };
     }
     function calcOPD() {
@@ -3655,9 +3674,9 @@ function App() {
             return { ok: false, msg: `วงเงินสูงสุดที่ซื้อได้ตอนนี้คือ ${baht(maxOpd)} ต่อครั้ง (ขึ้นกับค่าห้องของ ${sourceNote})` };
         const premium = OPD_RATES[bi][pi];
         return { ok: true, premium, benefits: [
-                ["ผลประโยชน์ต่อครั้ง", baht(opdPlan) + " (สูงสุด 1 ครั้ง/วัน ไม่เกิน 30 ครั้ง/รอบปีกรมธรรม์)"],
+                ["ผลประโยชน์ต่อครั้ง", "จ่ายตามจริง ไม่เกิน " + baht(opdPlan) + " (สูงสุด 1 ครั้ง/วัน ไม่เกิน 30 ครั้ง/รอบปีกรมธรรม์)"],
                 ["วงเงินสูงสุดที่ซื้อได้ตามสัญญาหลักที่แนบ", baht(maxOpd) + ` (อ้างอิง ${sourceNote})`],
-                ["ความคุ้มครอง", "ค่าปรึกษาแพทย์ ค่าบริการทางการแพทย์ ค่ายา ค่าตรวจวินิจฉัยทางห้องปฏิบัติการและรังสีวิทยา ค่าภาพถ่ายทางการแพทย์ ค่าเครื่องมือและอุปกรณ์การแพทย์"],
+                ["ความคุ้มครอง (ผู้ป่วยนอก)", "ค่าแพทย์ ค่าบริการพยาบาลและโรงพยาบาลกรณีผู้ป่วยนอก ค่ายา ค่าตรวจทางเทคนิคการแพทย์และรังสีวิทยา ค่ากายภาพบำบัด ค่าเครื่องมือและอุปกรณ์การแพทย์"],
                 ["ระยะเวลาคุ้มครอง", "1 ปี ต่ออายุพร้อมสัญญาเพิ่มเติมสุขภาพที่บันทึกสลักหลังนี้แนบอยู่"],
             ] };
     }
@@ -3695,9 +3714,9 @@ function App() {
             return { ok: false, msg: "แนบได้เฉพาะ เพรสทีจ เฮลธ์ ปลดล็อค แผน 20 ล้าน หรือ 30 ล้าน เท่านั้น" };
         const premium = OPDP_RATES[bandIndex(age, OPDP_BANDS)][OPDP_AMOUNTS.indexOf(amt)];
         return { ok: true, premium, benefits: [
-                ["ผลประโยชน์ต่อครั้ง", baht(amt) + " (สูงสุด 1 ครั้ง/วัน ไม่เกิน 30 ครั้ง/รอบปีกรมธรรม์)"],
+                ["ผลประโยชน์ต่อครั้ง", "จ่ายตามจริง ไม่เกิน " + baht(amt) + " (สูงสุด 1 ครั้ง/วัน ไม่เกิน 30 ครั้ง/รอบปีกรมธรรม์)"],
                 ["แนบกับ", `เพรสทีจ เฮลธ์ ปลดล็อค แผน ${baht(phPlan)} (แผน 20 ล้าน = 1,500 / 30 ล้าน = 2,000)`],
-                ["ความคุ้มครอง", "ค่าแพทย์ ค่าบริการพยาบาลและโรงพยาบาลกรณีผู้ป่วยนอก ค่ายา ค่าตรวจทางเทคนิคการแพทย์และรังสีวิทยา ค่ากายภาพบำบัด ค่าเครื่องมือและอุปกรณ์การแพทย์"],
+                ["ความคุ้มครอง (ผู้ป่วยนอก)", "ค่าแพทย์ ค่าบริการพยาบาลและโรงพยาบาลกรณีผู้ป่วยนอก ค่ายา ค่าตรวจทางเทคนิคการแพทย์และรังสีวิทยา ค่ากายภาพบำบัด ค่าเครื่องมือและอุปกรณ์การแพทย์"],
                 ["เงื่อนไขการซื้อ", "ซื้อได้ 1 ฉบับต่อคน · วงเงิน OPD ทุกฉบับรวมกันไม่เกิน 2,000 บาท · ถ้า เพรสทีจ เฮลธ์ มีเบี้ยเพิ่มตามอาชีพ/สุขภาพ ซื้อไม่ได้"],
                 ["ระยะเวลาคุ้มครอง", "1 ปี ต่ออายุพร้อม เพรสทีจ เฮลธ์ ได้ถึงอายุ 98 ปี"],
             ] };
@@ -5493,18 +5512,11 @@ function App() {
                         React.createElement("div", { className: "flex gap-2 mt-2" },
                             !agentInfo.confirmed && (React.createElement("button", { onClick: () => saveAgent(agentInfo), className: "flex-1 rounded-xl py-2 text-[19px] font-medium text-white", style: { background: BRAND.greenDeep } }, "✓ ถูกต้อง")),
                             React.createElement("button", { onClick: () => setAgentDraft(Object.assign({}, agentInfo)), className: "flex-1 rounded-xl py-2 text-[19px] font-medium", style: { background: "#FFFFFF", color: BRAND.navy, border: "1px solid #D7E8F0" } }, "✎ แก้ไข")))),
-                    shareModal.id && shareDraft && (React.createElement("div", { className: "mb-3" },
-                        React.createElement("div", { className: "flex items-center justify-between gap-2 mb-2" },
-                            React.createElement("p", { className: "text-[19px] font-semibold", style: { color: BRAND.navy } }, shareModal.mode === "text" ? "✏️ ตรวจ/แก้ข้อความก่อนส่ง" : "✏️ ตรวจ/แก้บรรทัดสรุปบนรูป (ตารางแก้ไม่ได้)"),
-                            React.createElement("button", { onClick: () => setShareDraft(makeShareDraft()), className: "text-[17px] px-3 py-1 rounded-full shrink-0", style: { background: BRAND.bg, color: BRAND.navy, border: "1px solid #D7E8F0" } }, "↺ คืนค่าเดิม")),
-                        shareModal.mode === "text"
-                            ? React.createElement("textarea", { value: shareDraft.text || "", onChange: (e) => setShareDraft(Object.assign({}, shareDraft, { text: e.target.value, dirty: true })), rows: 14, className: "w-full rounded-xl px-3 py-2 text-[17px]", style: { border: "1px solid #D7E8F0", lineHeight: 1.5, fontFamily: "inherit" } })
-                            : React.createElement(LineEditor, { groups: shareDraft.groups || [], onChange: (g) => setShareDraft(Object.assign({}, shareDraft, { groups: g, dirty: true })) }),
-                        shareModal.mode === "image" && (React.createElement("div", { className: "mt-3" },
+                        shareModal.id && shareModal.mode === "image" && (React.createElement("div", { className: "mb-3" },
                             React.createElement("p", { className: "text-[18px] mb-2 font-semibold", style: { color: BRAND.navy } }, `👀 ตัวอย่างรูปที่จะส่ง${shareLive.length > 1 ? ` (${shareLive.length} รูป)` : ""} · มือถือกดค้างที่รูปเพื่อบันทึก`),
                             shareLive.map((src, i) => (React.createElement("div", { key: i, className: "mb-2" },
                                 React.createElement(ZoomImage, { src, alt: `รูปที่ ${i + 1}`, className: "w-full rounded-lg", style: { border: "1px solid #D7E8F0", WebkitTouchCallout: "default" } }),
-                                React.createElement("a", { href: src, download: `insurance-summary-${i + 1}.png`, className: "block text-center mt-1 rounded-xl py-1.5 text-[17px]", style: { background: BRAND.bg, color: BRAND.navy } }, `⬇️ ดาวน์โหลดรูปที่ ${i + 1}`)))))))),
+                                React.createElement("a", { href: src, download: `insurance-summary-${i + 1}.png`, className: "block text-center mt-1 rounded-xl py-1.5 text-[17px]", style: { background: BRAND.bg, color: BRAND.navy } }, `⬇️ ดาวน์โหลดรูปที่ ${i + 1}`)))))),
                     shareNote && (React.createElement("p", { className: "text-[19px] mb-3", style: { color: BRAND.greenDeep } }, shareNote)),
                     shareModal.id === "QUOTE" && shareModal.mode === "text" && (() => {
                         const q = buildQuoteData();
@@ -5518,6 +5530,13 @@ function App() {
                         React.createElement("p", { className: "text-[18px] mb-2", style: { color: BRAND.sub } }, "ส่งผ่าน LINE OA: คัดลอกหรือบันทึกไว้ก่อน แล้วไปวาง/แนบในแชทลูกค้า"),
                         React.createElement("div", { className: "flex gap-2" },
                             React.createElement("button", { disabled: !agentInfo.confirmed || !!agentDraft, onClick: copyForOA, className: "flex-1 rounded-xl py-2.5 text-[19px] font-medium", style: { background: "#FFFFFF", color: "#06A045", border: "1px solid #06C755", opacity: (!agentInfo.confirmed || agentDraft) ? 0.4 : 1 } }, "📋 คัดลอกข้อความ")))),
+                    shareModal.id && shareDraft && (React.createElement("div", { className: "mt-4 mb-3" },
+                        React.createElement("div", { className: "flex items-center justify-between gap-2 mb-2" },
+                            React.createElement("p", { className: "text-[19px] font-semibold", style: { color: BRAND.navy } }, shareModal.mode === "text" ? "✏️ ตรวจ/แก้ข้อความก่อนส่ง" : "✏️ ตรวจ/แก้บรรทัดสรุปบนรูป (ตารางแก้ไม่ได้)"),
+                            React.createElement("button", { onClick: () => setShareDraft(makeShareDraft()), className: "text-[17px] px-3 py-1 rounded-full shrink-0", style: { background: BRAND.bg, color: BRAND.navy, border: "1px solid #D7E8F0" } }, "↺ คืนค่าเดิม")),
+                        shareModal.mode === "text"
+                            ? React.createElement("textarea", { value: shareDraft.text || "", onChange: (e) => setShareDraft(Object.assign({}, shareDraft, { text: e.target.value, dirty: true })), rows: 14, className: "w-full rounded-xl px-3 py-2 text-[17px]", style: { border: "1px solid #D7E8F0", lineHeight: 1.5, fontFamily: "inherit" } })
+                            : React.createElement(LineEditor, { groups: shareDraft.groups || [], onChange: (g) => setShareDraft(Object.assign({}, shareDraft, { groups: g, dirty: true })) }))),
                     React.createElement("button", { onClick: () => { setShareModal(null); setAgentDraft(null); }, className: "w-full mt-2 rounded-xl py-2.5 text-[20px] font-medium", style: { background: BRAND.bg, color: BRAND.navy } }, "✕ ปิด")))),
             React.createElement("footer", { className: "text-center text-[21px] py-6", style: { color: BRAND.sub } }, "\u0E40\u0E1E\u0E37\u0E48\u0E2D\u0E01\u0E32\u0E23\u0E19\u0E33\u0E40\u0E2A\u0E19\u0E2D\u0E40\u0E1A\u0E37\u0E49\u0E2D\u0E07\u0E15\u0E49\u0E19\u0E40\u0E17\u0E48\u0E32\u0E19\u0E31\u0E49\u0E19 \u0E44\u0E21\u0E48\u0E43\u0E0A\u0E48\u0E40\u0E2D\u0E01\u0E2A\u0E32\u0E23\u0E40\u0E2A\u0E19\u0E2D\u0E02\u0E32\u0E22\u0E2D\u0E22\u0E48\u0E32\u0E07\u0E40\u0E1B\u0E47\u0E19\u0E17\u0E32\u0E07\u0E01\u0E32\u0E23")),
         React.createElement("style", null, `
@@ -6740,29 +6759,28 @@ function ShareModal({ mode, isKids, customer, setCustomer, child, setChild, agen
   };
   const inCls = "w-full mt-1 rounded-xl px-3 py-2.5 text-[24px] bg-white border border-sky-200 outline-none focus:border-blue-700";
   const btnOutline = "flex-1 rounded-xl py-2.5 text-[21px] font-semibold bg-white border";
-  return /* @__PURE__ */ React.createElement("div", { className: "fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 print:hidden", style: { background: "rgba(8,30,62,0.55)" }, onClick: onClose }, /* @__PURE__ */ React.createElement("div", { className: "w-full max-w-md rounded-2xl p-5 bg-white max-h-[90vh] overflow-y-auto", onClick: (e) => e.stopPropagation() }, /* @__PURE__ */ React.createElement("h3", { className: "text-[30px] font-bold text-blue-900 mb-3" }, mode === "agent" ? "\u2699\uFE0F \u0E02\u0E49\u0E2D\u0E21\u0E39\u0E25\u0E15\u0E31\u0E27\u0E41\u0E17\u0E19" : mode === "text" ? "\u{1F4AC} \u0E2A\u0E48\u0E07\u0E02\u0E49\u0E2D\u0E04\u0E27\u0E32\u0E21 LINE" : "\u{1F5BC}\uFE0F \u0E2A\u0E48\u0E07\u0E23\u0E39\u0E1B LINE"), mode !== "agent" && /* @__PURE__ */ React.createElement("div", { className: "mb-3 space-y-2" }, /* @__PURE__ */ React.createElement("label", { className: "block" }, /* @__PURE__ */ React.createElement("span", { className: "text-[21px] text-slate-500" }, isKids ? "\u0E0A\u0E37\u0E48\u0E2D\u0E1C\u0E39\u0E49\u0E1B\u0E01\u0E04\u0E23\u0E2D\u0E07 (\u0E1C\u0E39\u0E49\u0E23\u0E31\u0E1A\u0E02\u0E49\u0E2D\u0E04\u0E27\u0E32\u0E21) \u2014 \u0E44\u0E21\u0E48\u0E1A\u0E31\u0E07\u0E04\u0E31\u0E1A" : "\u0E0A\u0E37\u0E48\u0E2D\u0E25\u0E39\u0E01\u0E04\u0E49\u0E32 \u2014 \u0E44\u0E21\u0E48\u0E1A\u0E31\u0E07\u0E04\u0E31\u0E1A"), /* @__PURE__ */ React.createElement("input", { value: customer, onChange: (e) => setCustomer(e.target.value), placeholder: isKids ? "\u0E40\u0E0A\u0E48\u0E19 \u0E41\u0E21\u0E48\u0E2A\u0E49\u0E21" : "\u0E40\u0E0A\u0E48\u0E19 \u0E2A\u0E21\u0E0A\u0E32\u0E22", className: inCls })), isKids && /* @__PURE__ */ React.createElement("label", { className: "block" }, /* @__PURE__ */ React.createElement("span", { className: "text-[21px] text-slate-500" }, "\u0E0A\u0E37\u0E48\u0E2D\u0E40\u0E14\u0E47\u0E01 (\u0E1C\u0E39\u0E49\u0E40\u0E2D\u0E32\u0E1B\u0E23\u0E30\u0E01\u0E31\u0E19) \u2014 \u0E44\u0E21\u0E48\u0E1A\u0E31\u0E07\u0E04\u0E31\u0E1A"), /* @__PURE__ */ React.createElement("input", { value: child, onChange: (e) => setChild(e.target.value), placeholder: "\u0E40\u0E0A\u0E48\u0E19 \u0E02\u0E49\u0E32\u0E27\u0E1B\u0E31\u0E49\u0E19", className: inCls }))), draft ? /* @__PURE__ */ React.createElement("div", { className: "rounded-xl p-3 mb-3 bg-sky-50" }, [["name", "\u0E0A\u0E37\u0E48\u0E2D\u0E15\u0E31\u0E27\u0E41\u0E17\u0E19"], ["phone", "\u0E40\u0E1A\u0E2D\u0E23\u0E4C\u0E42\u0E17\u0E23"], ["lineId", "LINE ID"]].map(([k, l]) => /* @__PURE__ */ React.createElement("label", { key: k, className: "block mb-2" }, /* @__PURE__ */ React.createElement("span", { className: "text-[21px] text-slate-500" }, l), /* @__PURE__ */ React.createElement("input", { value: draft[k] || "", onChange: (e) => setDraft(Object.assign({}, draft, { [k]: e.target.value })), className: inCls }))), /* @__PURE__ */ React.createElement("button", { onClick: () => {
+  return /* @__PURE__ */ React.createElement("div", { className: "fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 print:hidden", style: { background: "rgba(8,30,62,0.55)" }, onClick: onClose }, /* @__PURE__ */ React.createElement("div", { className: "w-full max-w-md rounded-2xl p-5 bg-white max-h-[90vh] overflow-y-auto", onClick: (e) => e.stopPropagation() }, /* @__PURE__ */ React.createElement("h3", { className: "text-[30px] font-bold text-blue-900 mb-3" }, mode === "agent" ? "\u2699\uFE0F \u0E02\u0E49\u0E2D\u0E21\u0E39\u0E25\u0E15\u0E31\u0E27\u0E41\u0E17\u0E19" : mode === "text" ? "\u{1F4AC} \u0E2A\u0E48\u0E07\u0E02\u0E49\u0E2D\u0E04\u0E27\u0E32\u0E21 LINE" : "\u{1F5BC}\uFE0F \u0E2A\u0E48\u0E07\u0E23\u0E39\u0E1B LINE"), mode !== "agent" && /* @__PURE__ */ React.createElement("div", { className: "mb-3 space-y-2" }, /* @__PURE__ */ React.createElement("label", { className: "block" }, /* @__PURE__ */ React.createElement("span", { className: "text-[21px] text-slate-500" }, isKids ? "\u0E0A\u0E37\u0E48\u0E2D\u0E1C\u0E39\u0E49\u0E1B\u0E01\u0E04\u0E23\u0E2D\u0E07 (\u0E1C\u0E39\u0E49\u0E23\u0E31\u0E1A\u0E02\u0E49\u0E2D\u0E04\u0E27\u0E32\u0E21) \u2014 \u0E44\u0E21\u0E48\u0E1A\u0E31\u0E07\u0E04\u0E31\u0E1A" : "\u0E0A\u0E37\u0E48\u0E2D\u0E25\u0E39\u0E01\u0E04\u0E49\u0E32 \u2014 \u0E44\u0E21\u0E48\u0E1A\u0E31\u0E07\u0E04\u0E31\u0E1A"), /* @__PURE__ */ React.createElement("input", { value: customer, onChange: (e) => setCustomer(e.target.value), placeholder: isKids ? "\u0E40\u0E0A\u0E48\u0E19 \u0E41\u0E21\u0E48\u0E2A\u0E49\u0E21" : "\u0E40\u0E0A\u0E48\u0E19 \u0E2A\u0E21\u0E0A\u0E32\u0E22", className: inCls })), isKids && /* @__PURE__ */ React.createElement("label", { className: "block" }, /* @__PURE__ */ React.createElement("span", { className: "text-[21px] text-slate-500" }, "\u0E0A\u0E37\u0E48\u0E2D\u0E40\u0E14\u0E47\u0E01 (\u0E1C\u0E39\u0E49\u0E40\u0E2D\u0E32\u0E1B\u0E23\u0E30\u0E01\u0E31\u0E19) \u2014 \u0E44\u0E21\u0E48\u0E1A\u0E31\u0E07\u0E04\u0E31\u0E1A"), /* @__PURE__ */ React.createElement("input", { value: child, onChange: (e) => setChild(e.target.value), placeholder: "\u0E40\u0E0A\u0E48\u0E19 \u0E02\u0E49\u0E32\u0E27\u0E1B\u0E31\u0E49\u0E19", className: inCls }))),     draft ? /* @__PURE__ */ React.createElement("div", { className: "rounded-xl p-3 mb-3 bg-sky-50" }, [["name", "\u0E0A\u0E37\u0E48\u0E2D\u0E15\u0E31\u0E27\u0E41\u0E17\u0E19"], ["phone", "\u0E40\u0E1A\u0E2D\u0E23\u0E4C\u0E42\u0E17\u0E23"], ["lineId", "LINE ID"]].map(([k, l]) => /* @__PURE__ */ React.createElement("label", { key: k, className: "block mb-2" }, /* @__PURE__ */ React.createElement("span", { className: "text-[21px] text-slate-500" }, l), /* @__PURE__ */ React.createElement("input", { value: draft[k] || "", onChange: (e) => setDraft(Object.assign({}, draft, { [k]: e.target.value })), className: inCls }))), /* @__PURE__ */ React.createElement("button", { onClick: () => {
     saveAgent(draft);
     if (mode === "agent") onClose();
-  }, className: "w-full rounded-xl py-2.5 text-[24px] font-semibold text-white bg-blue-900" }, "\u{1F4BE} \u0E1A\u0E31\u0E19\u0E17\u0E36\u0E01\u0E02\u0E49\u0E2D\u0E21\u0E39\u0E25\u0E15\u0E31\u0E27\u0E41\u0E17\u0E19")) : /* @__PURE__ */ React.createElement("div", { className: `rounded-xl p-3 mb-3 ${agent.confirmed ? "bg-sky-50" : "bg-amber-50 border border-amber-300"}` }, !agent.confirmed && /* @__PURE__ */ React.createElement("p", { className: "text-[21px] font-semibold text-amber-800 mb-1" }, "\u0E01\u0E23\u0E38\u0E13\u0E32\u0E15\u0E23\u0E27\u0E08\u0E2A\u0E2D\u0E1A\u0E02\u0E49\u0E2D\u0E21\u0E39\u0E25\u0E15\u0E31\u0E27\u0E41\u0E17\u0E19\u0E01\u0E48\u0E2D\u0E19\u0E2A\u0E48\u0E07\u0E04\u0E23\u0E31\u0E49\u0E07\u0E41\u0E23\u0E01"), /* @__PURE__ */ React.createElement("p", { className: "text-[24px] font-semibold text-slate-800" }, agent.name || "-"), /* @__PURE__ */ React.createElement("p", { className: "text-[21px] text-slate-500" }, "\u{1F4DE} ", agent.phone || "-", " \xB7 LINE: ", agent.lineId || "-"), /* @__PURE__ */ React.createElement("div", { className: "flex gap-2 mt-2" }, !agent.confirmed && /* @__PURE__ */ React.createElement("button", { onClick: () => saveAgent(agent), className: "flex-1 rounded-xl py-2 text-[21px] font-semibold text-white bg-emerald-600" }, "\u2713 \u0E16\u0E39\u0E01\u0E15\u0E49\u0E2D\u0E07"), /* @__PURE__ */ React.createElement("button", { onClick: () => setDraft(Object.assign({}, agent)), className: `${btnOutline} text-blue-900 border-sky-200` }, "\u270E \u0E41\u0E01\u0E49\u0E44\u0E02"))), note && /* @__PURE__ */ React.createElement("p", { className: "text-[21px] text-emerald-700 mb-3" }, note), imageSent && mode === "image" && /* @__PURE__ */ React.createElement("button", { onClick: () => {
+  }, className: "w-full rounded-xl py-2.5 text-[24px] font-semibold text-white bg-blue-900" }, "\u{1F4BE} \u0E1A\u0E31\u0E19\u0E17\u0E36\u0E01\u0E02\u0E49\u0E2D\u0E21\u0E39\u0E25\u0E15\u0E31\u0E27\u0E41\u0E17\u0E19")) : /* @__PURE__ */ React.createElement("div", { className: `rounded-xl p-3 mb-3 ${agent.confirmed ? "bg-sky-50" : "bg-amber-50 border border-amber-300"}` }, !agent.confirmed && /* @__PURE__ */ React.createElement("p", { className: "text-[21px] font-semibold text-amber-800 mb-1" }, "\u0E01\u0E23\u0E38\u0E13\u0E32\u0E15\u0E23\u0E27\u0E08\u0E2A\u0E2D\u0E1A\u0E02\u0E49\u0E2D\u0E21\u0E39\u0E25\u0E15\u0E31\u0E27\u0E41\u0E17\u0E19\u0E01\u0E48\u0E2D\u0E19\u0E2A\u0E48\u0E07\u0E04\u0E23\u0E31\u0E49\u0E07\u0E41\u0E23\u0E01"), /* @__PURE__ */ React.createElement("p", { className: "text-[24px] font-semibold text-slate-800" }, agent.name || "-"), /* @__PURE__ */ React.createElement("p", { className: "text-[21px] text-slate-500" }, "\u{1F4DE} ", agent.phone || "-", " \xB7 LINE: ", agent.lineId || "-"), /* @__PURE__ */ React.createElement("div", { className: "flex gap-2 mt-2" }, !agent.confirmed && /* @__PURE__ */ React.createElement("button", { onClick: () => saveAgent(agent), className: "flex-1 rounded-xl py-2 text-[21px] font-semibold text-white bg-emerald-600" }, "\u2713 \u0E16\u0E39\u0E01\u0E15\u0E49\u0E2D\u0E07"), /* @__PURE__ */ React.createElement("button", { onClick: () => setDraft(Object.assign({}, agent)), className: `${btnOutline} text-blue-900 border-sky-200` }, "\u270E \u0E41\u0E01\u0E49\u0E44\u0E02"))),
+  mode === "image" && live && React.createElement("div", { className: "mb-3" },
+      React.createElement("p", { className: "text-[21px] font-semibold text-blue-900 mb-2" }, "👀 ตัวอย่างรูปที่จะส่ง · มือถือกดค้างที่รูปเพื่อบันทึก"),
+      React.createElement(ZoomImage, { src: live, alt: "ตัวอย่างรูป", className: "w-full rounded-lg border border-sky-200", style: { WebkitTouchCallout: "default" } })), note && /* @__PURE__ */ React.createElement("p", { className: "text-[21px] text-emerald-700 mb-3" }, note), imageSent && mode === "image" && /* @__PURE__ */ React.createElement("button", { onClick: () => {
     openLineText(buildSKText(buildData()));
     onClose();
-  }, className: "w-full mb-3 rounded-xl py-3 text-[27px] font-bold text-white", style: { background: "#06C755" } }, "\u{1F4AC} \u0E2A\u0E48\u0E07\u0E02\u0E49\u0E2D\u0E04\u0E27\u0E32\u0E21\u0E15\u0E48\u0E2D"), mode !== "agent" && edit && React.createElement("div", { className: "mb-3" },
-    React.createElement("div", { className: "flex items-center justify-between gap-2 mb-2" },
-      React.createElement("p", { className: "text-[21px] font-semibold text-blue-900" }, mode === "text" ? "✏️ ตรวจ/แก้ข้อความก่อนส่ง" : "✏️ ตรวจ/แก้บรรทัดสรุปบนรูป (ตารางแก้ไม่ได้)"),
-      React.createElement("button", { onClick: () => setEdit(makeEdit()), className: "text-[18px] px-3 py-1 rounded-full bg-sky-50 text-blue-900 border border-sky-200 shrink-0" }, "↺ คืนค่าเดิม")),
-    mode === "text"
-      ? React.createElement("textarea", { value: edit.text || "", rows: 14, onChange: (e) => setEdit(Object.assign({}, edit, { text: e.target.value, dirty: true })), className: "w-full rounded-xl px-3 py-2 text-[21px] border border-sky-200", style: { lineHeight: 1.5, fontFamily: "inherit" } })
-      : React.createElement(LineEditor, { groups: edit.groups || [], onChange: (g) => setEdit(Object.assign({}, edit, { groups: g, dirty: true })) }),
-    mode === "image" && live && React.createElement("div", { className: "mt-3" },
-      React.createElement("p", { className: "text-[21px] font-semibold text-blue-900 mb-2" }, "👀 ตัวอย่างรูปที่จะส่ง · มือถือกดค้างที่รูปเพื่อบันทึก"),
-      React.createElement(ZoomImage, { src: live, alt: "ตัวอย่างรูป", className: "w-full rounded-lg border border-sky-200", style: { WebkitTouchCallout: "default" } }))),
-  mode !== "agent" && /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("button", { disabled: !ready, onClick: send, className: "w-full rounded-xl py-3 text-[27px] font-bold text-white", style: { background: "#06C755", opacity: ready ? 1 : 0.4 } }, mode === "text" ? "\u{1F4AC} \u0E40\u0E1B\u0E34\u0E14 LINE \u0E40\u0E1E\u0E37\u0E48\u0E2D\u0E2A\u0E48\u0E07\u0E02\u0E49\u0E2D\u0E04\u0E27\u0E32\u0E21" : "\u{1F5BC}\uFE0F \u0E2A\u0E23\u0E49\u0E32\u0E07\u0E23\u0E39\u0E1B\u0E41\u0E25\u0E30\u0E2A\u0E48\u0E07 LINE"), /* @__PURE__ */ React.createElement("div", { className: "mt-3 rounded-xl p-3 border border-dashed border-emerald-300" }, /* @__PURE__ */ React.createElement("p", { className: "text-[21px] text-slate-500 mb-2" }, "\u0E2A\u0E48\u0E07\u0E1C\u0E48\u0E32\u0E19 LINE OA: \u0E04\u0E31\u0E14\u0E25\u0E2D\u0E01\u0E2B\u0E23\u0E37\u0E2D\u0E1A\u0E31\u0E19\u0E17\u0E36\u0E01\u0E44\u0E27\u0E49\u0E01\u0E48\u0E2D\u0E19 \u0E41\u0E25\u0E49\u0E27\u0E44\u0E1B\u0E27\u0E32\u0E07/\u0E41\u0E19\u0E1A\u0E43\u0E19\u0E41\u0E0A\u0E17\u0E25\u0E39\u0E01\u0E04\u0E49\u0E32"), /* @__PURE__ */ React.createElement("div", { className: "flex gap-2" }, /* @__PURE__ */ React.createElement("button", { disabled: !ready, onClick: () => {
+  }, className: "w-full mb-3 rounded-xl py-3 text-[27px] font-bold text-white", style: { background: "#06C755" } }, "\u{1F4AC} \u0E2A\u0E48\u0E07\u0E02\u0E49\u0E2D\u0E04\u0E27\u0E32\u0E21\u0E15\u0E48\u0E2D"), mode !== "agent" && /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("button", { disabled: !ready, onClick: send, className: "w-full rounded-xl py-3 text-[27px] font-bold text-white", style: { background: "#06C755", opacity: ready ? 1 : 0.4 } }, mode === "text" ? "\u{1F4AC} \u0E40\u0E1B\u0E34\u0E14 LINE \u0E40\u0E1E\u0E37\u0E48\u0E2D\u0E2A\u0E48\u0E07\u0E02\u0E49\u0E2D\u0E04\u0E27\u0E32\u0E21" : "\u{1F5BC}\uFE0F \u0E2A\u0E23\u0E49\u0E32\u0E07\u0E23\u0E39\u0E1B\u0E41\u0E25\u0E30\u0E2A\u0E48\u0E07 LINE"), /* @__PURE__ */ React.createElement("div", { className: "mt-3 rounded-xl p-3 border border-dashed border-emerald-300" }, /* @__PURE__ */ React.createElement("p", { className: "text-[21px] text-slate-500 mb-2" }, "\u0E2A\u0E48\u0E07\u0E1C\u0E48\u0E32\u0E19 LINE OA: \u0E04\u0E31\u0E14\u0E25\u0E2D\u0E01\u0E2B\u0E23\u0E37\u0E2D\u0E1A\u0E31\u0E19\u0E17\u0E36\u0E01\u0E44\u0E27\u0E49\u0E01\u0E48\u0E2D\u0E19 \u0E41\u0E25\u0E49\u0E27\u0E44\u0E1B\u0E27\u0E32\u0E07/\u0E41\u0E19\u0E1A\u0E43\u0E19\u0E41\u0E0A\u0E17\u0E25\u0E39\u0E01\u0E04\u0E49\u0E32"), /* @__PURE__ */ React.createElement("div", { className: "flex gap-2" }, /* @__PURE__ */ React.createElement("button", { disabled: !ready, onClick: () => {
     const ok = copyTextToClipboard(editedText());
     setNote(ok ? "\u{1F4CB} \u0E04\u0E31\u0E14\u0E25\u0E2D\u0E01\u0E02\u0E49\u0E2D\u0E04\u0E27\u0E32\u0E21\u0E41\u0E25\u0E49\u0E27 \u2014 \u0E40\u0E1B\u0E34\u0E14\u0E41\u0E0A\u0E17\u0E25\u0E39\u0E01\u0E04\u0E49\u0E32\u0E43\u0E19 LINE OA \u0E41\u0E25\u0E49\u0E27\u0E01\u0E14\u0E27\u0E32\u0E07" : "\u0E04\u0E31\u0E14\u0E25\u0E2D\u0E01\u0E44\u0E21\u0E48\u0E2A\u0E33\u0E40\u0E23\u0E47\u0E08 \u0E25\u0E2D\u0E07\u0E43\u0E2B\u0E21\u0E48\u0E2D\u0E35\u0E01\u0E04\u0E23\u0E31\u0E49\u0E07");
   }, className: `${btnOutline} text-emerald-700 border-emerald-500`, style: { opacity: ready ? 1 : 0.4 } }, "\u{1F4CB} \u0E04\u0E31\u0E14\u0E25\u0E2D\u0E01\u0E02\u0E49\u0E2D\u0E04\u0E27\u0E32\u0E21"), /* @__PURE__ */ React.createElement("button", { disabled: !ready, onClick: () => {
     setPreview(drawSKImage(editedData()).toDataURL("image/png"));
     setNote("");
-  }, className: `${btnOutline} text-emerald-700 border-emerald-500`, style: { opacity: ready ? 1 : 0.4 } }, "\u{1F4BE} \u0E1A\u0E31\u0E19\u0E17\u0E36\u0E01\u0E23\u0E39\u0E1B")), preview && /* @__PURE__ */ React.createElement("div", { className: "mt-3" }, /* @__PURE__ */ React.createElement("p", { className: "text-[21px] font-semibold text-blue-900 mb-2" }, "\u0E21\u0E37\u0E2D\u0E16\u0E37\u0E2D: \u0E01\u0E14\u0E04\u0E49\u0E32\u0E07\u0E17\u0E35\u0E48\u0E23\u0E39\u0E1B \u2192 \u0E1A\u0E31\u0E19\u0E17\u0E36\u0E01\u0E23\u0E39\u0E1B\u0E20\u0E32\u0E1E \xB7 \u0E04\u0E2D\u0E21: \u0E01\u0E14\u0E1B\u0E38\u0E48\u0E21\u0E14\u0E32\u0E27\u0E19\u0E4C\u0E42\u0E2B\u0E25\u0E14\u0E14\u0E49\u0E32\u0E19\u0E25\u0E48\u0E32\u0E07"), /* @__PURE__ */ React.createElement(ZoomImage, { src: preview, alt: "\u0E2A\u0E23\u0E38\u0E1B\u0E41\u0E1A\u0E1A\u0E1B\u0E23\u0E30\u0E01\u0E31\u0E19", className: "w-full rounded-lg border border-sky-200", style: { WebkitTouchCallout: "default" } }), /* @__PURE__ */ React.createElement("a", { href: preview, download: "sudkhum-summary.png", className: "block text-center mt-2 rounded-xl py-2 text-[21px] font-semibold bg-sky-50 text-blue-900" }, "\u2B07\uFE0F \u0E14\u0E32\u0E27\u0E19\u0E4C\u0E42\u0E2B\u0E25\u0E14\u0E23\u0E39\u0E1B")))), /* @__PURE__ */ React.createElement("button", { onClick: onClose, className: "w-full mt-2 rounded-xl py-2.5 text-[24px] font-semibold bg-sky-50 text-blue-900" }, "\u2715 \u0E1B\u0E34\u0E14")));
+  }, className: `${btnOutline} text-emerald-700 border-emerald-500`, style: { opacity: ready ? 1 : 0.4 } }, "\u{1F4BE} \u0E1A\u0E31\u0E19\u0E17\u0E36\u0E01\u0E23\u0E39\u0E1B")), preview && /* @__PURE__ */ React.createElement("div", { className: "mt-3" }, /* @__PURE__ */ React.createElement("p", { className: "text-[21px] font-semibold text-blue-900 mb-2" }, "\u0E21\u0E37\u0E2D\u0E16\u0E37\u0E2D: \u0E01\u0E14\u0E04\u0E49\u0E32\u0E07\u0E17\u0E35\u0E48\u0E23\u0E39\u0E1B \u2192 \u0E1A\u0E31\u0E19\u0E17\u0E36\u0E01\u0E23\u0E39\u0E1B\u0E20\u0E32\u0E1E \xB7 \u0E04\u0E2D\u0E21: \u0E01\u0E14\u0E1B\u0E38\u0E48\u0E21\u0E14\u0E32\u0E27\u0E19\u0E4C\u0E42\u0E2B\u0E25\u0E14\u0E14\u0E49\u0E32\u0E19\u0E25\u0E48\u0E32\u0E07"), /* @__PURE__ */ React.createElement(ZoomImage, { src: preview, alt: "\u0E2A\u0E23\u0E38\u0E1B\u0E41\u0E1A\u0E1A\u0E1B\u0E23\u0E30\u0E01\u0E31\u0E19", className: "w-full rounded-lg border border-sky-200", style: { WebkitTouchCallout: "default" } }), /* @__PURE__ */ React.createElement("a", { href: preview, download: "sudkhum-summary.png", className: "block text-center mt-2 rounded-xl py-2 text-[21px] font-semibold bg-sky-50 text-blue-900" }, "\u2B07\uFE0F \u0E14\u0E32\u0E27\u0E19\u0E4C\u0E42\u0E2B\u0E25\u0E14\u0E23\u0E39\u0E1B")))), mode !== "agent" && edit && React.createElement("div", { className: "mt-4 mb-3" },
+    React.createElement("div", { className: "flex items-center justify-between gap-2 mb-2" },
+      React.createElement("p", { className: "text-[21px] font-semibold text-blue-900" }, mode === "text" ? "✏️ ตรวจ/แก้ข้อความก่อนส่ง" : "✏️ ตรวจ/แก้บรรทัดสรุปบนรูป (ตารางแก้ไม่ได้)"),
+      React.createElement("button", { onClick: () => setEdit(makeEdit()), className: "text-[18px] px-3 py-1 rounded-full bg-sky-50 text-blue-900 border border-sky-200 shrink-0" }, "↺ คืนค่าเดิม")),
+    mode === "text"
+      ? React.createElement("textarea", { value: edit.text || "", rows: 14, onChange: (e) => setEdit(Object.assign({}, edit, { text: e.target.value, dirty: true })), className: "w-full rounded-xl px-3 py-2 text-[21px] border border-sky-200", style: { lineHeight: 1.5, fontFamily: "inherit" } })
+      : React.createElement(LineEditor, { groups: edit.groups || [], onChange: (g) => setEdit(Object.assign({}, edit, { groups: g, dirty: true })) })), /* @__PURE__ */ React.createElement("button", { onClick: onClose, className: "w-full mt-2 rounded-xl py-2.5 text-[24px] font-semibold bg-sky-50 text-blue-900" }, "\u2715 \u0E1B\u0E34\u0E14")));
 }
 function SudKoomDashboard({ onBack }) {
   const [productKey, setProductKey] = useState(init("productKey"));
