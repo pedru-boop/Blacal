@@ -8,7 +8,7 @@ const BRAND = {
     ink: "#000000", sub: "#404040", danger: "#B93232", warn: "#6B4508",
     label: "#000000", nameBlue: "#1668D6", mainBlue: "#0C2F63", dataBlack: "#000000",
 };
-const APP_VERSION = "v2.36.0 (2569-10-05)";
+const APP_VERSION = "v2.37.0 (2569-10-05)";
 const RATE_SOURCE = "อัตราเบี้ยตามคู่มือตัวแทน V.14 (14-02-2026) · ค่าคอม 10-09-2026";
 const CASES_KEY = "blacal-cases-v1"; // อัปเดตเลขนี้ทุกครั้งที่มีการแก้ไข/เพิ่มแบบประกันใหม่ เพื่อให้รู้ว่าไฟล์ที่ใช้อยู่เป็นเวอร์ชันล่าสุดหรือไม่
 const fmt = (n) => (n === null || n === undefined || isNaN(n) ? "0" : Math.round(n).toLocaleString("th-TH"));
@@ -251,6 +251,68 @@ function ImageZoomViewer({ src, alt, onClose }) {
             React.createElement("button", { type: "button", style: Object.assign({}, btn, { fontSize: 20 }), onClick: onClose }, "✕ ปิด")),
         React.createElement("div", { ref: boxRef, onTouchStart, onTouchMove, onTouchEnd, onDoubleClick: onDouble, style: { flex: 1, overflow: "auto", WebkitOverflowScrolling: "touch", touchAction: "pan-x pan-y", paddingBottom: "env(safe-area-inset-bottom, 0px)" } },
             React.createElement("img", { src, alt, draggable: false, style: { display: "block", width: `${z * 100}%`, maxWidth: "none", height: "auto", margin: z === 1 ? "0 auto" : 0, WebkitTouchCallout: "default" } })));
+}
+/* ============================== หน้าส่ง LINE (ใช้ร่วมกันทั้งแอป: หน้าคำนวณเบี้ย + หน้าสุดคุ้ม/สมาร์ท คิดส์) ==============================
+   แก้หน้าตา/ลำดับที่นี่ที่เดียว มีผลทั้งแอป
+   ลำดับ: ชื่อลูกค้า → ข้อมูลตัวแทน → ตัวอย่างรูป → ปุ่มส่ง (+ LINE OA) → ส่วนแก้ข้อความ
+   props:
+     mode: "text" | "image" | "agent"
+     nameFields: [{ label, value, onChange, placeholder }]
+     agent, onSaveAgent(info)            — ข้อมูลตัวแทน (บันทึกแล้ว confirmed = true)
+     previews: [dataURL], downloadName(i) — ตัวอย่างรูป (โหมดรูป)
+     note, extra                          — ข้อความแจ้งผล / ส่วนเสริมเหนือปุ่มส่ง
+     onSend, onCopy                       — ส่ง LINE / คัดลอกข้อความสำหรับ LINE OA
+     editor: { text, onText, groups, onGroups, onReset }
+     onClose */
+function LineShareSheet(props) {
+    const { mode, nameFields = [], agent, onSaveAgent, previews = [], downloadName, note, extra, onSend, onCopy, editor, onClose } = props;
+    const [draft, setDraft] = React.useState(mode === "agent" ? Object.assign({}, agent) : null);
+    const ready = !!agent.confirmed && !draft;
+    const save = (info) => { onSaveAgent(Object.assign({}, info, { confirmed: true })); setDraft(null); if (mode === "agent") onClose(); };
+    const box = { border: "1px solid #D7E8F0" };
+    const h = React.createElement;
+    return h("div", { className: "fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 print:hidden", style: { background: "rgba(8,30,62,0.55)" }, onClick: onClose },
+        h("div", { className: "w-full max-w-md rounded-2xl p-5 max-h-[90vh] overflow-y-auto", style: { background: BRAND.card }, onClick: (e) => e.stopPropagation() },
+            h("h3", { className: "text-[24px] font-semibold mb-3", style: { color: BRAND.navy } }, mode === "agent" ? "⚙️ ข้อมูลตัวแทน" : mode === "text" ? "💬 ส่งข้อความ LINE" : "🖼️ ส่งรูป LINE"),
+            // 1) ชื่อลูกค้า
+            mode !== "agent" && nameFields.map((f, i) => h("label", { key: i, className: "block mb-3" },
+                h("span", { className: "text-[19px]", style: { color: BRAND.sub } }, f.label),
+                h("input", { value: f.value, onChange: (e) => f.onChange(e.target.value), placeholder: f.placeholder, className: "w-full mt-1 rounded-xl px-3 py-2.5 text-[21px]", style: box }))),
+            // 2) ข้อมูลตัวแทน
+            draft ? h("div", { className: "rounded-xl p-3 mb-3", style: { background: BRAND.bg } },
+                [["name", "ชื่อตัวแทน"], ["phone", "เบอร์โทร"], ["lineId", "LINE ID"]].map(([k, l]) => h("label", { key: k, className: "block mb-2" },
+                    h("span", { className: "text-[18px]", style: { color: BRAND.sub } }, l),
+                    h("input", { value: draft[k] || "", onChange: (e) => setDraft(Object.assign({}, draft, { [k]: e.target.value })), className: "w-full mt-1 rounded-xl px-3 py-2 text-[20px] bg-white", style: box }))),
+                h("button", { onClick: () => save(draft), className: "w-full rounded-xl py-2.5 text-[21px] font-medium text-white", style: { background: BRAND.navy } }, "💾 บันทึกข้อมูลตัวแทน"))
+                : h("div", { className: "rounded-xl p-3 mb-3", style: { background: agent.confirmed ? BRAND.bg : "#FFF6E0", border: agent.confirmed ? "none" : "1px solid #F0C36D" } },
+                    !agent.confirmed && h("p", { className: "text-[19px] font-semibold mb-1", style: { color: BRAND.warn } }, "กรุณาตรวจสอบข้อมูลตัวแทนก่อนส่งครั้งแรก"),
+                    h("p", { className: "text-[20px]", style: { color: BRAND.ink } }, agent.name || "-"),
+                    h("p", { className: "text-[19px]", style: { color: BRAND.sub } }, "📞 ", agent.phone || "-", " · LINE: ", agent.lineId || "-"),
+                    h("div", { className: "flex gap-2 mt-2" },
+                        !agent.confirmed && h("button", { onClick: () => save(agent), className: "flex-1 rounded-xl py-2 text-[19px] font-medium text-white", style: { background: BRAND.greenDeep } }, "✓ ถูกต้อง"),
+                        h("button", { onClick: () => setDraft(Object.assign({}, agent)), className: "flex-1 rounded-xl py-2 text-[19px] font-medium", style: Object.assign({ background: "#FFFFFF", color: BRAND.navy }, box) }, "✎ แก้ไข"))),
+            // 3) ตัวอย่างรูป
+            mode === "image" && previews.length > 0 && h("div", { className: "mb-3" },
+                h("p", { className: "text-[18px] mb-2 font-semibold", style: { color: BRAND.navy } }, `👀 ตัวอย่างรูปที่จะส่ง${previews.length > 1 ? ` (${previews.length} รูป)` : ""} · แตะรูปเพื่อขยาย · กดค้างเพื่อบันทึก`),
+                previews.map((src, i) => h("div", { key: i, className: "mb-2" },
+                    h(ZoomImage, { src, alt: `รูปที่ ${i + 1}`, className: "w-full rounded-lg", style: Object.assign({ WebkitTouchCallout: "default" }, box) }),
+                    h("a", { href: src, download: downloadName ? downloadName(i) : `summary-${i + 1}.png`, className: "block text-center mt-1 rounded-xl py-1.5 text-[17px]", style: { background: BRAND.bg, color: BRAND.navy } }, previews.length > 1 ? `⬇️ ดาวน์โหลดรูปที่ ${i + 1}` : "⬇️ ดาวน์โหลดรูป")))),
+            mode !== "agent" && note && h("p", { className: "text-[19px] mb-3", style: { color: BRAND.greenDeep } }, note),
+            mode !== "agent" && extra,
+            // 4) ปุ่มส่ง + LINE OA
+            mode !== "agent" && h("button", { disabled: !ready, onClick: onSend, className: "w-full rounded-xl py-3 text-[22px] font-semibold text-white", style: { background: "#06C755", opacity: ready ? 1 : 0.4 } }, mode === "text" ? "💬 เปิด LINE เพื่อส่งข้อความ" : "🖼️ สร้างรูปและส่ง LINE"),
+            mode !== "agent" && onCopy && h("div", { className: "mt-3 rounded-xl p-3", style: { border: "1px dashed #9FD8B0" } },
+                h("p", { className: "text-[18px] mb-2", style: { color: BRAND.sub } }, mode === "image" ? "ส่งผ่าน LINE OA: กดค้างที่รูปเพื่อบันทึก (หรือกดดาวน์โหลด) แล้วแนบในแชทลูกค้า · คัดลอกข้อความไปวางต่อได้" : "ส่งผ่าน LINE OA: คัดลอกข้อความ แล้วไปวางในแชทลูกค้า"),
+                h("button", { disabled: !ready, onClick: onCopy, className: "w-full rounded-xl py-2.5 text-[19px] font-medium", style: { background: "#FFFFFF", color: "#06A045", border: "1px solid #06C755", opacity: ready ? 1 : 0.4 } }, "📋 คัดลอกข้อความ")),
+            // 5) ส่วนแก้ข้อความ
+            mode !== "agent" && editor && h("div", { className: "mt-4 mb-3" },
+                h("div", { className: "flex items-center justify-between gap-2 mb-2" },
+                    h("p", { className: "text-[19px] font-semibold", style: { color: BRAND.navy } }, mode === "text" ? "✏️ ตรวจ/แก้ข้อความก่อนส่ง" : "✏️ ตรวจ/แก้บรรทัดสรุปบนรูป (ตารางแก้ไม่ได้)"),
+                    h("button", { onClick: editor.onReset, className: "text-[17px] px-3 py-1 rounded-full shrink-0", style: Object.assign({ background: BRAND.bg, color: BRAND.navy }, box) }, "↺ คืนค่าเดิม")),
+                mode === "text"
+                    ? h("textarea", { value: editor.text || "", onChange: (e) => editor.onText(e.target.value), rows: 14, className: "w-full rounded-xl px-3 py-2 text-[17px]", style: Object.assign({ lineHeight: 1.5, fontFamily: "inherit" }, box) })
+                    : h(LineEditor, { groups: editor.groups || [], onChange: editor.onGroups })),
+            h("button", { onClick: onClose, className: "w-full mt-2 rounded-xl py-2.5 text-[20px] font-medium", style: { background: BRAND.bg, color: BRAND.navy } }, "✕ ปิด")));
 }
 function copyTextToClipboard(text) {
     const fallback = () => {
@@ -5495,49 +5557,26 @@ function App() {
                             React.createElement("button", { onClick: () => openCase(c), className: "rounded-xl px-3 py-2 text-[18px] font-semibold text-white shrink-0", style: { background: BRAND.greenDeep } }, "เปิด"),
                             React.createElement("button", { onClick: () => deleteCase(c), className: "rounded-xl px-2.5 py-2 text-[18px] shrink-0", style: { background: "#FFFFFF", color: BRAND.danger, border: "1px solid #F0C9C9" } }, "🗑️")))),
                     React.createElement("button", { onClick: () => setCasesOpen(false), className: "w-full mt-2 rounded-xl py-2.5 text-[20px] font-medium", style: { background: BRAND.bg, color: BRAND.navy } }, "✕ ปิด")))),
-            shareModal && (React.createElement("div", { className: "fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4", style: { background: "rgba(8,30,62,0.55)" }, onClick: () => setShareModal(null) },
-                React.createElement("div", { className: "w-full max-w-md rounded-2xl p-5 max-h-[90vh] overflow-y-auto", style: { background: BRAND.card }, onClick: (e) => e.stopPropagation() },
-                    React.createElement("h3", { className: "text-[24px] font-semibold mb-3", style: { color: BRAND.navy } }, !shareModal.id ? "⚙️ ข้อมูลตัวแทน" : shareModal.mode === "text" ? "💬 ส่งข้อความ LINE" : "🖼️ ส่งรูป LINE"),
-                    shareModal.id && (React.createElement("label", { className: "block mb-3" },
-                        React.createElement("span", { className: "text-[19px]", style: { color: BRAND.sub } }, "ชื่อลูกค้า (ไม่บังคับ)"),
-                        React.createElement("input", { value: customerName, onChange: (e) => setCustomerName(e.target.value), placeholder: "เช่น สมชาย", className: "w-full mt-1 rounded-xl px-3 py-2.5 text-[21px]", style: { border: "1px solid #D7E8F0" } }))),
-                    agentDraft ? (React.createElement("div", { className: "rounded-xl p-3 mb-3", style: { background: BRAND.bg } },
-                        [["name", "ชื่อตัวแทน"], ["phone", "เบอร์โทร"], ["lineId", "LINE ID"]].map(([k, l]) => (React.createElement("label", { key: k, className: "block mb-2" },
-                            React.createElement("span", { className: "text-[18px]", style: { color: BRAND.sub } }, l),
-                            React.createElement("input", { value: agentDraft[k] || "", onChange: (e) => setAgentDraft(Object.assign({}, agentDraft, { [k]: e.target.value })), className: "w-full mt-1 rounded-xl px-3 py-2 text-[20px] bg-white", style: { border: "1px solid #D7E8F0" } })))),
-                        React.createElement("button", { onClick: () => { saveAgent(agentDraft); if (!shareModal.id) setShareModal(null); }, className: "w-full rounded-xl py-2.5 text-[21px] font-medium text-white", style: { background: BRAND.navy } }, "💾 บันทึกข้อมูลตัวแทน"))) : (React.createElement("div", { className: "rounded-xl p-3 mb-3", style: { background: agentInfo.confirmed ? BRAND.bg : "#FFF6E0", border: agentInfo.confirmed ? "none" : "1px solid #F0C36D" } },
-                        !agentInfo.confirmed && (React.createElement("p", { className: "text-[19px] font-semibold mb-1", style: { color: BRAND.warn } }, "กรุณาตรวจสอบข้อมูลตัวแทนก่อนส่งครั้งแรก")),
-                        React.createElement("p", { className: "text-[20px]", style: { color: BRAND.ink } }, agentInfo.name || "-"),
-                        React.createElement("p", { className: "text-[19px]", style: { color: BRAND.sub } }, "📞 ", agentInfo.phone || "-", " · LINE: ", agentInfo.lineId || "-"),
-                        React.createElement("div", { className: "flex gap-2 mt-2" },
-                            !agentInfo.confirmed && (React.createElement("button", { onClick: () => saveAgent(agentInfo), className: "flex-1 rounded-xl py-2 text-[19px] font-medium text-white", style: { background: BRAND.greenDeep } }, "✓ ถูกต้อง")),
-                            React.createElement("button", { onClick: () => setAgentDraft(Object.assign({}, agentInfo)), className: "flex-1 rounded-xl py-2 text-[19px] font-medium", style: { background: "#FFFFFF", color: BRAND.navy, border: "1px solid #D7E8F0" } }, "✎ แก้ไข")))),
-                        shareModal.id && shareModal.mode === "image" && (React.createElement("div", { className: "mb-3" },
-                            React.createElement("p", { className: "text-[18px] mb-2 font-semibold", style: { color: BRAND.navy } }, `👀 ตัวอย่างรูปที่จะส่ง${shareLive.length > 1 ? ` (${shareLive.length} รูป)` : ""} · มือถือกดค้างที่รูปเพื่อบันทึก`),
-                            shareLive.map((src, i) => (React.createElement("div", { key: i, className: "mb-2" },
-                                React.createElement(ZoomImage, { src, alt: `รูปที่ ${i + 1}`, className: "w-full rounded-lg", style: { border: "1px solid #D7E8F0", WebkitTouchCallout: "default" } }),
-                                React.createElement("a", { href: src, download: `insurance-summary-${i + 1}.png`, className: "block text-center mt-1 rounded-xl py-1.5 text-[17px]", style: { background: BRAND.bg, color: BRAND.navy } }, `⬇️ ดาวน์โหลดรูปที่ ${i + 1}`)))))),
-                    shareNote && (React.createElement("p", { className: "text-[19px] mb-3", style: { color: BRAND.greenDeep } }, shareNote)),
-                    shareModal.id === "QUOTE" && shareModal.mode === "text" && (() => {
+            shareModal && React.createElement(LineShareSheet, {
+                key: (shareModal.id || "agent") + ":" + shareModal.mode,
+                mode: shareModal.id ? shareModal.mode : "agent",
+                nameFields: [{ label: "ชื่อลูกค้า (ไม่บังคับ)", value: customerName, onChange: setCustomerName, placeholder: "เช่น สมชาย" }],
+                agent: agentInfo, onSaveAgent: saveAgent,
+                previews: shareLive, downloadName: (i) => `insurance-summary-${i + 1}.png`,
+                note: shareNote,
+                extra: shareModal.id === "QUOTE" && shareModal.mode === "text" && (() => {
                         const q = buildQuoteData();
                         const n = q ? buildQuoteText(q).length : 0;
                         return n > LINE_TEXT_SOFT_LIMIT && (React.createElement("div", { className: "rounded-xl p-3 mb-3", style: { background: "#FFF6E0", border: "1px solid #F0C36D" } },
                             React.createElement("p", { className: "text-[19px]", style: { color: BRAND.warn } }, `ข้อความยาว ${fmt(n)} ตัวอักษร LINE อาจตัดท้ายข้อความ แนะนำส่งเป็นรูปแทน`),
                             React.createElement("button", { onClick: () => setShareModal({ id: "QUOTE", mode: "image" }), className: "mt-2 w-full rounded-xl py-2 text-[19px] font-medium", style: { background: "#FFFFFF", color: BRAND.navy, border: "1px solid #D7E8F0" } }, "🖼️ เปลี่ยนเป็นส่งรูป")));
                     })(),
-                    shareModal.id && (React.createElement("button", { disabled: !agentInfo.confirmed || !!agentDraft, onClick: doShare, className: "w-full rounded-xl py-3 text-[22px] font-semibold text-white", style: { background: "#06C755", opacity: (!agentInfo.confirmed || agentDraft) ? 0.4 : 1 } }, shareModal.mode === "text" ? "💬 เปิด LINE เพื่อส่งข้อความ" : "🖼️ สร้างรูปและส่ง LINE")),
-                    shareModal.id && (React.createElement("div", { className: "mt-3 rounded-xl p-3", style: { border: "1px dashed #9FD8B0" } },
-                        React.createElement("p", { className: "text-[18px] mb-2", style: { color: BRAND.sub } }, "ส่งผ่าน LINE OA: คัดลอกหรือบันทึกไว้ก่อน แล้วไปวาง/แนบในแชทลูกค้า"),
-                        React.createElement("div", { className: "flex gap-2" },
-                            React.createElement("button", { disabled: !agentInfo.confirmed || !!agentDraft, onClick: copyForOA, className: "flex-1 rounded-xl py-2.5 text-[19px] font-medium", style: { background: "#FFFFFF", color: "#06A045", border: "1px solid #06C755", opacity: (!agentInfo.confirmed || agentDraft) ? 0.4 : 1 } }, "📋 คัดลอกข้อความ")))),
-                    shareModal.id && shareDraft && (React.createElement("div", { className: "mt-4 mb-3" },
-                        React.createElement("div", { className: "flex items-center justify-between gap-2 mb-2" },
-                            React.createElement("p", { className: "text-[19px] font-semibold", style: { color: BRAND.navy } }, shareModal.mode === "text" ? "✏️ ตรวจ/แก้ข้อความก่อนส่ง" : "✏️ ตรวจ/แก้บรรทัดสรุปบนรูป (ตารางแก้ไม่ได้)"),
-                            React.createElement("button", { onClick: () => setShareDraft(makeShareDraft()), className: "text-[17px] px-3 py-1 rounded-full shrink-0", style: { background: BRAND.bg, color: BRAND.navy, border: "1px solid #D7E8F0" } }, "↺ คืนค่าเดิม")),
-                        shareModal.mode === "text"
-                            ? React.createElement("textarea", { value: shareDraft.text || "", onChange: (e) => setShareDraft(Object.assign({}, shareDraft, { text: e.target.value, dirty: true })), rows: 14, className: "w-full rounded-xl px-3 py-2 text-[17px]", style: { border: "1px solid #D7E8F0", lineHeight: 1.5, fontFamily: "inherit" } })
-                            : React.createElement(LineEditor, { groups: shareDraft.groups || [], onChange: (g) => setShareDraft(Object.assign({}, shareDraft, { groups: g, dirty: true })) }))),
-                    React.createElement("button", { onClick: () => { setShareModal(null); setAgentDraft(null); }, className: "w-full mt-2 rounded-xl py-2.5 text-[20px] font-medium", style: { background: BRAND.bg, color: BRAND.navy } }, "✕ ปิด")))),
+                onSend: doShare, onCopy: copyForOA,
+                editor: shareDraft ? { text: shareDraft.text, groups: shareDraft.groups,
+                    onText: (t) => setShareDraft(Object.assign({}, shareDraft, { text: t, dirty: true })),
+                    onGroups: (g) => setShareDraft(Object.assign({}, shareDraft, { groups: g, dirty: true })),
+                    onReset: () => setShareDraft(makeShareDraft()) } : null,
+                onClose: () => { setShareModal(null); setAgentDraft(null); } }),
             React.createElement("footer", { className: "text-center text-[21px] py-6", style: { color: BRAND.sub } }, "\u0E40\u0E1E\u0E37\u0E48\u0E2D\u0E01\u0E32\u0E23\u0E19\u0E33\u0E40\u0E2A\u0E19\u0E2D\u0E40\u0E1A\u0E37\u0E49\u0E2D\u0E07\u0E15\u0E49\u0E19\u0E40\u0E17\u0E48\u0E32\u0E19\u0E31\u0E49\u0E19 \u0E44\u0E21\u0E48\u0E43\u0E0A\u0E48\u0E40\u0E2D\u0E01\u0E2A\u0E32\u0E23\u0E40\u0E2A\u0E19\u0E2D\u0E02\u0E32\u0E22\u0E2D\u0E22\u0E48\u0E32\u0E07\u0E40\u0E1B\u0E47\u0E19\u0E17\u0E32\u0E07\u0E01\u0E32\u0E23")),
         React.createElement("style", null, `
         .print-only-container { display: none; }
@@ -6715,9 +6754,7 @@ const SAVED = loadSaved();
 const DEFAULTS = { productKey: "adult", productAuto: true, plan: "15/9", gender: "male", age: "23", mode: "premium", freqKey: "monthly", premiumInput: "2000", sumInsuredInput: "256000", guardianGender: "male", guardianAge: "35" };
 const init = (k) => SAVED[k] !== void 0 ? SAVED[k] : DEFAULTS[k];
 function ShareModal({ mode, isKids, customer, setCustomer, child, setChild, agent, setAgent, onClose, buildData }) {
-  const [draft, setDraft] = useState(mode === "agent" ? Object.assign({}, agent) : null);
   const [note, setNote] = useState("");
-  const [preview, setPreview] = useState("");
   const [imageSent, setImageSent] = useState(false);
   const [edit, setEdit] = useState(null); // ฉบับแก้ไขก่อนส่ง { dirty, text, groups }
   const [live, setLive] = useState("");
@@ -6739,12 +6776,9 @@ function ShareModal({ mode, isKids, customer, setCustomer, child, setChild, agen
   useEffect(() => {
     preloadShareFonts();
   }, []);
-  const ready = agent.confirmed && !draft;
   const saveAgent = (info) => {
-    const next = Object.assign({}, info, { confirmed: true });
-    setAgent(next);
-    lsSet(AGENT_KEY, JSON.stringify(next));
-    setDraft(null);
+    setAgent(info);
+    lsSet(AGENT_KEY, JSON.stringify(info));
   };
   const send = () => {
     const d = editedData();
@@ -6754,33 +6788,26 @@ function ShareModal({ mode, isKids, customer, setCustomer, child, setChild, agen
     } else {
       const r = shareCanvasImage(drawSKImage(d));
       setImageSent(true);
-      setNote(r === "downloaded" ? "\u0E1A\u0E31\u0E19\u0E17\u0E36\u0E01\u0E23\u0E39\u0E1B\u0E25\u0E07\u0E40\u0E04\u0E23\u0E37\u0E48\u0E2D\u0E07\u0E41\u0E25\u0E49\u0E27 \u2014 \u0E40\u0E1B\u0E34\u0E14 LINE \u0E41\u0E25\u0E49\u0E27\u0E41\u0E19\u0E1A\u0E23\u0E39\u0E1B\u0E2A\u0E48\u0E07\u0E25\u0E39\u0E01\u0E04\u0E49\u0E32\u0E44\u0E14\u0E49\u0E40\u0E25\u0E22" : "\u0E2A\u0E48\u0E07\u0E23\u0E39\u0E1B\u0E41\u0E25\u0E49\u0E27 \u2014 \u0E2A\u0E48\u0E07\u0E04\u0E33\u0E2D\u0E18\u0E34\u0E1A\u0E32\u0E22\u0E40\u0E1B\u0E47\u0E19\u0E02\u0E49\u0E2D\u0E04\u0E27\u0E32\u0E21\u0E15\u0E48\u0E2D\u0E44\u0E14\u0E49\u0E40\u0E25\u0E22");
+      setNote(r === "downloaded" ? "บันทึกรูปลงเครื่องแล้ว — เปิด LINE แล้วแนบรูปส่งลูกค้าได้เลย" : "ส่งรูปแล้ว — ส่งคำอธิบายเป็นข้อความต่อได้เลย");
     }
   };
-  const inCls = "w-full mt-1 rounded-xl px-3 py-2.5 text-[24px] bg-white border border-sky-200 outline-none focus:border-blue-700";
-  const btnOutline = "flex-1 rounded-xl py-2.5 text-[21px] font-semibold bg-white border";
-  return /* @__PURE__ */ React.createElement("div", { className: "fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 print:hidden", style: { background: "rgba(8,30,62,0.55)" }, onClick: onClose }, /* @__PURE__ */ React.createElement("div", { className: "w-full max-w-md rounded-2xl p-5 bg-white max-h-[90vh] overflow-y-auto", onClick: (e) => e.stopPropagation() }, /* @__PURE__ */ React.createElement("h3", { className: "text-[30px] font-bold text-blue-900 mb-3" }, mode === "agent" ? "\u2699\uFE0F \u0E02\u0E49\u0E2D\u0E21\u0E39\u0E25\u0E15\u0E31\u0E27\u0E41\u0E17\u0E19" : mode === "text" ? "\u{1F4AC} \u0E2A\u0E48\u0E07\u0E02\u0E49\u0E2D\u0E04\u0E27\u0E32\u0E21 LINE" : "\u{1F5BC}\uFE0F \u0E2A\u0E48\u0E07\u0E23\u0E39\u0E1B LINE"), mode !== "agent" && /* @__PURE__ */ React.createElement("div", { className: "mb-3 space-y-2" }, /* @__PURE__ */ React.createElement("label", { className: "block" }, /* @__PURE__ */ React.createElement("span", { className: "text-[21px] text-slate-500" }, isKids ? "\u0E0A\u0E37\u0E48\u0E2D\u0E1C\u0E39\u0E49\u0E1B\u0E01\u0E04\u0E23\u0E2D\u0E07 (\u0E1C\u0E39\u0E49\u0E23\u0E31\u0E1A\u0E02\u0E49\u0E2D\u0E04\u0E27\u0E32\u0E21) \u2014 \u0E44\u0E21\u0E48\u0E1A\u0E31\u0E07\u0E04\u0E31\u0E1A" : "\u0E0A\u0E37\u0E48\u0E2D\u0E25\u0E39\u0E01\u0E04\u0E49\u0E32 \u2014 \u0E44\u0E21\u0E48\u0E1A\u0E31\u0E07\u0E04\u0E31\u0E1A"), /* @__PURE__ */ React.createElement("input", { value: customer, onChange: (e) => setCustomer(e.target.value), placeholder: isKids ? "\u0E40\u0E0A\u0E48\u0E19 \u0E41\u0E21\u0E48\u0E2A\u0E49\u0E21" : "\u0E40\u0E0A\u0E48\u0E19 \u0E2A\u0E21\u0E0A\u0E32\u0E22", className: inCls })), isKids && /* @__PURE__ */ React.createElement("label", { className: "block" }, /* @__PURE__ */ React.createElement("span", { className: "text-[21px] text-slate-500" }, "\u0E0A\u0E37\u0E48\u0E2D\u0E40\u0E14\u0E47\u0E01 (\u0E1C\u0E39\u0E49\u0E40\u0E2D\u0E32\u0E1B\u0E23\u0E30\u0E01\u0E31\u0E19) \u2014 \u0E44\u0E21\u0E48\u0E1A\u0E31\u0E07\u0E04\u0E31\u0E1A"), /* @__PURE__ */ React.createElement("input", { value: child, onChange: (e) => setChild(e.target.value), placeholder: "\u0E40\u0E0A\u0E48\u0E19 \u0E02\u0E49\u0E32\u0E27\u0E1B\u0E31\u0E49\u0E19", className: inCls }))),     draft ? /* @__PURE__ */ React.createElement("div", { className: "rounded-xl p-3 mb-3 bg-sky-50" }, [["name", "\u0E0A\u0E37\u0E48\u0E2D\u0E15\u0E31\u0E27\u0E41\u0E17\u0E19"], ["phone", "\u0E40\u0E1A\u0E2D\u0E23\u0E4C\u0E42\u0E17\u0E23"], ["lineId", "LINE ID"]].map(([k, l]) => /* @__PURE__ */ React.createElement("label", { key: k, className: "block mb-2" }, /* @__PURE__ */ React.createElement("span", { className: "text-[21px] text-slate-500" }, l), /* @__PURE__ */ React.createElement("input", { value: draft[k] || "", onChange: (e) => setDraft(Object.assign({}, draft, { [k]: e.target.value })), className: inCls }))), /* @__PURE__ */ React.createElement("button", { onClick: () => {
-    saveAgent(draft);
-    if (mode === "agent") onClose();
-  }, className: "w-full rounded-xl py-2.5 text-[24px] font-semibold text-white bg-blue-900" }, "\u{1F4BE} \u0E1A\u0E31\u0E19\u0E17\u0E36\u0E01\u0E02\u0E49\u0E2D\u0E21\u0E39\u0E25\u0E15\u0E31\u0E27\u0E41\u0E17\u0E19")) : /* @__PURE__ */ React.createElement("div", { className: `rounded-xl p-3 mb-3 ${agent.confirmed ? "bg-sky-50" : "bg-amber-50 border border-amber-300"}` }, !agent.confirmed && /* @__PURE__ */ React.createElement("p", { className: "text-[21px] font-semibold text-amber-800 mb-1" }, "\u0E01\u0E23\u0E38\u0E13\u0E32\u0E15\u0E23\u0E27\u0E08\u0E2A\u0E2D\u0E1A\u0E02\u0E49\u0E2D\u0E21\u0E39\u0E25\u0E15\u0E31\u0E27\u0E41\u0E17\u0E19\u0E01\u0E48\u0E2D\u0E19\u0E2A\u0E48\u0E07\u0E04\u0E23\u0E31\u0E49\u0E07\u0E41\u0E23\u0E01"), /* @__PURE__ */ React.createElement("p", { className: "text-[24px] font-semibold text-slate-800" }, agent.name || "-"), /* @__PURE__ */ React.createElement("p", { className: "text-[21px] text-slate-500" }, "\u{1F4DE} ", agent.phone || "-", " \xB7 LINE: ", agent.lineId || "-"), /* @__PURE__ */ React.createElement("div", { className: "flex gap-2 mt-2" }, !agent.confirmed && /* @__PURE__ */ React.createElement("button", { onClick: () => saveAgent(agent), className: "flex-1 rounded-xl py-2 text-[21px] font-semibold text-white bg-emerald-600" }, "\u2713 \u0E16\u0E39\u0E01\u0E15\u0E49\u0E2D\u0E07"), /* @__PURE__ */ React.createElement("button", { onClick: () => setDraft(Object.assign({}, agent)), className: `${btnOutline} text-blue-900 border-sky-200` }, "\u270E \u0E41\u0E01\u0E49\u0E44\u0E02"))),
-  mode === "image" && live && React.createElement("div", { className: "mb-3" },
-      React.createElement("p", { className: "text-[21px] font-semibold text-blue-900 mb-2" }, "👀 ตัวอย่างรูปที่จะส่ง · มือถือกดค้างที่รูปเพื่อบันทึก"),
-      React.createElement(ZoomImage, { src: live, alt: "ตัวอย่างรูป", className: "w-full rounded-lg border border-sky-200", style: { WebkitTouchCallout: "default" } })), note && /* @__PURE__ */ React.createElement("p", { className: "text-[21px] text-emerald-700 mb-3" }, note), imageSent && mode === "image" && /* @__PURE__ */ React.createElement("button", { onClick: () => {
-    openLineText(buildSKText(buildData()));
-    onClose();
-  }, className: "w-full mb-3 rounded-xl py-3 text-[27px] font-bold text-white", style: { background: "#06C755" } }, "\u{1F4AC} \u0E2A\u0E48\u0E07\u0E02\u0E49\u0E2D\u0E04\u0E27\u0E32\u0E21\u0E15\u0E48\u0E2D"), mode !== "agent" && /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("button", { disabled: !ready, onClick: send, className: "w-full rounded-xl py-3 text-[27px] font-bold text-white", style: { background: "#06C755", opacity: ready ? 1 : 0.4 } }, mode === "text" ? "\u{1F4AC} \u0E40\u0E1B\u0E34\u0E14 LINE \u0E40\u0E1E\u0E37\u0E48\u0E2D\u0E2A\u0E48\u0E07\u0E02\u0E49\u0E2D\u0E04\u0E27\u0E32\u0E21" : "\u{1F5BC}\uFE0F \u0E2A\u0E23\u0E49\u0E32\u0E07\u0E23\u0E39\u0E1B\u0E41\u0E25\u0E30\u0E2A\u0E48\u0E07 LINE"), /* @__PURE__ */ React.createElement("div", { className: "mt-3 rounded-xl p-3 border border-dashed border-emerald-300" }, /* @__PURE__ */ React.createElement("p", { className: "text-[21px] text-slate-500 mb-2" }, "\u0E2A\u0E48\u0E07\u0E1C\u0E48\u0E32\u0E19 LINE OA: \u0E04\u0E31\u0E14\u0E25\u0E2D\u0E01\u0E2B\u0E23\u0E37\u0E2D\u0E1A\u0E31\u0E19\u0E17\u0E36\u0E01\u0E44\u0E27\u0E49\u0E01\u0E48\u0E2D\u0E19 \u0E41\u0E25\u0E49\u0E27\u0E44\u0E1B\u0E27\u0E32\u0E07/\u0E41\u0E19\u0E1A\u0E43\u0E19\u0E41\u0E0A\u0E17\u0E25\u0E39\u0E01\u0E04\u0E49\u0E32"), /* @__PURE__ */ React.createElement("div", { className: "flex gap-2" }, /* @__PURE__ */ React.createElement("button", { disabled: !ready, onClick: () => {
-    const ok = copyTextToClipboard(editedText());
-    setNote(ok ? "\u{1F4CB} \u0E04\u0E31\u0E14\u0E25\u0E2D\u0E01\u0E02\u0E49\u0E2D\u0E04\u0E27\u0E32\u0E21\u0E41\u0E25\u0E49\u0E27 \u2014 \u0E40\u0E1B\u0E34\u0E14\u0E41\u0E0A\u0E17\u0E25\u0E39\u0E01\u0E04\u0E49\u0E32\u0E43\u0E19 LINE OA \u0E41\u0E25\u0E49\u0E27\u0E01\u0E14\u0E27\u0E32\u0E07" : "\u0E04\u0E31\u0E14\u0E25\u0E2D\u0E01\u0E44\u0E21\u0E48\u0E2A\u0E33\u0E40\u0E23\u0E47\u0E08 \u0E25\u0E2D\u0E07\u0E43\u0E2B\u0E21\u0E48\u0E2D\u0E35\u0E01\u0E04\u0E23\u0E31\u0E49\u0E07");
-  }, className: `${btnOutline} text-emerald-700 border-emerald-500`, style: { opacity: ready ? 1 : 0.4 } }, "\u{1F4CB} \u0E04\u0E31\u0E14\u0E25\u0E2D\u0E01\u0E02\u0E49\u0E2D\u0E04\u0E27\u0E32\u0E21"), /* @__PURE__ */ React.createElement("button", { disabled: !ready, onClick: () => {
-    setPreview(drawSKImage(editedData()).toDataURL("image/png"));
-    setNote("");
-  }, className: `${btnOutline} text-emerald-700 border-emerald-500`, style: { opacity: ready ? 1 : 0.4 } }, "\u{1F4BE} \u0E1A\u0E31\u0E19\u0E17\u0E36\u0E01\u0E23\u0E39\u0E1B")), preview && /* @__PURE__ */ React.createElement("div", { className: "mt-3" }, /* @__PURE__ */ React.createElement("p", { className: "text-[21px] font-semibold text-blue-900 mb-2" }, "\u0E21\u0E37\u0E2D\u0E16\u0E37\u0E2D: \u0E01\u0E14\u0E04\u0E49\u0E32\u0E07\u0E17\u0E35\u0E48\u0E23\u0E39\u0E1B \u2192 \u0E1A\u0E31\u0E19\u0E17\u0E36\u0E01\u0E23\u0E39\u0E1B\u0E20\u0E32\u0E1E \xB7 \u0E04\u0E2D\u0E21: \u0E01\u0E14\u0E1B\u0E38\u0E48\u0E21\u0E14\u0E32\u0E27\u0E19\u0E4C\u0E42\u0E2B\u0E25\u0E14\u0E14\u0E49\u0E32\u0E19\u0E25\u0E48\u0E32\u0E07"), /* @__PURE__ */ React.createElement(ZoomImage, { src: preview, alt: "\u0E2A\u0E23\u0E38\u0E1B\u0E41\u0E1A\u0E1A\u0E1B\u0E23\u0E30\u0E01\u0E31\u0E19", className: "w-full rounded-lg border border-sky-200", style: { WebkitTouchCallout: "default" } }), /* @__PURE__ */ React.createElement("a", { href: preview, download: "sudkhum-summary.png", className: "block text-center mt-2 rounded-xl py-2 text-[21px] font-semibold bg-sky-50 text-blue-900" }, "\u2B07\uFE0F \u0E14\u0E32\u0E27\u0E19\u0E4C\u0E42\u0E2B\u0E25\u0E14\u0E23\u0E39\u0E1B")))), mode !== "agent" && edit && React.createElement("div", { className: "mt-4 mb-3" },
-    React.createElement("div", { className: "flex items-center justify-between gap-2 mb-2" },
-      React.createElement("p", { className: "text-[21px] font-semibold text-blue-900" }, mode === "text" ? "✏️ ตรวจ/แก้ข้อความก่อนส่ง" : "✏️ ตรวจ/แก้บรรทัดสรุปบนรูป (ตารางแก้ไม่ได้)"),
-      React.createElement("button", { onClick: () => setEdit(makeEdit()), className: "text-[18px] px-3 py-1 rounded-full bg-sky-50 text-blue-900 border border-sky-200 shrink-0" }, "↺ คืนค่าเดิม")),
-    mode === "text"
-      ? React.createElement("textarea", { value: edit.text || "", rows: 14, onChange: (e) => setEdit(Object.assign({}, edit, { text: e.target.value, dirty: true })), className: "w-full rounded-xl px-3 py-2 text-[21px] border border-sky-200", style: { lineHeight: 1.5, fontFamily: "inherit" } })
-      : React.createElement(LineEditor, { groups: edit.groups || [], onChange: (g) => setEdit(Object.assign({}, edit, { groups: g, dirty: true })) })), /* @__PURE__ */ React.createElement("button", { onClick: onClose, className: "w-full mt-2 rounded-xl py-2.5 text-[24px] font-semibold bg-sky-50 text-blue-900" }, "\u2715 \u0E1B\u0E34\u0E14")));
+  const copy = () => {
+    const ok = copyTextToClipboard(mode === "image" ? buildSKText(buildData()) : editedText());
+    setNote(ok ? "📋 คัดลอกข้อความแล้ว — เปิดแชทลูกค้าใน LINE OA แล้วกดวาง" : "คัดลอกไม่สำเร็จ ลองใหม่อีกครั้ง");
+  };
+  const nameFields = [{ label: isKids ? "ชื่อผู้ปกครอง (ผู้รับข้อความ) — ไม่บังคับ" : "ชื่อลูกค้า — ไม่บังคับ", value: customer, onChange: setCustomer, placeholder: isKids ? "เช่น แม่ส้ม" : "เช่น สมชาย" }];
+  if (isKids) nameFields.push({ label: "ชื่อเด็ก (ผู้เอาประกัน) — ไม่บังคับ", value: child, onChange: setChild, placeholder: "เช่น ข้าวปั้น" });
+  return React.createElement(LineShareSheet, {
+    mode, nameFields, agent, onSaveAgent: saveAgent,
+    previews: live ? [live] : [], downloadName: () => "sudkhum-summary.png",
+    note,
+    extra: imageSent && mode === "image" ? React.createElement("button", { onClick: () => { openLineText(buildSKText(buildData())); onClose(); }, className: "w-full mb-3 rounded-xl py-3 text-[22px] font-semibold text-white", style: { background: "#06C755" } }, "💬 ส่งข้อความต่อ") : null,
+    onSend: send, onCopy: copy,
+    editor: edit ? { text: edit.text, groups: edit.groups,
+      onText: (t) => setEdit(Object.assign({}, edit, { text: t, dirty: true })),
+      onGroups: (g) => setEdit(Object.assign({}, edit, { groups: g, dirty: true })),
+      onReset: () => setEdit(makeEdit()) } : null,
+    onClose });
 }
 function SudKoomDashboard({ onBack }) {
   const [productKey, setProductKey] = useState(init("productKey"));
