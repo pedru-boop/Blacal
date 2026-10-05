@@ -8,7 +8,7 @@ const BRAND = {
     ink: "#000000", sub: "#404040", danger: "#B93232", warn: "#6B4508",
     label: "#000000", nameBlue: "#1668D6", mainBlue: "#0C2F63", dataBlack: "#000000",
 };
-const APP_VERSION = "v2.37.0 (2569-10-05)";
+const APP_VERSION = "v2.38.0 (2569-10-05)";
 const RATE_SOURCE = "อัตราเบี้ยตามคู่มือตัวแทน V.14 (14-02-2026) · ค่าคอม 10-09-2026";
 const CASES_KEY = "blacal-cases-v1"; // อัปเดตเลขนี้ทุกครั้งที่มีการแก้ไข/เพิ่มแบบประกันใหม่ เพื่อให้รู้ว่าไฟล์ที่ใช้อยู่เป็นเวอร์ชันล่าสุดหรือไม่
 const fmt = (n) => (n === null || n === undefined || isNaN(n) ? "0" : Math.round(n).toLocaleString("th-TH"));
@@ -259,14 +259,15 @@ function ImageZoomViewer({ src, alt, onClose }) {
      mode: "text" | "image" | "agent"
      nameFields: [{ label, value, onChange, placeholder }]
      agent, onSaveAgent(info)            — ข้อมูลตัวแทน (บันทึกแล้ว confirmed = true)
-     previews: [dataURL], downloadName(i) — ตัวอย่างรูป (โหมดรูป)
+     previews: [dataURL], saveName        — ตัวอย่างรูป (โหมดรูป) + ชื่อไฟล์ตอนบันทึก
      note, extra                          — ข้อความแจ้งผล / ส่วนเสริมเหนือปุ่มส่ง
      onSend, onCopy                       — ส่ง LINE / คัดลอกข้อความสำหรับ LINE OA
      editor: { text, onText, groups, onGroups, onReset }
      onClose */
 function LineShareSheet(props) {
-    const { mode, nameFields = [], agent, onSaveAgent, previews = [], downloadName, note, extra, onSend, onCopy, editor, onClose } = props;
+    const { mode, nameFields = [], agent, onSaveAgent, previews = [], saveName, note, extra, onSend, onCopy, editor, onClose } = props;
     const [draft, setDraft] = React.useState(mode === "agent" ? Object.assign({}, agent) : null);
+    const [saveNote, setSaveNote] = React.useState("");
     const ready = !!agent.confirmed && !draft;
     const save = (info) => { onSaveAgent(Object.assign({}, info, { confirmed: true })); setDraft(null); if (mode === "agent") onClose(); };
     const box = { border: "1px solid #D7E8F0" };
@@ -293,17 +294,19 @@ function LineShareSheet(props) {
                         h("button", { onClick: () => setDraft(Object.assign({}, agent)), className: "flex-1 rounded-xl py-2 text-[19px] font-medium", style: Object.assign({ background: "#FFFFFF", color: BRAND.navy }, box) }, "✎ แก้ไข"))),
             // 3) ตัวอย่างรูป
             mode === "image" && previews.length > 0 && h("div", { className: "mb-3" },
-                h("p", { className: "text-[18px] mb-2 font-semibold", style: { color: BRAND.navy } }, `👀 ตัวอย่างรูปที่จะส่ง${previews.length > 1 ? ` (${previews.length} รูป)` : ""} · แตะรูปเพื่อขยาย · กดค้างเพื่อบันทึก`),
+                h("p", { className: "text-[18px] mb-2 font-semibold", style: { color: BRAND.navy } }, `👀 ตัวอย่างรูปที่จะส่ง${previews.length > 1 ? ` (${previews.length} รูป)` : ""} · แตะรูปเพื่อขยาย`),
                 previews.map((src, i) => h("div", { key: i, className: "mb-2" },
-                    h(ZoomImage, { src, alt: `รูปที่ ${i + 1}`, className: "w-full rounded-lg", style: Object.assign({ WebkitTouchCallout: "default" }, box) }),
-                    h("a", { href: src, download: downloadName ? downloadName(i) : `summary-${i + 1}.png`, className: "block text-center mt-1 rounded-xl py-1.5 text-[17px]", style: { background: BRAND.bg, color: BRAND.navy } }, previews.length > 1 ? `⬇️ ดาวน์โหลดรูปที่ ${i + 1}` : "⬇️ ดาวน์โหลดรูป")))),
+                    h(ZoomImage, { src, alt: `รูปที่ ${i + 1}`, className: "w-full rounded-lg", style: Object.assign({ WebkitTouchCallout: "default" }, box) })))),
             mode !== "agent" && note && h("p", { className: "text-[19px] mb-3", style: { color: BRAND.greenDeep } }, note),
             mode !== "agent" && extra,
             // 4) ปุ่มส่ง + LINE OA
             mode !== "agent" && h("button", { disabled: !ready, onClick: onSend, className: "w-full rounded-xl py-3 text-[22px] font-semibold text-white", style: { background: "#06C755", opacity: ready ? 1 : 0.4 } }, mode === "text" ? "💬 เปิด LINE เพื่อส่งข้อความ" : "🖼️ สร้างรูปและส่ง LINE"),
             mode !== "agent" && onCopy && h("div", { className: "mt-3 rounded-xl p-3", style: { border: "1px dashed #9FD8B0" } },
-                h("p", { className: "text-[18px] mb-2", style: { color: BRAND.sub } }, mode === "image" ? "ส่งผ่าน LINE OA: กดค้างที่รูปเพื่อบันทึก (หรือกดดาวน์โหลด) แล้วแนบในแชทลูกค้า · คัดลอกข้อความไปวางต่อได้" : "ส่งผ่าน LINE OA: คัดลอกข้อความ แล้วไปวางในแชทลูกค้า"),
-                h("button", { disabled: !ready, onClick: onCopy, className: "w-full rounded-xl py-2.5 text-[19px] font-medium", style: { background: "#FFFFFF", color: "#06A045", border: "1px solid #06C755", opacity: ready ? 1 : 0.4 } }, "📋 คัดลอกข้อความ")),
+                h("p", { className: "text-[18px] mb-2", style: { color: BRAND.sub } }, mode === "image" ? (isIOSDevice() ? "ส่งผ่าน LINE OA: กด 💾 แล้วแตะ \"บันทึกภาพ\" รูปจะเข้าแอปรูปภาพ จากนั้นแนบในแชทลูกค้า" : "ส่งผ่าน LINE OA: กด 💾 รูปจะอยู่ในแกลเลอรี อัลบั้ม Download (ดาวน์โหลด) จากนั้นแนบในแชทลูกค้า") : "ส่งผ่าน LINE OA: คัดลอกข้อความ แล้วไปวางในแชทลูกค้า"),
+                h("div", { className: "flex gap-2" },
+                    mode === "image" && previews.length > 0 && h("button", { disabled: !ready, onClick: () => { const r = saveImagesToDevice(previews, saveName || "summary"); setSaveNote(r === "ios-share" ? "แตะ \"บันทึกภาพ\" ในเมนูที่ขึ้นมา" : (navigator.maxTouchPoints > 0 ? "บันทึกรูปแล้ว — ดูในแกลเลอรี อัลบั้ม Download" : "บันทึกรูปแล้ว — อยู่ในโฟลเดอร์ Downloads ของเครื่อง")); }, className: "flex-1 rounded-xl py-2.5 text-[19px] font-medium text-white", style: { background: "#06A045", opacity: ready ? 1 : 0.4 } }, previews.length > 1 ? `💾 บันทึกรูป (${previews.length})` : "💾 บันทึกรูป"),
+                    h("button", { disabled: !ready, onClick: onCopy, className: "flex-1 rounded-xl py-2.5 text-[19px] font-medium", style: { background: "#FFFFFF", color: "#06A045", border: "1px solid #06C755", opacity: ready ? 1 : 0.4 } }, "📋 คัดลอกข้อความ")),
+                saveNote && h("p", { className: "text-[18px] mt-2", style: { color: BRAND.greenDeep } }, saveNote)),
             // 5) ส่วนแก้ข้อความ
             mode !== "agent" && editor && h("div", { className: "mt-4 mb-3" },
                 h("div", { className: "flex items-center justify-between gap-2 mb-2" },
@@ -765,6 +768,29 @@ function LineEditor({ groups, onChange }) {
                         r.sub !== undefined && React.createElement("input", { key: "s", value: r.sub, onChange: (e) => upd(gi, ri, { sub: e.target.value }), style: Object.assign({}, box, { fontSize: 15 }) }),
                         React.createElement("textarea", { key: "v", value: r.v || "", rows: Math.min(5, Math.max(1, Math.ceil(String(r.v || "").length / 32))), onChange: (e) => upd(gi, ri, { v: e.target.value }), style: Object.assign({}, box, { fontWeight: 600, resize: "vertical" }) })]),
             React.createElement("button", { onClick: () => del(gi, ri), title: "ลบบรรทัดนี้", style: { width: 34, height: 34, borderRadius: 17, background: "#FFFFFF", border: "1px solid #F0C9C9", color: "#B93232", fontSize: 16, flexShrink: 0 } }, "✕"))))));
+}
+// บันทึกรูปลงเครื่อง (ใช้ตอนจะแนบใน LINE OA)
+// iPhone/iPad: เปิดเมนูแชร์ → แตะ "บันทึกภาพ" → เข้าแอปรูปภาพ · Android/คอม: บันทึกไฟล์ (Android เห็นในแกลเลอรี อัลบั้ม Download)
+function isIOSDevice() {
+    try { return /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1); } catch (e) { return false; }
+}
+function saveImagesToDevice(srcs, baseName) {
+    const name = (k) => srcs.length > 1 ? `${baseName}-${k + 1}.png` : `${baseName}.png`;
+    if (isIOSDevice()) {
+        const files = srcs.map((u, k) => {
+            const bin = atob(u.split(",")[1]);
+            const arr = new Uint8Array(bin.length);
+            for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
+            return new File([arr], name(k), { type: "image/png" });
+        });
+        if (navigator.canShare && navigator.canShare({ files })) { navigator.share({ files }).catch(() => { }); return "ios-share"; }
+    }
+    srcs.forEach((u, k) => {
+        const a = document.createElement("a");
+        a.href = u; a.download = name(k);
+        document.body.appendChild(a); a.click(); a.remove();
+    });
+    return "downloaded";
 }
 function shareCanvasImage(canvasOrList) {
     const list = Array.isArray(canvasOrList) ? canvasOrList : [canvasOrList];
@@ -5562,7 +5588,7 @@ function App() {
                 mode: shareModal.id ? shareModal.mode : "agent",
                 nameFields: [{ label: "ชื่อลูกค้า (ไม่บังคับ)", value: customerName, onChange: setCustomerName, placeholder: "เช่น สมชาย" }],
                 agent: agentInfo, onSaveAgent: saveAgent,
-                previews: shareLive, downloadName: (i) => `insurance-summary-${i + 1}.png`,
+                previews: shareLive, saveName: "insurance-summary",
                 note: shareNote,
                 extra: shareModal.id === "QUOTE" && shareModal.mode === "text" && (() => {
                         const q = buildQuoteData();
@@ -6799,7 +6825,7 @@ function ShareModal({ mode, isKids, customer, setCustomer, child, setChild, agen
   if (isKids) nameFields.push({ label: "ชื่อเด็ก (ผู้เอาประกัน) — ไม่บังคับ", value: child, onChange: setChild, placeholder: "เช่น ข้าวปั้น" });
   return React.createElement(LineShareSheet, {
     mode, nameFields, agent, onSaveAgent: saveAgent,
-    previews: live ? [live] : [], downloadName: () => "sudkhum-summary.png",
+    previews: live ? [live] : [], saveName: "sudkhum-summary",
     note,
     extra: imageSent && mode === "image" ? React.createElement("button", { onClick: () => { openLineText(buildSKText(buildData())); onClose(); }, className: "w-full mb-3 rounded-xl py-3 text-[22px] font-semibold text-white", style: { background: "#06C755" } }, "💬 ส่งข้อความต่อ") : null,
     onSend: send, onCopy: copy,
