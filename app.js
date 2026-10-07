@@ -8,7 +8,7 @@ const BRAND = {
     ink: "#000000", sub: "#404040", danger: "#B93232", warn: "#6B4508",
     label: "#000000", nameBlue: "#1668D6", mainBlue: "#0C2F63", dataBlack: "#000000",
 };
-const APP_VERSION = "v2.39.0 (2569-10-05)";
+const APP_VERSION = "v2.40.0 (2569-10-05)";
 const RATE_SOURCE = "อัตราเบี้ยตามคู่มือตัวแทน V.14 (14-02-2026) · ค่าคอม 10-09-2026";
 const CASES_KEY = "blacal-cases-v1"; // อัปเดตเลขนี้ทุกครั้งที่มีการแก้ไข/เพิ่มแบบประกันใหม่ เพื่อให้รู้ว่าไฟล์ที่ใช้อยู่เป็นเวอร์ชันล่าสุดหรือไม่
 const fmt = (n) => (n === null || n === undefined || isNaN(n) ? "0" : Math.round(n).toLocaleString("th-TH"));
@@ -125,6 +125,29 @@ function benefitSection(k) {
     return "alive";
 }
 // เรียงบรรทัดผลประโยชน์ตาม 4 คำถาม และแทรกแถวหัวข้อ ["§", ชื่อหัวข้อ] (ถ้ามีมากกว่า 1 หมวด)
+// ===== ใส่ลำดับในข้อความ/รูปที่ส่งลูกค้า: หัวข้อที่มีหลายรายการ → 1. 2. 3. · รายชื่อ (โรค ฯลฯ) ตั้งแต่ 3 รายการ → แตกบรรทัด 1) 2) 3)
+const NUM_RE = /^\d+\.\s/;
+function listifyValue(v) {
+    if (typeof v !== "string" || v.includes("\n")) return v;
+    return v.split(" · ").map((part) => {
+        const c = part.lastIndexOf(": ");
+        const head = c >= 0 && c < part.length * 0.5 ? part.slice(0, c + 1) : "";
+        const body = head ? part.slice(c + 2) : part;
+        const items = body.split(/,\s+/).map((x) => x.replace(/^และ\s*/, "").trim()).filter(Boolean);
+        if (items.length < 3 || items.some((x) => x.length > 90)) return part;
+        return (head ? head + "\n" : "") + items.map((x, i) => `${i + 1}) ${x}`).join("\n");
+    }).join(" · ").replace(/ · \n/g, "\n");
+}
+// rows = [[k, v] | ["§", หัวข้อ]] → ใส่เลขลำดับให้แถวในแต่ละหัวข้อที่มีตั้งแต่ 2 แถว
+function numberBenefitRows(rows) {
+    const out = rows.map((r) => r.slice());
+    let seg = [];
+    const flush = () => { if (seg.length >= 2) seg.forEach((r, i) => { if (!NUM_RE.test(r[0])) r[0] = `${i + 1}. ${r[0]}`; }); seg = []; };
+    out.forEach((r) => { if (r[0] === "§") flush(); else { r[1] = listifyValue(r[1]); seg.push(r); } });
+    flush();
+    return out;
+}
+const numberedNotes = (notes) => (notes || []).length >= 2 ? notes.map((n, i) => `${i + 1}. ${n}`) : (notes || []);
 function groupBenefits(rows) {
     const order = ["pay", "alive", "maturity", "death", "until", "know"], by = {};
     rows.forEach((r) => { const k = benefitSection(r[0]); (by[k] = by[k] || []).push(r); });
@@ -170,6 +193,11 @@ function shareKeyLines(d) {
     if (protDeath.length) { sec(SEC.death); protDeath.forEach(([k, v]) => lines.push(["•", k, v])); }
     if (d.coverUntil) { sec(SEC.until); lines.push(["⏳", "คุ้มครองถึง", d.coverUntil]); }
     if (d.knowLines && d.knowLines.length) { sec(SEC.know); d.knowLines.forEach(([k, v]) => lines.push(["•", k, v])); }
+    // ใส่ลำดับในแต่ละหัวข้อที่มีตั้งแต่ 2 รายการ
+    let seg = [];
+    const flush = () => { if (seg.length >= 2) seg.forEach((l, i) => { if (!NUM_RE.test(l[1])) { l[1] = `${i + 1}. ${l[1]}`; if (l[0] === "•") l[0] = ""; } }); seg = []; };
+    lines.forEach((l) => { if (l[0] === "§") flush(); else { l[2] = listifyValue(l[2]); seg.push(l); } });
+    flush();
     return lines;
 }
 function buildShareText(d) {
@@ -180,7 +208,7 @@ function buildShareText(d) {
     out.push(`👤 ${d.gender === "female" ? "เพศหญิง" : "เพศชาย"} อายุ ${d.age} ปี`);
     shareKeyLines(d).forEach(([ic, k, v]) => out.push(ic === "§" ? `\n${v}` : `${ic ? ic + " " : ""}${k}: ${v}`));
     if (d.div) { out.push("", `${d.div.badge} — เงื่อนไข`); d.div.lines.forEach((n) => out.push(`• ${n}`)); }
-    if (d.customerNotes && d.customerNotes.length) { out.push("", "📌 ข้อควรรู้"); d.customerNotes.forEach((n) => out.push(`• ${n}`)); }
+    if (d.customerNotes && d.customerNotes.length) { out.push("", "📌 ข้อควรรู้"); d.customerNotes.forEach((n) => out.push(NUM_RE.test(n) ? n : `• ${n}`)); }
     out.push("", "————————");
     if (d.agent.name) out.push(d.agent.name);
     if (d.agent.phone) out.push(`📞 ${d.agent.phone}`);
@@ -459,7 +487,7 @@ function drawShareImage(d, part) {
         y += 14;
         const ns = L.ops.length; let nh = 14;
         nh += L.para(P + 4, y + nh, "📌 ข้อควรรู้", 26, 600, BRAND.warn, W - P * 2 - 8, 36);
-        d.customerNotes.forEach((n) => { nh += L.para(P + 4, y + nh, `• ${n}`, 23, 500, BRAND.sub, W - P * 2 - 8, 32); });
+        d.customerNotes.forEach((n) => { nh += L.para(P + 4, y + nh, NUM_RE.test(n) ? n : `• ${n}`, 23, 500, BRAND.sub, W - P * 2 - 8, 32); });
         nh += 12;
         L.ops.splice(ns, 0, { t: "rect", x: P - 12, y, w: W - P * 2 + 24, h: nh, color: "#FFF8E6" });
         y += nh;
@@ -697,7 +725,7 @@ function buildQuoteText(q) {
         out.push(`💳 เบี้ย ${baht(c.pay)}${c.single ? " (ชำระครั้งเดียว)" : ` (${q.payLabel})`}${c.renewalNote ? " · " + c.renewalNote : ""}`);
         c.benefits.forEach(([k, v]) => out.push(k === "§" ? `▸ ${v}` : `• ${k}: ${v}`));
         if (c.div) { out.push(`${c.div.badge} — เงื่อนไข`); c.div.lines.forEach((n) => out.push(`  - ${n}`)); }
-        if (c.notes && c.notes.length) { out.push("📌 ข้อควรรู้"); c.notes.forEach((n) => out.push(`  - ${n}`)); }
+        if (c.notes && c.notes.length) { out.push("📌 ข้อควรรู้"); c.notes.forEach((n) => out.push(`  ${NUM_RE.test(n) ? "" : "- "}${n}`)); }
     });
     out.push("", `💰 รวมเบี้ย (${q.payLabel}): ${baht(q.totalPay)}`);
     if (q.totalPay !== q.totalYear) out.push(`   เทียบเท่าเบี้ยรายปีรวม ${baht(q.totalYear)}`);
@@ -730,7 +758,7 @@ function drawQuoteImage(q) {
         if (c.notes && c.notes.length) {
             const ns = L.ops.length; let nh = 14;
             nh += L.para(P + 4, y + nh, "📌 ข้อควรรู้", 26, 600, BRAND.warn, W - P * 2 - 8, 36);
-            c.notes.forEach((n) => { nh += L.para(P + 4, y + nh, `• ${n}`, 23, 500, BRAND.sub, W - P * 2 - 8, 32); });
+            c.notes.forEach((n) => { nh += L.para(P + 4, y + nh, NUM_RE.test(n) ? n : `• ${n}`, 23, 500, BRAND.sub, W - P * 2 - 8, 32); });
             nh += 12;
             L.ops.splice(ns, 0, { t: "rect", x: P - 12, y, w: W - P * 2 + 24, h: nh, color: "#FFF8E6" });
             y += nh;
@@ -2011,7 +2039,7 @@ const PRODUCTS = [
     { id: "UNJAI", name: "บีแอลเอ อุ่นใจ โรคร้าย", tag: "แบบประกันหลัก · แพ็กเกจชีวิต + โรคร้ายแรง 11 โรค", ageMin: 20, ageMax: 75, coverAge: 90, isMain: true, renewalNote: "เบี้ยคงที่",
         occNote: "รับได้ทุกชั้นอาชีพ", siNote: "แพ็กเกจปิด 7 แผนสำเร็จรูป (ทุนชีวิต 50,000 บาทคงที่ + ทุนอีซีแคร์ 100,000-1,000,000 บาท) · ไม่สามารถซื้อสัญญาเพิ่มเติมอื่นเพิ่มได้ · เลือกได้เพียง 1 แบบ จาก 30 แบบทุนประกันหลัก" },
     { id: "CANCERMAX", name: "บีแอลเอ แคนเซอร์ แม็กซ์", tag: "แบบประกันหลัก · แพ็กเกจชีวิต + คุ้มครองมะเร็ง 3 สัญญา", ageMin: 0, ageMax: 70, coverAge: 90, isMain: true, renewalNote: "เบี้ยคงที่",
-        occNote: "รับได้ทุกชั้นอาชีพ", siNote: "แพ็กเกจปิด 5 แผน (Bronze/Silver/Gold/Emerald/Diamond) · ไม่สามารถซื้อสัญญาเพิ่มเติมอื่นเพิ่มได้ ยกเว้น คช. (ผู้เยาว์อายุ 0-14 ปี ต้องซื้อ คช. เพิ่มด้วย) · เลือกได้เพียง 1 แบบ จาก 30 แบบทุนประกันหลัก" },
+        occNote: "รับได้ทุกชั้นอาชีพ", siNote: "แพ็กเกจปิด 5 แผน (ทุนมะเร็ง 300,000–3,000,000 บาท) · ไม่สามารถซื้อสัญญาเพิ่มเติมอื่นเพิ่มได้ ยกเว้น คช. (ผู้เยาว์อายุ 0-14 ปี ต้องซื้อ คช. เพิ่มด้วย) · เลือกได้เพียง 1 แบบ จาก 30 แบบทุนประกันหลัก" },
     { id: "PLUS2", name: "บีแอลเอ คุ้มครอง 2 พลัส", tag: "แบบประกันหลัก · ชีวิต + ทุพพลภาพ 3 เท่า เลือกระยะชำระเบี้ย 10/15/20 ปี", ageMin: 20, ageMax: 65, coverAge: 65, isMain: true, renewalNote: "เบี้ยคงที่",
         occNote: "รับประกันเฉพาะชั้นอาชีพ 1-2 เท่านั้น (ไม่รับชั้นอาชีพ 3)", siNote: "ทุนประกันขั้นต่ำ 1,000,000 บาท · ทุพพลภาพถาวรสิ้นเชิงจ่าย 3 เท่าของทุนชีวิต สูงสุดไม่เกิน 30,000,000 บาท · อายุรับประกันสูงสุดขึ้นกับระยะที่เลือก (10 ปี→65, 15 ปี→60, 20 ปี→55) · เลือกได้เพียง 1 แบบ จาก 30 แบบทุนประกันหลัก" },
     { id: "HAPPYPENSION", name: "แฮปปี้ เพนชั่น (มีเงินปันผล)", tag: "แบบประกันหลัก · บำนาญตลอดชีพ 60", ageMin: 20, ageMax: 55, coverAge: 99, isMain: true, renewalNote: "เบี้ยคงที่",
@@ -2280,7 +2308,7 @@ function App() {
             totalPremium: premiumRows.reduce((t, r) => t + r.premium, 0),
             totalCash: rows.reduce((t, r) => t + (r.cashBaht || 0), 0), ciPerYear, agent: agentInfo,
             notes: shareNotes([{ name: prod ? prod.name : "", renewalNote: prod ? prod.renewalNote : "" }]),
-            customerNotes: CUSTOMER_NOTES[id] || [], div: dividendOf(id),
+            customerNotes: numberedNotes(CUSTOMER_NOTES[id] || []), div: dividendOf(id),
         };
     }
     function handleShareLine(id, pl) {
@@ -2292,7 +2320,7 @@ function App() {
         if (!result) return null;
         const cards = result.cards.map((c) => {
             const f = c.factor !== undefined ? c.factor : result.factor;
-            return { name: c.name, pay: c.premium * f, single: c.single, renewalNote: c.renewalNote, benefits: groupBenefits(customerBenefits(c.benefits, c.id)), notes: CUSTOMER_NOTES[c.id] || [], div: dividendOf(c.id) };
+            return { name: c.name, pay: c.premium * f, single: c.single, renewalNote: c.renewalNote, benefits: numberBenefitRows(groupBenefits(customerBenefits(c.benefits, c.id))), notes: numberedNotes(CUSTOMER_NOTES[c.id] || []), div: dividendOf(c.id) };
         });
         return { cards, payLabel: result.payLabel, totalPay: result.totalPay, totalYear: result.totalYear, singleNote: result.singleNote,
             customer: customerName.trim(), gender, age, agent: agentInfo, notes: shareNotes(cards) };
@@ -2899,8 +2927,8 @@ function App() {
                 React.createElement(NumInput, { value: life99SI, onChange: setLife99SI, min: 0, step: 50000 })));
             case "UNJAI": return selected.UNJAI && (React.createElement(PlanRow, { label: "\u0E41\u0E1C\u0E19\u0E04\u0E27\u0E32\u0E21\u0E04\u0E38\u0E49\u0E21\u0E04\u0E23\u0E2D\u0E07 (\u0E17\u0E38\u0E19\u0E2D\u0E35\u0E0B\u0E35\u0E41\u0E04\u0E23\u0E4C)" },
                 React.createElement(Chips, { options: UNJAI_PLANS, value: unjaiPlan, onChange: setUnjaiPlan, fmt: baht })));
-            case "CANCERMAX": return selected.CANCERMAX && (React.createElement(PlanRow, { label: "\u0E41\u0E1C\u0E19\u0E04\u0E27\u0E32\u0E21\u0E04\u0E38\u0E49\u0E21\u0E04\u0E23\u0E2D\u0E07 (\u0E27\u0E07\u0E40\u0E25\u0E47\u0E1A = \u0E17\u0E38\u0E19\u0E40\u0E1F\u0E34\u0E2A\u0E15\u0E4C \u0E41\u0E04\u0E19\u0E40\u0E0B\u0E2D\u0E23\u0E4C)" },
-                React.createElement(Chips, { options: CANCERMAX_PLANS.map((pl) => pl.key), value: cancermaxPlan, onChange: setCancermaxPlan, fmt: (k) => { const pl = CANCERMAX_PLANS.find((pp) => pp.key === k); return pl.label + " (" + baht(pl.first) + ")"; } })));
+            case "CANCERMAX": return selected.CANCERMAX && (React.createElement(PlanRow, { label: "แผนความคุ้มครอง (ทุนเฟิสต์ แคนเซอร์)" },
+                React.createElement(Chips, { options: CANCERMAX_PLANS.map((pl) => pl.key), value: cancermaxPlan, onChange: setCancermaxPlan, fmt: (k) => { const pl = CANCERMAX_PLANS.find((pp) => pp.key === k); return "ทุนมะเร็ง " + baht(pl.first); } })));
             case "PLUS2": return selected.PLUS2 && (React.createElement(React.Fragment, null,
                 React.createElement(PlanRow, { label: "\u0E23\u0E30\u0E22\u0E30\u0E40\u0E27\u0E25\u0E32\u0E0A\u0E33\u0E23\u0E30\u0E40\u0E1A\u0E35\u0E49\u0E22/\u0E40\u0E2D\u0E32\u0E1B\u0E23\u0E30\u0E01\u0E31\u0E19\u0E20\u0E31\u0E22" },
                     React.createElement(Chips, { options: PLUS2_TERMS, value: plus2Term, onChange: setPlus2Term, fmt: (t) => t + " ปี" })),
@@ -3424,7 +3452,7 @@ function App() {
         const endingRate = (gender === "female" ? ENDINGCANCER_FEMALE : ENDINGCANCER_MALE)[bi];
         const premium = (lifeRate * plan.life + firstRate * plan.first + dailyRate * plan.daily + endingRate * plan.ending) / 1000;
         return { ok: true, premium, benefits: [
-                ["แผนที่เลือก", plan.label],
+                ["แผนที่เลือก", "ทุนคุ้มครองมะเร็ง " + baht(plan.first)],
                 ["ทุนประกันชีวิต (สัญญาหลัก บีแอลเอ อุ่นใจ)", baht(plan.life)],
                 ["ทุนเฟิสต์ แคนเซอร์ (ตรวจพบมะเร็งครั้งแรก)", baht(plan.first)],
                 ["ทุนเดย์ลี่ แคนเซอร์ (ชดเชยรายวันรักษามะเร็ง)", baht(plan.daily) + " ต่อวัน"],
@@ -5915,28 +5943,57 @@ function PrintTableView({ data }) {
     }
     return null;
 }
-// แบบที่เลือกระยะได้หลายแบบในกล่องเดียว → ป้าย "เลือกได้ N ระยะ" (เห็นเฉพาะหน้าเลือกแบบของตัวแทน)
-const TERM_CHOICES = {
-    PRESTIGE: { kind: "ชำระ", terms: [5, 10, 15, 20] },
-    HRPDIV: { kind: "ชำระ", terms: [5, 10, 15, 20] },
-    HAPPYWL: { kind: "ชำระ", terms: [5, 10, 15] },
-    PLUS2: { kind: "ชำระ", terms: [10, 15, 20] },
-    HAPPYSAVING: { kind: "ชำระ", terms: [5, 10] },
-    CHAK: { kind: "คุ้มครอง", terms: [5, 10, 15, 18] },
+// แบบที่เลือกระยะ/แผนได้หลายแบบในกล่องเดียว → ป้าย "เลือกได้ N ระยะ/แผน" (เห็นเฉพาะหน้าเลือกแบบของตัวแทน)
+const CHOICE_BADGES = {
+    PRESTIGE: { n: 4, unit: "ระยะ", detail: "ชำระ 5/10/15/20 ปี" },
+    HRPDIV: { n: 4, unit: "ระยะ", detail: "ชำระ 5/10/15/20 ปี" },
+    HAPPYWL: { n: 3, unit: "ระยะ", detail: "ชำระ 5/10/15 ปี" },
+    PLUS2: { n: 3, unit: "ระยะ", detail: "ชำระ 10/15/20 ปี" },
+    HAPPYSAVING: { n: 2, unit: "ระยะ", detail: "ชำระ 5/10 ปี" },
+    HAPPYPENSION: { n: 4, unit: "ระยะ", detail: "ชำระครั้งเดียว/5 ปี/10 ปี/ถึงอายุ 60" },
+    HAPPYCI: { n: 2, unit: "ระยะ", detail: "ชำระ 20 ปี/ถึงอายุ 99" },
+    CHAK: { n: 4, unit: "ระยะ", detail: "คุ้มครอง 5/10/15/18 ปี" },
+    CHAP: { n: 4, unit: "ระยะ", detail: "คุ้มครอง 5/10/15/18 ปี" },
+    LLC: { n: 2, unit: "แบบ", detail: "ลองไลฟ์แคร์ (10) / พลัส (99)" },
+    UNJAI: { n: 7, unit: "แผน", detail: "ทุนโรคร้ายแรง 100,000–1,000,000 บาท" },
+    CANCERMAX: { n: 5, unit: "แผน", detail: "ทุนมะเร็ง 300,000–3,000,000 บาท" },
+    ACC: { n: 4, unit: "แผน", detail: "ทุน 200,000–1,000,000 บาท" },
+    ACC3: { n: 3, unit: "แผน", detail: "ค่ารักษา 5,000–15,000 บาท/ครั้ง" },
+    VH: { n: 4, unit: "แผน", detail: "แผน 2,000–5,000 บาท" },
+    VHKIDS: { n: 3, unit: "แผน", detail: "แผน 3,000–5,000 บาท" },
+    HH: { n: 3, unit: "แผน", detail: "วงเงิน 1–10 ล้านบาท/ปี" },
+    HHP: { n: 3, unit: "แผน", detail: "วงเงิน 1–10 ล้านบาท/ปี" },
+    PH: { n: 5, unit: "แผน", detail: "วงเงิน 20–200 ล้านบาท/ปี" },
+    OPD: { n: 4, unit: "แผน", detail: "500–2,000 บาท/ครั้ง" },
 };
-function TermBadge({ id, size = 12 }) {
-    const t = TERM_CHOICES[id];
+// ของแถมฟรีที่ติดมากับแบบ (เห็นเฉพาะหน้าเลือกแบบของตัวแทน) — อ้างอิงบรรทัด "แถมฟรี" ในผลประโยชน์ของแต่ละแบบ
+const FREEBIE_BADGES = {
+    SUD: "อุบัติเหตุ + ทุพพลภาพ",
+    HAPPYKID: "คุ้มครองผู้ชำระเบี้ย",
+    PSAVE104: "อุบัติเหตุ",
+    PSAVE126: "อุบัติเหตุ",
+    HS2515: "อุบัติเหตุ + ยกเว้นเบี้ยกรณีทุพพลภาพ",
+    HS1810: "ยกเว้นเบี้ยกรณีทุพพลภาพ",
+    PUNSUK: "ยกเว้นเบี้ยกรณีทุพพลภาพ",
+    HS999: "เอดีบี 999",
+    SAVECARE168: "8 โรคร้ายแรง",
+    PENSIONCARE888: "8 โรคร้ายแรง",
+};
+function FreebieBadge({ id, size = 12 }) {
+    const t = FREEBIE_BADGES[id];
     if (!t) return null;
-    return React.createElement("span", { className: "font-bold rounded-full whitespace-nowrap", style: { fontSize: size, padding: size >= 15 ? "4px 10px" : "1px 7px", background: "#EAF1FC", color: BRAND.navy, border: `1px solid ${BRAND.navy}` } }, `🔀 เลือกได้ ${t.terms.length} ระยะ`);
+    return React.createElement("span", { className: "inline-block font-semibold rounded-lg leading-snug", style: { fontSize: size, padding: size >= 15 ? "3px 10px" : "2px 6px", background: "#FFF9EE", color: BRAND.warn, border: "1px solid #F3D98B" } }, `🎁 แถมฟรี ${t}`);
 }
-function termLine(id) {
-    const t = TERM_CHOICES[id];
-    return t ? `${t.kind} ${t.terms.join("/")} ปี` : "";
+// ป้ายแถบเดียว วางใต้ชื่อแบบ (ไม่ทับชื่อ) ตัดบรรทัดเองถ้ากล่องแคบ
+function ChoiceBadge({ id, size = 12 }) {
+    const t = CHOICE_BADGES[id];
+    if (!t) return null;
+    return React.createElement("span", { className: "inline-block font-semibold rounded-lg leading-snug", style: { fontSize: size, padding: size >= 15 ? "3px 10px" : "2px 6px", background: "#EAF1FC", color: BRAND.navy, border: `1px solid #B9CDEB` } },
+        `🔀 เลือกได้ ${t.n} ${t.unit} · ${t.detail}`);
 }
 function CompactChip({ product, checked, picked, disabled, recommended, tag, onCheckboxClick, onNameClick }) {
-    const multi = !!TERM_CHOICES[product.id];
+    const multi = !!CHOICE_BADGES[product.id];
     return (React.createElement("div", { className: "rounded-lg", style: {
-            position: "relative", marginTop: multi ? 8 : 0,
             opacity: disabled ? 0.5 : 1,
             background: checked ? "#F3FBEF" : (picked ? "#EAF1FC" : "#fff"),
             border: checked ? `1.5px solid ${BRAND.greenDeep}` : (picked ? `1.5px solid ${BRAND.navy}` : (recommended ? `1.5px solid ${BRAND.green}` : "1px solid #E3EAF0")),
@@ -5949,14 +6006,14 @@ function CompactChip({ product, checked, picked, disabled, recommended, tag, onC
                     recommended && !checked && !picked ? "⭐ " : "",
                     product.name.includes("ปันผล") ? "🎁 " : "",
                     product.name),
-                multi && React.createElement("span", { className: "text-[12px] font-semibold leading-tight block mt-0.5", style: { color: BRAND.navy } }, termLine(product.id)),
-                tag && (React.createElement("span", { className: "text-[12px] font-medium leading-tight block mt-0.5", style: { color: BRAND.warn } }, tag)))),
-        multi && React.createElement("div", { style: { position: "absolute", top: -9, right: 6, lineHeight: 1 } }, React.createElement(TermBadge, { id: product.id, size: 11 }))));
+                tag && (React.createElement("span", { className: "text-[12px] font-medium leading-tight block mt-0.5", style: { color: BRAND.warn } }, tag)),
+                multi && React.createElement("span", { className: "block mt-1" }, React.createElement(ChoiceBadge, { id: product.id, size: 11 })),
+                FREEBIE_BADGES[product.id] && React.createElement("span", { className: "block mt-1" }, React.createElement(FreebieBadge, { id: product.id, size: 11 }))))));
 }
 function ProductRow({ product, checked, onToggle, age, live, pending, children, disabled, recommended, recommendedReason, expanded, onToggleExpand, onShowSchedule }) {
     const outOfRange = age < product.ageMin || age > product.ageMax;
     const invalid = checked && !disabled && live && !live.ok && !pending;
-    return (React.createElement("div", { id: `product-row-${product.id}`, className: `rounded-2xl p-4 ${(product.renewalNote || recommended || product.name.includes("มีเงินปันผล") || TERM_CHOICES[product.id]) ? "pt-10" : ""}`, style: {
+    return (React.createElement("div", { id: `product-row-${product.id}`, className: `rounded-2xl p-4 ${(product.renewalNote || recommended || product.name.includes("มีเงินปันผล")) ? "pt-10" : ""}`, style: {
             background: disabled ? "#F3F5F7" : (invalid ? "#FFF7F7" : (checked ? "#F3FBEF" : BRAND.card)),
             boxShadow: disabled ? "none" : "0 4px 14px rgba(11,42,85,0.06)",
             border: invalid ? `2.5px solid ${BRAND.danger}` : (checked && !disabled ? `2.5px solid ${BRAND.greenDeep}` : (recommended && !disabled ? `1.5px solid ${BRAND.green}` : "1.5px solid transparent")),
@@ -5964,8 +6021,7 @@ function ProductRow({ product, checked, onToggle, age, live, pending, children, 
             filter: disabled ? "grayscale(0.4)" : "none",
             position: "relative",
         } },
-        (product.renewalNote || product.name.includes("มีเงินปันผล") || TERM_CHOICES[product.id]) && (React.createElement("div", { className: "absolute top-2 right-2 flex items-center gap-1.5 flex-wrap justify-end", style: { maxWidth: "70%" } },
-            React.createElement(TermBadge, { id: product.id, size: 15 }),
+        (product.renewalNote || product.name.includes("มีเงินปันผล")) && (React.createElement("div", { className: "absolute top-2 right-2 flex items-center gap-1.5 flex-wrap justify-end", style: { maxWidth: "70%" } },
             product.name.includes("มีเงินปันผล") && (React.createElement("span", { className: "text-[15px] font-medium px-2 py-1 rounded-full whitespace-nowrap", style: { background: "#FFF9EE", color: BRAND.warn, border: `1px solid #F3D98B` } }, "\uD83C\uDF81 \u0E21\u0E35\u0E2A\u0E34\u0E17\u0E18\u0E34\u0E4C\u0E23\u0E31\u0E1A\u0E1B\u0E31\u0E19\u0E1C\u0E25")),
             product.renewalNote && (React.createElement("span", { className: "text-[15px] font-medium px-2 py-1 rounded-full whitespace-nowrap", style: { background: BRAND.bg, color: BRAND.sub, border: "1px solid #D7E8F0" } }, product.renewalNote)))),
         recommended && !disabled && (React.createElement("span", { className: "absolute top-2 left-2 text-[15px] font-bold px-2.5 py-1 rounded-full", style: { background: "#fff", color: BRAND.greenDeep, border: `1.5px solid ${BRAND.greenDeep}` } }, recommendedReason === "companion-1" ? "⭐ แนะนำคู่ อันดับ 1 (เบี้ยถูกสุด)" : recommendedReason === "companion-2" ? "⭐ แนะนำคู่ อันดับ 2" : "⭐ แนะนำ")),
@@ -5975,6 +6031,9 @@ function ProductRow({ product, checked, onToggle, age, live, pending, children, 
                 React.createElement("p", { className: "text-[27px] font-bold", style: { color: disabled ? BRAND.sub : BRAND.nameBlue } }, product.name),
                 checked && !disabled && !invalid && (React.createElement("span", { className: "text-[15px] font-bold px-2 py-0.5 rounded-full shrink-0", style: { background: BRAND.greenDeep, color: "#fff" } }, "\u2713 \u0E40\u0E25\u0E37\u0E2D\u0E01\u0E41\u0E25\u0E49\u0E27"))),
             React.createElement("button", { onClick: disabled ? undefined : onToggleExpand, disabled: disabled, className: "p-1.5 rounded-lg shrink-0", style: { background: BRAND.bg, cursor: disabled ? "not-allowed" : "pointer" } }, expanded ? "▴" : "▾")),
+        (CHOICE_BADGES[product.id] || FREEBIE_BADGES[product.id]) && React.createElement("div", { className: "mt-2 pl-10 flex flex-wrap gap-1.5" },
+            React.createElement(ChoiceBadge, { id: product.id, size: 16 }),
+            React.createElement(FreebieBadge, { id: product.id, size: 16 })),
         disabled ? (React.createElement("span", { className: "inline-block mt-2 text-[16px] px-2.5 py-1 rounded-full", style: { background: "#E4E8EC", color: BRAND.sub } }, "\u0E44\u0E21\u0E48\u0E2A\u0E32\u0E21\u0E32\u0E23\u0E16\u0E40\u0E25\u0E37\u0E2D\u0E01\u0E44\u0E14\u0E49\u0E02\u0E13\u0E30\u0E19\u0E35\u0E49")) : invalid ? (React.createElement("span", { className: "inline-block mt-2 text-[16px] px-2.5 py-1 rounded-full", style: { background: BRAND.danger, color: "#fff" } }, "\u0E44\u0E21\u0E48\u0E1C\u0E48\u0E32\u0E19\u0E40\u0E07\u0E37\u0E48\u0E2D\u0E19\u0E44\u0E02")) : outOfRange && checked && (React.createElement("span", { className: "inline-block mt-2 text-[16px] px-2.5 py-1 rounded-full", style: { background: "#FDEAEA", color: BRAND.danger } }, "\u0E2D\u0E32\u0E22\u0E38\u0E44\u0E21\u0E48\u0E40\u0E02\u0E49\u0E32\u0E40\u0E07\u0E37\u0E48\u0E2D\u0E19\u0E44\u0E02")),
         expanded && !disabled && (React.createElement("div", { className: "mt-2" },
             React.createElement("p", { className: "text-[21px]", style: { color: BRAND.sub } },
@@ -6449,7 +6508,19 @@ function openLineText(text) {
   window.open("https://line.me/R/share?text=" + encodeURIComponent(text), "_blank");
 }
 const genderTh = (g) => g === "female" ? "\u0E40\u0E1E\u0E28\u0E2B\u0E0D\u0E34\u0E07" : "\u0E40\u0E1E\u0E28\u0E0A\u0E32\u0E22";
-function skCoverage(d) {
+// ใส่ลำดับ 1. 2. 3. ให้หัวข้อที่มีหลายรายการ (ข้อความ + รูป + ส่วนแก้ไข ใช้ชุดเดียวกัน)
+function skNum(arr, field) {
+  if (!arr || arr.length < 2) return arr || [];
+  return arr.map((x, i) => {
+    if (typeof x === "string") return /^\d+\.\s/.test(x) ? x : `${i + 1}. ${x}`;
+    return /^\d+\.\s/.test(x[field] || "") ? x : Object.assign({}, x, { [field]: `${i + 1}. ${x[field]}` });
+  });
+}
+function skCoverage(d) { return skNum(skCoverageRaw(d), "title"); }
+function skFree(d) { return skNum(skFreeRaw(d), "label"); }
+function skKids(d) { return skNum(skKidsRaw(d), "label"); }
+function skNotes(d) { return skNum(skNotesRaw(d)); }
+function skCoverageRaw(d) {
   if (d.ov && d.ov.coverage) return d.ov.coverage;
   return [
     { title: "1. \u0E21\u0E35\u0E0A\u0E35\u0E27\u0E34\u0E15\u0E2D\u0E22\u0E39\u0E48\u0E04\u0E23\u0E1A\u0E2A\u0E31\u0E0D\u0E0D\u0E32", formula: "\u0E23\u0E31\u0E1A\u0E40\u0E1A\u0E35\u0E49\u0E22\u0E2A\u0E30\u0E2A\u0E21 + \u0E40\u0E07\u0E34\u0E19\u0E04\u0E37\u0E19\u0E1E\u0E34\u0E40\u0E28\u0E29", amount: d.maturity, color: C.blue },
@@ -6457,7 +6528,7 @@ function skCoverage(d) {
     { title: "3. \u0E40\u0E2A\u0E35\u0E22\u0E0A\u0E35\u0E27\u0E34\u0E15\u0E08\u0E32\u0E01\u0E2D\u0E38\u0E1A\u0E31\u0E15\u0E34\u0E40\u0E2B\u0E15\u0E38", formula: "\u0E17\u0E38\u0E19\u0E1B\u0E23\u0E30\u0E01\u0E31\u0E19 x 2 + \u0E40\u0E1A\u0E35\u0E49\u0E22\u0E2A\u0E30\u0E2A\u0E21 + \u0E40\u0E07\u0E34\u0E19\u0E04\u0E37\u0E19\u0E1E\u0E34\u0E40\u0E28\u0E29", amount: d.deathAccident, note: "(\u0E2A\u0E39\u0E07\u0E2A\u0E38\u0E14\u0E40\u0E21\u0E37\u0E48\u0E2D\u0E0A\u0E33\u0E23\u0E30\u0E40\u0E1A\u0E35\u0E49\u0E22\u0E1B\u0E23\u0E30\u0E01\u0E31\u0E19\u0E04\u0E23\u0E1A)", color: C.green }
   ];
 }
-function skFree(d) {
+function skFreeRaw(d) {
   if (d.ov && d.ov.free) return d.ov.free;
   return [
     { label: "\u0E04\u0E48\u0E32\u0E23\u0E31\u0E01\u0E29\u0E32\u0E1E\u0E22\u0E32\u0E1A\u0E32\u0E25\u0E08\u0E32\u0E01\u0E2D\u0E38\u0E1A\u0E31\u0E15\u0E34\u0E40\u0E2B\u0E15\u0E38 (\u0E15\u0E32\u0E21\u0E08\u0E23\u0E34\u0E07)", value: `\u0E44\u0E21\u0E48\u0E40\u0E01\u0E34\u0E19 ${baht(d.medicalCap)}`, sub: "\u0E2A\u0E39\u0E07\u0E2A\u0E38\u0E14 5 \u0E40\u0E17\u0E48\u0E32\u0E02\u0E2D\u0E07\u0E40\u0E1A\u0E35\u0E49\u0E22\u0E23\u0E32\u0E22\u0E40\u0E14\u0E37\u0E2D\u0E19 \u0E15\u0E48\u0E2D\u0E04\u0E23\u0E31\u0E49\u0E07" },
@@ -6466,7 +6537,7 @@ function skFree(d) {
     { label: "\u0E19\u0E34\u0E49\u0E27\u0E2B\u0E31\u0E27\u0E41\u0E21\u0E48\u0E21\u0E37\u0E2D+\u0E19\u0E34\u0E49\u0E27\u0E0A\u0E35\u0E49\u0E02\u0E49\u0E32\u0E07\u0E40\u0E14\u0E35\u0E22\u0E27\u0E01\u0E31\u0E19 (25%)", value: baht(d.acc25) }
   ];
 }
-function skKids(d) {
+function skKidsRaw(d) {
   if (d.ov && d.ov.kids) return d.ov.kids;
   if (!d.isKids) return [];
   return [
@@ -6482,7 +6553,7 @@ function skKids(d) {
     }
   ];
 }
-function skNotes(d) {
+function skNotesRaw(d) {
   if (d.ov && d.ov.notes) return d.ov.notes;
   const n = ["ส่วนอุบัติเหตุที่แถมฟรี ไม่คุ้มครองขณะมึนเมาหรือใช้สารเสพติดจนครองสติไม่ได้, การทำร้ายตัวเอง, การทะเลาะวิวาท, การแข่งรถหรือแข่งเรือ"];
   if (d.isKids) n.push("4 โรคร้ายแรงของเด็ก มีระยะเวลารอคอย 90 วัน นับจากวันเริ่มคุ้มครอง");
@@ -6535,18 +6606,18 @@ function buildSKText(d) {
   });
   out.push("", "\u2501\u2501 \u0E41\u0E16\u0E21\u0E1F\u0E23\u0E35 \u0E04\u0E38\u0E49\u0E21\u0E04\u0E23\u0E2D\u0E07\u0E2D\u0E38\u0E1A\u0E31\u0E15\u0E34\u0E40\u0E2B\u0E15\u0E38 \u2501\u2501");
   skFree(d).forEach((f) => {
-    out.push(`\u2022 ${f.label} ${f.value}${f.sub ? ` (${f.sub})` : ""}`);
+    out.push(`${/^\d+\.\s/.test(f.label) ? "" : "\u2022 "}${f.label} ${f.value}${f.sub ? ` (${f.sub})` : ""}`);
   });
   const kids = skKids(d);
   if (kids.length) {
     out.push("", "\u2501\u2501 \u0E04\u0E27\u0E32\u0E21\u0E04\u0E38\u0E49\u0E21\u0E04\u0E23\u0E2D\u0E07\u0E2A\u0E33\u0E2B\u0E23\u0E31\u0E1A\u0E40\u0E14\u0E47\u0E01 \u2501\u2501", "(\u0E41\u0E19\u0E1A\u0E2A\u0E31\u0E0D\u0E0D\u0E32\u0E40\u0E1E\u0E34\u0E48\u0E21\u0E40\u0E15\u0E34\u0E21 \u0E1A\u0E35\u0E41\u0E2D\u0E25\u0E40\u0E2D \u0E0B\u0E35\u0E44\u0E2D \u0E04\u0E34\u0E14\u0E2A\u0E4C + \u0E04\u0E0A.)");
     kids.forEach((k) => {
-      out.push(`\u2022 ${k.label}${k.value ? ` ${k.value}` : ""}`);
+      out.push(`${/^\d+\.\s/.test(k.label) ? "" : "\u2022 "}${k.label}${k.value ? ` ${k.value}` : ""}`);
       if (k.sub) out.push(`  ${k.sub}`);
     });
   }
   out.push("", "\u{1F4CC} \u0E02\u0E49\u0E2D\u0E04\u0E27\u0E23\u0E23\u0E39\u0E49");
-  skNotes(d).forEach((n) => out.push(`\u2022 ${n}`));
+  skNotes(d).forEach((n) => out.push(/^\d+\.\s/.test(n) ? n : `\u2022 ${n}`));
   out.push("", "\u2014\u2014\u2014\u2014\u2014\u2014\u2014\u2014");
   if (d.agent.name) out.push(d.agent.name);
   if (d.agent.phone) out.push(`\u{1F4DE} ${d.agent.phone}`);
@@ -6763,7 +6834,7 @@ function drawSKImage(d) {
     let nh = 16;
     nh += L.para(P + 8, y + nh, "\u{1F4CC} \u0E02\u0E49\u0E2D\u0E04\u0E27\u0E23\u0E23\u0E39\u0E49", 27, 700, "#B45309", TW - 16, 38);
     skNotes(d).forEach((n) => {
-      nh += L.para(P + 8, y + nh, `\u2022 ${n}`, 24, 500, "#475569", TW - 16, 34);
+      nh += L.para(P + 8, y + nh, /^\d+\.\s/.test(n) ? n : `\u2022 ${n}`, 24, 500, "#475569", TW - 16, 34);
     });
     nh += 14;
     L.ops.splice(ns, 0, { t: "rect", x: P, y, w: TW, h: nh, color: "#FFF8E6" });
