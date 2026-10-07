@@ -8,7 +8,7 @@ const BRAND = {
     ink: "#000000", sub: "#404040", danger: "#B93232", warn: "#6B4508",
     label: "#000000", nameBlue: "#1668D6", mainBlue: "#0C2F63", dataBlack: "#000000",
 };
-const APP_VERSION = "v2.38.0 (2569-10-05)";
+const APP_VERSION = "v2.39.0 (2569-10-05)";
 const RATE_SOURCE = "อัตราเบี้ยตามคู่มือตัวแทน V.14 (14-02-2026) · ค่าคอม 10-09-2026";
 const CASES_KEY = "blacal-cases-v1"; // อัปเดตเลขนี้ทุกครั้งที่มีการแก้ไข/เพิ่มแบบประกันใหม่ เพื่อให้รู้ว่าไฟล์ที่ใช้อยู่เป็นเวอร์ชันล่าสุดหรือไม่
 const fmt = (n) => (n === null || n === undefined || isNaN(n) ? "0" : Math.round(n).toLocaleString("th-TH"));
@@ -2852,6 +2852,14 @@ function App() {
         { id: "other", label: "🧩 อื่นๆ (อุบัติเหตุ / ทุพพลภาพ / เฉพาะกาล)", ids: ["ACC", "ACC3", "ACC1", "ACC2", "TPD", "RPPR", "CHAK", "CHAP"] },
     ];
     // ป้ายบอกเงื่อนไขพิเศษแบบสั้นๆ ในการ์ดกะทัดรัด — แพ็กเกจปิด / ต้องมีทุนหลักคู่กัน
+    // ทุนขั้นต่ำที่ขึ้นกับการซื้อสัญญาเพิ่มเติม (ฝั่งตัวแทน) — แสดงตั้งแต่ก่อนกดคำนวณ
+    const riderMinHint = (si, min) => {
+        const noRider = !RIDER_IDS.some((id) => selected[id]);
+        const warn = si > 0 && si < 500000 && noRider;
+        return React.createElement("div", { className: "rounded-xl px-3 py-2 mt-2 text-[17px] leading-snug", style: { background: warn ? "#FFF6E0" : BRAND.bg, color: warn ? BRAND.warn : BRAND.sub, border: warn ? "1px solid #F0C36D" : "1px solid #D7E8F0" } },
+            `ขั้นต่ำ ${baht(min)} (ต้องซื้อคู่สัญญาเพิ่มเติม) · ซื้อเดี่ยวขั้นต่ำ 500,000 บาท`,
+            warn && React.createElement("div", { className: "font-semibold mt-1" }, "⚠️ ทุนต่ำกว่า 500,000 บาท และยังไม่ได้เลือกสัญญาเพิ่มเติม — เลือกสัญญาเพิ่มเติมอย่างน้อย 1 รายการ หรือเพิ่มทุนเป็น 500,000 บาท"));
+    };
     const COMPACT_TAG = {
         UNJAI: "📦 แพ็กเกจปิด (ห้ามซื้ออนุสัญญาอื่นเพิ่ม)",
         CANCERMAX: "📦 แพ็กเกจปิด (ยกเว้น คช.)",
@@ -2886,7 +2894,7 @@ function App() {
                             65 - csPayorAge,
                             " \u0E1B\u0E35")))));
             case "SUD": return selected.SUD && (React.createElement(PlanRow, { label: "\u0E17\u0E38\u0E19\u0E1B\u0E23\u0E30\u0E01\u0E31\u0E19\u0E20\u0E31\u0E22 (\u0E1A\u0E32\u0E17)" },
-                React.createElement(NumInput, { value: sudSI, onChange: setSudSI, min: 0, step: 50000 })));
+                React.createElement(NumInput, { value: sudSI, onChange: setSudSI, min: 0, step: 50000 }), riderMinHint(sudSI, 100000)));
             case "LIFE99": return selected.LIFE99 && (React.createElement(PlanRow, { label: "\u0E17\u0E38\u0E19\u0E1B\u0E23\u0E30\u0E01\u0E31\u0E19\u0E20\u0E31\u0E22 (\u0E1A\u0E32\u0E17)" },
                 React.createElement(NumInput, { value: life99SI, onChange: setLife99SI, min: 0, step: 50000 })));
             case "UNJAI": return selected.UNJAI && (React.createElement(PlanRow, { label: "\u0E41\u0E1C\u0E19\u0E04\u0E27\u0E32\u0E21\u0E04\u0E38\u0E49\u0E21\u0E04\u0E23\u0E2D\u0E07 (\u0E17\u0E38\u0E19\u0E2D\u0E35\u0E0B\u0E35\u0E41\u0E04\u0E23\u0E4C)" },
@@ -2951,7 +2959,7 @@ function App() {
                     React.createElement(NumInput, { value: happywlSI, onChange: setHappywlSI, min: 0, step: 500000 })),
                 renderTermCompare(happywlOpt(), happywlTerm, setHappywlTerm)));
             case "HRP9920": return selected.HRP9920 && (React.createElement(PlanRow, { label: "\u0E17\u0E38\u0E19\u0E1B\u0E23\u0E30\u0E01\u0E31\u0E19\u0E20\u0E31\u0E22 (\u0E1A\u0E32\u0E17)" },
-                React.createElement(NumInput, { value: hrp9920SI, onChange: setHrp9920SI, min: 0, step: 100000 })));
+                React.createElement(NumInput, { value: hrp9920SI, onChange: setHrp9920SI, min: 0, step: 100000 }), riderMinHint(hrp9920SI, 200000)));
             case "HRPDIV": return selected.HRPDIV && (React.createElement(React.Fragment, null,
                 React.createElement(PlanRow, { label: "ทุนประกันภัย (บาท) — ใช้เทียบทุกระยะชำระพร้อมกัน" },
                     React.createElement(NumInput, { value: hrpdivSI, onChange: setHrpdivSI, min: 0, step: 100000 })),
@@ -5907,8 +5915,28 @@ function PrintTableView({ data }) {
     }
     return null;
 }
+// แบบที่เลือกระยะได้หลายแบบในกล่องเดียว → ป้าย "เลือกได้ N ระยะ" (เห็นเฉพาะหน้าเลือกแบบของตัวแทน)
+const TERM_CHOICES = {
+    PRESTIGE: { kind: "ชำระ", terms: [5, 10, 15, 20] },
+    HRPDIV: { kind: "ชำระ", terms: [5, 10, 15, 20] },
+    HAPPYWL: { kind: "ชำระ", terms: [5, 10, 15] },
+    PLUS2: { kind: "ชำระ", terms: [10, 15, 20] },
+    HAPPYSAVING: { kind: "ชำระ", terms: [5, 10] },
+    CHAK: { kind: "คุ้มครอง", terms: [5, 10, 15, 18] },
+};
+function TermBadge({ id, size = 12 }) {
+    const t = TERM_CHOICES[id];
+    if (!t) return null;
+    return React.createElement("span", { className: "font-bold rounded-full whitespace-nowrap", style: { fontSize: size, padding: size >= 15 ? "4px 10px" : "1px 7px", background: "#EAF1FC", color: BRAND.navy, border: `1px solid ${BRAND.navy}` } }, `🔀 เลือกได้ ${t.terms.length} ระยะ`);
+}
+function termLine(id) {
+    const t = TERM_CHOICES[id];
+    return t ? `${t.kind} ${t.terms.join("/")} ปี` : "";
+}
 function CompactChip({ product, checked, picked, disabled, recommended, tag, onCheckboxClick, onNameClick }) {
+    const multi = !!TERM_CHOICES[product.id];
     return (React.createElement("div", { className: "rounded-lg", style: {
+            position: "relative", marginTop: multi ? 8 : 0,
             opacity: disabled ? 0.5 : 1,
             background: checked ? "#F3FBEF" : (picked ? "#EAF1FC" : "#fff"),
             border: checked ? `1.5px solid ${BRAND.greenDeep}` : (picked ? `1.5px solid ${BRAND.navy}` : (recommended ? `1.5px solid ${BRAND.green}` : "1px solid #E3EAF0")),
@@ -5921,12 +5949,14 @@ function CompactChip({ product, checked, picked, disabled, recommended, tag, onC
                     recommended && !checked && !picked ? "⭐ " : "",
                     product.name.includes("ปันผล") ? "🎁 " : "",
                     product.name),
-                tag && (React.createElement("span", { className: "text-[12px] font-medium leading-tight block mt-0.5", style: { color: BRAND.warn } }, tag))))));
+                multi && React.createElement("span", { className: "text-[12px] font-semibold leading-tight block mt-0.5", style: { color: BRAND.navy } }, termLine(product.id)),
+                tag && (React.createElement("span", { className: "text-[12px] font-medium leading-tight block mt-0.5", style: { color: BRAND.warn } }, tag)))),
+        multi && React.createElement("div", { style: { position: "absolute", top: -9, right: 6, lineHeight: 1 } }, React.createElement(TermBadge, { id: product.id, size: 11 }))));
 }
 function ProductRow({ product, checked, onToggle, age, live, pending, children, disabled, recommended, recommendedReason, expanded, onToggleExpand, onShowSchedule }) {
     const outOfRange = age < product.ageMin || age > product.ageMax;
     const invalid = checked && !disabled && live && !live.ok && !pending;
-    return (React.createElement("div", { id: `product-row-${product.id}`, className: `rounded-2xl p-4 ${(product.renewalNote || recommended || product.name.includes("มีเงินปันผล")) ? "pt-10" : ""}`, style: {
+    return (React.createElement("div", { id: `product-row-${product.id}`, className: `rounded-2xl p-4 ${(product.renewalNote || recommended || product.name.includes("มีเงินปันผล") || TERM_CHOICES[product.id]) ? "pt-10" : ""}`, style: {
             background: disabled ? "#F3F5F7" : (invalid ? "#FFF7F7" : (checked ? "#F3FBEF" : BRAND.card)),
             boxShadow: disabled ? "none" : "0 4px 14px rgba(11,42,85,0.06)",
             border: invalid ? `2.5px solid ${BRAND.danger}` : (checked && !disabled ? `2.5px solid ${BRAND.greenDeep}` : (recommended && !disabled ? `1.5px solid ${BRAND.green}` : "1.5px solid transparent")),
@@ -5934,7 +5964,8 @@ function ProductRow({ product, checked, onToggle, age, live, pending, children, 
             filter: disabled ? "grayscale(0.4)" : "none",
             position: "relative",
         } },
-        (product.renewalNote || product.name.includes("มีเงินปันผล")) && (React.createElement("div", { className: "absolute top-2 right-2 flex items-center gap-1.5 flex-wrap justify-end", style: { maxWidth: "70%" } },
+        (product.renewalNote || product.name.includes("มีเงินปันผล") || TERM_CHOICES[product.id]) && (React.createElement("div", { className: "absolute top-2 right-2 flex items-center gap-1.5 flex-wrap justify-end", style: { maxWidth: "70%" } },
+            React.createElement(TermBadge, { id: product.id, size: 15 }),
             product.name.includes("มีเงินปันผล") && (React.createElement("span", { className: "text-[15px] font-medium px-2 py-1 rounded-full whitespace-nowrap", style: { background: "#FFF9EE", color: BRAND.warn, border: `1px solid #F3D98B` } }, "\uD83C\uDF81 \u0E21\u0E35\u0E2A\u0E34\u0E17\u0E18\u0E34\u0E4C\u0E23\u0E31\u0E1A\u0E1B\u0E31\u0E19\u0E1C\u0E25")),
             product.renewalNote && (React.createElement("span", { className: "text-[15px] font-medium px-2 py-1 rounded-full whitespace-nowrap", style: { background: BRAND.bg, color: BRAND.sub, border: "1px solid #D7E8F0" } }, product.renewalNote)))),
         recommended && !disabled && (React.createElement("span", { className: "absolute top-2 left-2 text-[15px] font-bold px-2.5 py-1 rounded-full", style: { background: "#fff", color: BRAND.greenDeep, border: `1.5px solid ${BRAND.greenDeep}` } }, recommendedReason === "companion-1" ? "⭐ แนะนำคู่ อันดับ 1 (เบี้ยถูกสุด)" : recommendedReason === "companion-2" ? "⭐ แนะนำคู่ อันดับ 2" : "⭐ แนะนำ")),
