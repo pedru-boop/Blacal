@@ -1,18 +1,123 @@
 const { useState, useEffect, useRef } = React;
 "use strict";
 /* ============================== BRAND TOKENS ============================== */
-const LOGO_DATA_URI = "icon-192.png";
+const LOGO_DATA_URI = "logo.png?v=2";
 const BRAND = {
     sky: "#4FC3E8", skyDeep: "#2EA8D4", navy: "#123C7A", navyDeep: "#0A2452",
     green: "#8FD14F", greenDeep: "#6FB733", bg: "#EFF7FB", card: "#FFFFFF",
     ink: "#000000", sub: "#404040", danger: "#B93232", warn: "#6B4508",
     label: "#000000", nameBlue: "#1668D6", mainBlue: "#0C2F63", dataBlack: "#000000",
 };
-const APP_VERSION = "v2.40.0 (2569-10-05)";
-const RATE_SOURCE = "อัตราเบี้ยตามคู่มือตัวแทน V.14 (14-02-2026) · ค่าคอม 10-09-2026";
+const APP_VERSION = "v2.41.0 (2569-10-12)";
+const RATE_SOURCE = "อัตราเบี้ยตามคู่มือตัวแทน V.14 (14-02-2026)"; // วันที่ตารางค่าคอมอยู่ในป๊อปอัปค่าคอม (ตัวแทนเท่านั้น)
 const CASES_KEY = "blacal-cases-v1"; // อัปเดตเลขนี้ทุกครั้งที่มีการแก้ไข/เพิ่มแบบประกันใหม่ เพื่อให้รู้ว่าไฟล์ที่ใช้อยู่เป็นเวอร์ชันล่าสุดหรือไม่
 const fmt = (n) => (n === null || n === undefined || isNaN(n) ? "0" : Math.round(n).toLocaleString("th-TH"));
 const baht = (n) => (n === null || n === undefined ? "-" : (typeof n === "string" ? n : fmt(n) + " บาท"));
+/* ============================== วันเกิด → อายุ (ระเบียบการรับประกัน หน้า 17 "การคิดอายุ") ==============================
+   อายุ = วันนี้ − วันเกิด ใช้อายุใกล้สุด: เศษตั้งแต่ 6 เดือนขึ้นไปปัดเป็น 1 ปี ต่ำกว่าปัดทิ้ง
+   ไม่ทราบวัน → วันที่ 1 · ไม่ทราบเดือน → มกราคม · ทราบเฉพาะปี → 1 ม.ค. ของปีนั้น
+   รับปี พ.ศ. (2400+) หรือ ค.ศ. (1900-2399) · พิมพ์ได้ทั้ง 15/03/2530, 15032530, 03/2530, 2530 */
+const TH_MONTHS_SHORT = ["ม.ค.", "ก.พ.", "มี.ค.", "เม.ย.", "พ.ค.", "มิ.ย.", "ก.ค.", "ส.ค.", "ก.ย.", "ต.ค.", "พ.ย.", "ธ.ค."];
+function parseDob(text) {
+    const t = String(text || "").trim();
+    if (!t) return null;
+    let parts = t.split(/[^0-9]+/).filter(Boolean);
+    if (parts.length === 1) {
+        const s = parts[0];
+        if (s.length === 8) parts = [s.slice(0, 2), s.slice(2, 4), s.slice(4)];
+        else if (s.length === 6) parts = [s.slice(0, 2), s.slice(2)];
+        else if (s.length !== 4) return { error: true };
+    }
+    if (parts.length > 3) return { error: true };
+    const yRaw = parts[parts.length - 1];
+    if (yRaw.length !== 4) return { error: true };
+    let y = parseInt(yRaw, 10);
+    if (y >= 2400) y -= 543; else if (y < 1900) return { error: true };
+    const m = parts.length >= 2 ? parseInt(parts[parts.length - 2], 10) : 1;
+    const d = parts.length === 3 ? parseInt(parts[0], 10) : 1;
+    if (!(m >= 1 && m <= 12)) return { error: true };
+    const dim = new Date(y, m, 0).getDate();
+    if (!(d >= 1 && d <= dim)) return { error: true };
+    const precision = parts.length; // 1 = ปี, 2 = เดือน/ปี, 3 = ครบ
+    return { y, m, d, precision };
+}
+function dobText(p) {
+    const pad = (n) => String(n).padStart(2, "0");
+    const be = p.y + 543;
+    return p.precision === 3 ? `${pad(p.d)}/${pad(p.m)}/${be}` : p.precision === 2 ? `${pad(p.m)}/${be}` : String(be);
+}
+// จำนวนเดือนเต็มจากวันเกิดถึงวันที่ ref (วันที่ยังไม่ถึงวันเกิดของเดือน = ยืมเดือน ตามตัวอย่างในระเบียบ)
+function monthsBetween(p, ref) {
+    const ry = ref.getFullYear(), rm = ref.getMonth() + 1, rd = ref.getDate();
+    return (ry * 12 + rm) - (p.y * 12 + p.m) - (rd < p.d ? 1 : 0);
+}
+function insuranceAgeOn(p, ref) {
+    const months = monthsBetween(p, ref);
+    if (months < 0) return null;
+    return Math.floor(months / 12) + (months % 12 >= 6 ? 1 : 0);
+}
+function todayLocal() { const n = new Date(); return new Date(n.getFullYear(), n.getMonth(), n.getDate()); }
+// คืนค่า { age, months, daysToNext, nextDate, nextAge } หรือ { error } / { future }
+function dobInfo(text) {
+    const p = parseDob(text);
+    if (!p || p.error) return p;
+    const today = todayLocal();
+    const born = new Date(p.y, p.m - 1, p.d);
+    if (born > today) return { future: true };
+    const age = insuranceAgeOn(p, today);
+    let nextDate = null, daysToNext = null;
+    for (let i = 1; i <= 400; i++) {
+        const dt = new Date(today.getFullYear(), today.getMonth(), today.getDate() + i);
+        if (insuranceAgeOn(p, dt) > age) { nextDate = dt; daysToNext = i; break; }
+    }
+    return { age, months: monthsBetween(p, today), daysToNext, nextDate, nextAge: age + 1, p };
+}
+function thDateShort(dt) { return `${dt.getDate()} ${TH_MONTHS_SHORT[dt.getMonth()]} ${String(dt.getFullYear() + 543).slice(-2)}`; }
+// ช่องวันเกิด — ยืนยันค่าเมื่อแตะออก/กด Enter แล้วส่งอายุที่คำนวณได้ไปยังช่องอายุ
+// ข้อความ "อายุขึ้นอีก X วัน" แสดงเฉพาะบนหน้าจอแอป ไม่รวมในข้อความ/รูปที่ส่งลูกค้า
+function DobInput({ value, onChange, min, max, className, style }) {
+    const [text, setText] = useState(value || "");
+    const [focused, setFocused] = useState(false);
+    const keepText = useRef(false); // พิมพ์ผิดรูปแบบ: ล้างค่าที่ใช้คำนวณ แต่คงข้อความไว้ให้แก้
+    useEffect(() => { if (keepText.current) { keepText.current = false; return; } if (!focused) setText(value || ""); }, [value, focused]);
+    const committed = value ? dobInfo(value) : null;
+    const tp = text.trim() ? parseDob(text) : null;
+    const draftBad = !focused && !!text.trim() && (!tp || tp.error);
+    function commit() {
+        setFocused(false);
+        const t = text.trim();
+        if (!t) { if (value) onChange(""); return; }
+        const p = parseDob(t);
+        if (!p || p.error) { keepText.current = true; onChange(""); return; } // ค้างข้อความไว้ให้แก้ + แสดงคำเตือนด้านล่าง
+        const v = dobText(p);
+        setText(v);
+        onChange(v);
+    }
+    let hint = null, hintColor = BRAND.sub;
+    if (draftBad) { hint = "รูปแบบไม่ถูกต้อง พิมพ์ วว/ดด/ปปปป (พ.ศ.)"; hintColor = BRAND.danger; }
+    else if (committed && committed.future) { hint = "วันเกิดเลยวันนี้"; hintColor = BRAND.danger; }
+    else if (committed && !committed.error) {
+        if ((min !== undefined && committed.age < min) || (max !== undefined && committed.age > max)) {
+            hint = `อายุ ${committed.age} ปี นอกช่วง ${min}–${max} ปี`; hintColor = BRAND.danger;
+        } else if (committed.nextDate) {
+            hint = `อายุขึ้นเป็น ${committed.nextAge} ปี อีก ${committed.daysToNext} วัน (${thDateShort(committed.nextDate)})`;
+        }
+    }
+    return (React.createElement("div", { className: "flex flex-col gap-1" },
+        React.createElement("input", { type: "text", inputMode: "numeric", value: text, placeholder: "วว/ดด/ปปปป", "aria-label": "วันเดือนปีเกิด (พ.ศ.)",
+            onFocus: () => setFocused(true), onChange: (e) => setText(e.target.value.replace(/[^0-9/.\- ]/g, "")), onBlur: commit,
+            onKeyDown: (e) => { if (e.key === "Enter") e.target.blur(); }, enterKeyHint: "done",
+            className: className || "w-full rounded-xl border px-3 py-2.5 text-[24px] font-medium placeholder:font-normal",
+            style: Object.assign({ borderColor: "#D7E8F0", color: BRAND.navy }, style || {}) }),
+        React.createElement("span", { className: "text-[15px] leading-snug", style: { color: hint ? hintColor : "#9AA9B8" } }, hint || "เช่น 15/03/2530 · รู้แค่ปีใส่ 2530")));
+}
+// อายุจากวันเกิดที่บันทึกไว้ (ถ้าอยู่ในช่วง) — ใช้ซิงก์ช่องอายุ
+function dobAgeInRange(dob, min, max) {
+    const r = dob ? dobInfo(dob) : null;
+    if (!r || r.error || r.future) return null;
+    if ((min !== undefined && r.age < min) || (max !== undefined && r.age > max)) return null;
+    return r.age;
+}
 /* ============================== PERSISTENT STORAGE (works in Claude.ai artifact and standalone browser) ============================== */
 const STORAGE_KEY = "bla-premium-calc-state-v1";
 const storageAdapter = (typeof window !== "undefined" && window.storage) ? {
@@ -2161,6 +2266,8 @@ function App() {
     const [hhpPlan, setHhpPlan] = useState(5000000);
     const [hhpDeduct, setHhpDeduct] = useState(0);
     const [csPayorAge, setCsPayorAge] = useState(40);
+    const [dob, setDob] = useState(""); // วันเกิดผู้เอาประกัน (ถ้ากรอก) — อายุคำนวณใหม่ทุกครั้งที่เปิดตามวันนี้
+    const [csPayorDob, setCsPayorDob] = useState("");
     const [csPayorGender, setCsPayorGender] = useState("male");
     const [opdPlan, setOpdPlan] = useState(0);
     const [hhPlan, setHhPlan] = useState(1000000);
@@ -2451,6 +2558,8 @@ function App() {
             setHhpPlan(s.hhpPlan);
         if (s.hhpDeduct !== undefined)
             setHhpDeduct(s.hhpDeduct);
+        setDob(s.dob || "");
+        setCsPayorDob(s.csPayorDob || "");
         if (s.csPayorAge !== undefined)
             setCsPayorAge(s.csPayorAge);
         if (s.csPayorGender)
@@ -2583,8 +2692,14 @@ function App() {
             setLoadedFromStorage(true);
         })();
     }, []);
+    // วันเกิด → อายุ (นับถึงวันนี้ ตามระเบียบการคิดอายุ) — รวมตอนเปิดเคสเก่า อายุจะอัปเดตเป็นปัจจุบัน
+    useEffect(() => { const a = dobAgeInRange(dob, 0, 99); if (a !== null) setAge(a); }, [dob]);
+    useEffect(() => { const a = dobAgeInRange(csPayorDob, 20, 55); if (a !== null) setCsPayorAge(a); }, [csPayorDob]);
+    // แก้ช่องอายุเองเป็นค่าที่ไม่ตรงกับวันเกิด → ล้างวันเกิด กันข้อมูลสองช่องขัดกัน
+    const setAgeManual = (v) => { if (dob && dobAgeInRange(dob, 0, 99) !== v) setDob(""); setAge(v); };
+    const setCsPayorAgeManual = (v) => { if (csPayorDob && dobAgeInRange(csPayorDob, 20, 55) !== v) setCsPayorDob(""); setCsPayorAge(v); };
     function currentSnapshot() {
-        return { gender, age, occClass, payMode, sudSI, life99SI, unjaiPlan, cancermaxPlan, plus2SI, plus2Term, prestigeSI, prestigeTerm, selected, accPlan, acc3Plan, tpdSI, supSI, vhPlan, vhkidsPlan, rpprDaily, hhpPlan, hhpDeduct, opdPlan, hhPlan, hhDeduct, acc1SI, acc2SI, happyciSI, happyciTerm, llcSI, llcVariant, ssSI, happypensionPremiumInput, happypensionTerm, happypensionMode, happypensionTargetPension, happysavingSI, happysavingTerm, happywlSI, happywlTerm, hrp9920SI, hrpdivSI, hrpdivTerm, hrp9901SI, happywl9901SI, happykidSI, chakSI, chakTerm, chapSI, chapTerm, chapPayorAge, chapPayorGender, phPlan, phDeduct, phArea, psave104SI, psave126SI, hs208SI, hs126SI, hs157SI, hs147SI, hs168SI, hs1810SI, hs2515SI, taxsaver105SI, blasave168SI, hs999SI, punsukSI, pension888SI, pension888Mode, pension888PremiumInput, pension888TargetPension, savecare168SI, pensioncare888SI, pensioncare888Mode, pensioncare888PremiumInput, pensioncare888TargetPension, csPayorAge, csPayorGender, selectedConcerns };
+        return { gender, age, occClass, payMode, sudSI, life99SI, unjaiPlan, cancermaxPlan, plus2SI, plus2Term, prestigeSI, prestigeTerm, selected, accPlan, acc3Plan, tpdSI, supSI, vhPlan, vhkidsPlan, rpprDaily, hhpPlan, hhpDeduct, opdPlan, hhPlan, hhDeduct, acc1SI, acc2SI, happyciSI, happyciTerm, llcSI, llcVariant, ssSI, happypensionPremiumInput, happypensionTerm, happypensionMode, happypensionTargetPension, happysavingSI, happysavingTerm, happywlSI, happywlTerm, hrp9920SI, hrpdivSI, hrpdivTerm, hrp9901SI, happywl9901SI, happykidSI, chakSI, chakTerm, chapSI, chapTerm, chapPayorAge, chapPayorGender, phPlan, phDeduct, phArea, psave104SI, psave126SI, hs208SI, hs126SI, hs157SI, hs147SI, hs168SI, hs1810SI, hs2515SI, taxsaver105SI, blasave168SI, hs999SI, punsukSI, pension888SI, pension888Mode, pension888PremiumInput, pension888TargetPension, savecare168SI, pensioncare888SI, pensioncare888Mode, pensioncare888PremiumInput, pensioncare888TargetPension, csPayorAge, csPayorGender, dob, csPayorDob, selectedConcerns };
     }
     // บันทึกข้อมูลล่าสุดทุกครั้งที่มีการเปลี่ยนแปลง (หลังจากโหลดข้อมูลเดิมเสร็จแล้วเท่านั้น)
     useEffect(() => {
@@ -2592,7 +2707,7 @@ function App() {
             return;
         const snapshot = currentSnapshot();
         storageAdapter.set(STORAGE_KEY, JSON.stringify(snapshot));
-    }, [loadedFromStorage, gender, age, occClass, payMode, sudSI, life99SI, unjaiPlan, cancermaxPlan, plus2SI, plus2Term, prestigeSI, prestigeTerm, selected, accPlan, acc3Plan, tpdSI, supSI, vhPlan, vhkidsPlan, rpprDaily, hhpPlan, hhpDeduct, opdPlan, hhPlan, hhDeduct, acc1SI, acc2SI, happyciSI, happyciTerm, llcSI, llcVariant, ssSI, happypensionPremiumInput, happypensionTerm, happypensionMode, happypensionTargetPension, happysavingSI, happysavingTerm, happywlSI, happywlTerm, hrp9920SI, hrpdivSI, hrpdivTerm, hrp9901SI, happywl9901SI, happykidSI, chakSI, chakTerm, chapSI, chapTerm, chapPayorAge, chapPayorGender, phPlan, phDeduct, phArea, psave104SI, psave126SI, hs208SI, hs126SI, hs157SI, hs147SI, hs168SI, hs1810SI, hs2515SI, taxsaver105SI, blasave168SI, hs999SI, punsukSI, pension888SI, pension888Mode, pension888PremiumInput, pension888TargetPension, savecare168SI, pensioncare888SI, pensioncare888Mode, pensioncare888PremiumInput, pensioncare888TargetPension, csPayorAge, csPayorGender, selectedConcerns]);
+    }, [loadedFromStorage, gender, age, occClass, payMode, sudSI, life99SI, unjaiPlan, cancermaxPlan, plus2SI, plus2Term, prestigeSI, prestigeTerm, selected, accPlan, acc3Plan, tpdSI, supSI, vhPlan, vhkidsPlan, rpprDaily, hhpPlan, hhpDeduct, opdPlan, hhPlan, hhDeduct, acc1SI, acc2SI, happyciSI, happyciTerm, llcSI, llcVariant, ssSI, happypensionPremiumInput, happypensionTerm, happypensionMode, happypensionTargetPension, happysavingSI, happysavingTerm, happywlSI, happywlTerm, hrp9920SI, hrpdivSI, hrpdivTerm, hrp9901SI, happywl9901SI, happykidSI, chakSI, chakTerm, chapSI, chapTerm, chapPayorAge, chapPayorGender, phPlan, phDeduct, phArea, psave104SI, psave126SI, hs208SI, hs126SI, hs157SI, hs147SI, hs168SI, hs1810SI, hs2515SI, taxsaver105SI, blasave168SI, hs999SI, punsukSI, pension888SI, pension888Mode, pension888PremiumInput, pension888TargetPension, savecare168SI, pensioncare888SI, pensioncare888Mode, pensioncare888PremiumInput, pensioncare888TargetPension, csPayorAge, csPayorGender, dob, csPayorDob, selectedConcerns]);
     const toggle = (id) => setSelected((s) => {
         const turningOn = !s[id];
         const p = PRODUCTS.find((x) => x.id === id);
@@ -2907,8 +3022,10 @@ function App() {
             case "CS": return selected.CS && (React.createElement(React.Fragment, null,
                 React.createElement(PlanRow, { label: "\u0E40\u0E1E\u0E28\u0E1C\u0E39\u0E49\u0E0A\u0E33\u0E23\u0E30\u0E40\u0E1A\u0E35\u0E49\u0E22 (\u0E1C\u0E39\u0E49\u0E1B\u0E01\u0E04\u0E23\u0E2D\u0E07)" },
                     React.createElement(SegButton, { options: [{ k: "female", l: "หญิง" }, { k: "male", l: "ชาย" }], value: csPayorGender, onChange: setCsPayorGender })),
-                React.createElement(PlanRow, { label: "\u0E2D\u0E32\u0E22\u0E38\u0E1C\u0E39\u0E49\u0E0A\u0E33\u0E23\u0E30\u0E40\u0E1A\u0E35\u0E49\u0E22 (\u0E1C\u0E39\u0E49\u0E1B\u0E01\u0E04\u0E23\u0E2D\u0E07, 20-55 \u0E1B\u0E35)" },
-                    React.createElement(NumInput, { value: csPayorAge, onChange: setCsPayorAge, min: 20, max: 55 })),
+                React.createElement(PlanRow, { label: "วันเกิด / อายุผู้ชำระเบี้ย (ผู้ปกครอง, 20-55 ปี)" },
+                    React.createElement("div", { className: "grid grid-cols-2 gap-3 items-start" },
+                        React.createElement(DobInput, { value: csPayorDob, onChange: setCsPayorDob, min: 20, max: 55 }),
+                        React.createElement(NumInput, { value: csPayorAge, onChange: setCsPayorAgeManual, min: 20, max: 55 }))),
                 React.createElement(PlanRow, { label: "\u0E23\u0E30\u0E22\u0E30\u0E40\u0E27\u0E25\u0E32\u0E04\u0E38\u0E49\u0E21\u0E04\u0E23\u0E2D\u0E07\u0E01\u0E32\u0E23\u0E0A\u0E33\u0E23\u0E30\u0E40\u0E1A\u0E35\u0E49\u0E22 (\u0E04\u0E33\u0E19\u0E27\u0E13\u0E2D\u0E31\u0E15\u0E42\u0E19\u0E21\u0E31\u0E15\u0E34)" },
                     React.createElement("div", { className: "rounded-xl px-3 py-2.5 text-[24px] font-semibold", style: { background: BRAND.bg, color: BRAND.navy } },
                         Math.max(0, Math.min(CS_MAIN_POLICY_TERM, 21 - age, 65 - csPayorAge)),
@@ -3361,6 +3478,8 @@ function App() {
         setSavingsMode({});
         setSavingsPremiumInput({});
         setCsPayorAge(0);
+        setDob("");
+        setCsPayorDob("");
         setCsPayorGender("male");
         setResult(null);
         setModal(null);
@@ -5369,6 +5488,8 @@ function App() {
         if (selected.ACC2) warns.push("อบ.2 ขายเฉพาะผู้มีอาชีพ/รายได้ประจำ (ไม่ขายนักเรียน แม่บ้าน พระ)");
         if (selected.OPDP) warns.push("OPD สบายใจ เพรสทีจ: ถ้า เพรสทีจ เฮลธ์ มีเบี้ยเพิ่มตามอาชีพ/สุขภาพ จะซื้อไม่ได้");
         if (selected.HS999 && mode === "month") warns.push("แฮปปี้เซฟวิ่ง 999 รายเดือน: ชำระงวดแรก 2 งวด");
+        { const di = dob ? dobInfo(dob) : null;
+          if (selected.VHKIDS && di && !di.error && !di.future && di.months < 1) warns.push("แวลู เฮลธ์ คิดส์ พรีเมียร์ รับประกันตั้งแต่อายุ 1 เดือน — ตามวันเกิดที่กรอก เด็กยังอายุไม่ครบ 1 เดือน"); }
         if (occClass === 3 && cards.some((c) => !c.isMain)) warns.push("อาชีพชั้น 3 — สัญญาเพิ่มเติมบางแบบอาจมีเบี้ยเพิ่มพิเศษตามการพิจารณาของบริษัท");
         setResult({ warns, cards, totalYear, totalPay, factor: modeDef.factor, payLabel: singleCard ? "งวดแรก" : modeDef.label, singleNote: singleCard ? `รวมเบี้ย ${singleCard.name} ชำระครั้งเดียว ${baht(singleCard.premium)} · ปีต่อไปชำระเฉพาะสัญญาเพิ่มเติม` : "" });
     }
@@ -5379,9 +5500,8 @@ function App() {
         React.createElement("div", { id: "app-root-content" },
             React.createElement("header", { style: { background: `linear-gradient(120deg, ${BRAND.navy}, ${BRAND.navyDeep})` }, className: "text-white" },
                 React.createElement("div", { className: "max-w-5xl mx-auto px-5 py-4 flex items-center gap-4 relative" },
-                    React.createElement("span", { className: "absolute top-2 right-2 text-[14px] px-2 py-0.5 rounded-full text-right", style: { background: "rgba(255,255,255,0.15)", color: "#BFE3F5", maxWidth: "60%" } }, APP_VERSION, React.createElement("br", null), RATE_SOURCE),
                     React.createElement("button", { onClick: () => { setAgentDraft(Object.assign({}, agentInfo)); setShareModal({ id: null }); }, className: "absolute bottom-2 right-2 text-[15px] px-2.5 py-1 rounded-full", style: { background: "rgba(255,255,255,0.15)", color: "#FFFFFF" } }, "⚙️ ข้อมูลตัวแทน"),
-                    React.createElement("div", { style: { background: "#fff" }, className: "w-24 h-24 sm:w-28 sm:h-28 rounded-3xl flex items-center justify-center shrink-0 overflow-hidden shadow-lg" },
+                    React.createElement("div", { style: { background: "#fff" }, className: "w-28 h-28 sm:w-36 sm:h-36 rounded-3xl flex items-center justify-center shrink-0 overflow-hidden shadow-lg" },
                         React.createElement("img", { src: LOGO_DATA_URI, alt: "\u0E04\u0E33\u0E19\u0E27\u0E13\u0E40\u0E1A\u0E35\u0E49\u0E22\u0E2D\u0E22\u0E48\u0E32\u0E07\u0E07\u0E48\u0E32\u0E22", className: "w-full h-full object-cover" })),
                     React.createElement("div", null,
                         React.createElement("h1", { className: "text-[36px] sm:text-[45px] font-semibold leading-tight" }, "\u0E04\u0E33\u0E19\u0E27\u0E13\u0E40\u0E1A\u0E35\u0E49\u0E22\u0E2D\u0E22\u0E48\u0E32\u0E07\u0E07\u0E48\u0E32\u0E22"),
@@ -5400,11 +5520,13 @@ function App() {
                             " \u0E40\u0E04\u0E25\u0E35\u0E22\u0E23\u0E4C\u0E02\u0E49\u0E2D\u0E21\u0E39\u0E25\u0E17\u0E31\u0E49\u0E07\u0E2B\u0E21\u0E14")),
                     React.createElement("button", { onClick: openCasesModal, className: "w-full mb-3 flex items-center justify-center gap-1.5 text-[21px] font-medium px-3 py-2 rounded-xl", style: { background: BRAND.bg, color: BRAND.navy, border: "1px solid #D7E8F0" } }, `📁 เคสลูกค้า (บันทึก/เปิดเคส)${cases.length ? ` · ${cases.length} เคส` : ""}`),
                     React.createElement("p", { className: "text-[21px] mb-3", style: { color: BRAND.sub } }, "\u0E02\u0E49\u0E2D\u0E21\u0E39\u0E25\u0E17\u0E35\u0E48\u0E04\u0E35\u0E22\u0E4C\u0E08\u0E30\u0E16\u0E39\u0E01\u0E1A\u0E31\u0E19\u0E17\u0E36\u0E01\u0E44\u0E27\u0E49\u0E2D\u0E31\u0E15\u0E42\u0E19\u0E21\u0E31\u0E15\u0E34\u0E43\u0E19\u0E40\u0E04\u0E23\u0E37\u0E48\u0E2D\u0E07\u0E19\u0E35\u0E49 \u0E41\u0E21\u0E49\u0E1B\u0E34\u0E14\u0E41\u0E2D\u0E1B\u0E41\u0E25\u0E49\u0E27\u0E40\u0E1B\u0E34\u0E14\u0E43\u0E2B\u0E21\u0E48\u0E01\u0E47\u0E22\u0E31\u0E07\u0E2D\u0E22\u0E39\u0E48 \u0E08\u0E19\u0E01\u0E27\u0E48\u0E32\u0E08\u0E30\u0E01\u0E14 \"\u0E40\u0E04\u0E25\u0E35\u0E22\u0E23\u0E4C\u0E02\u0E49\u0E2D\u0E21\u0E39\u0E25\u0E17\u0E31\u0E49\u0E07\u0E2B\u0E21\u0E14\""),
-                    React.createElement("div", { className: "grid grid-cols-2 sm:grid-cols-4 gap-4" },
+                    React.createElement("div", { className: "grid grid-cols-2 sm:grid-cols-5 gap-4" },
+                        React.createElement(Field, { label: "วันเกิด (พ.ศ.)" },
+                            React.createElement(DobInput, { value: dob, onChange: setDob, min: 0, max: 99 })),
+                        React.createElement(Field, { label: "\u0E2D\u0E32\u0E22\u0E38 (\u0E1B\u0E35)" },
+                            React.createElement(NumInput, { value: age, onChange: setAgeManual, min: 0, max: 99 })),
                         React.createElement(Field, { label: "\u0E40\u0E1E\u0E28" },
                             React.createElement(SegButton, { options: [{ k: "female", l: "หญิง" }, { k: "male", l: "ชาย" }], value: gender, onChange: setGender })),
-                        React.createElement(Field, { label: "\u0E2D\u0E32\u0E22\u0E38 (\u0E1B\u0E35)" },
-                            React.createElement(NumInput, { value: age, onChange: setAge, min: 0, max: 99 })),
                         React.createElement(Field, { label: "\u0E0A\u0E31\u0E49\u0E19\u0E2D\u0E32\u0E0A\u0E35\u0E1E" },
                             React.createElement(SegButton, { options: [{ k: 1, l: "1" }, { k: 2, l: "2" }, { k: 3, l: "3" }], value: occClass, onChange: setOccClass })),
                         React.createElement(Field, { label: "\u0E07\u0E27\u0E14\u0E0A\u0E33\u0E23\u0E30\u0E40\u0E1A\u0E35\u0E49\u0E22" },
@@ -5551,6 +5673,7 @@ function App() {
                             openCards[c.id] && (React.createElement("div", { className: "mt-3 pt-2 rounded-xl overflow-hidden", style: { border: "1px solid #E7EEF3" } }, c.benefits.map(([k, v], i) => (React.createElement("div", { key: i, className: "px-3 py-3", style: { background: i % 2 === 0 ? "#FBFDFE" : "#FFFFFF", borderTop: i === 0 ? "none" : "1px solid #EEF3F7" } },
                                 React.createElement("p", { className: "text-[21px] font-medium leading-snug", style: { color: BRAND.label } }, k),
                                 React.createElement("p", { className: "text-[27px] font-bold leading-snug mt-0.5", style: { color: BRAND.dataBlack } }, v)))))))))))))),
+            React.createElement("footer", { className: "max-w-5xl mx-auto px-5 pt-2 pb-8 text-center text-[14px] leading-relaxed", style: { color: "#8A9AAB" } }, APP_VERSION, " · ", RATE_SOURCE),
             modal && (React.createElement("div", { className: "fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4", style: { background: "rgba(8,30,62,0.55)" } },
                 React.createElement("div", { className: "w-full max-w-md rounded-2xl p-5", style: { background: BRAND.card } },
                     React.createElement("div", { className: "flex items-center gap-2 mb-3" },
@@ -6385,7 +6508,7 @@ const FREQ = {
   monthly: { label: "\u0E23\u0E32\u0E22\u0E40\u0E14\u0E37\u0E2D\u0E19", perYear: 12, min: 200 }
 };
 const ROUNDING_EDGE = 0.49;
-const APP_VERSION = "\u0E2A\u0E38\u0E14\u0E04\u0E38\u0E49\u0E21 v1.5 \xB7 2026-10-03";
+const APP_VERSION = "สุดคุ้ม v1.6 · 2026-10-12";
 const fmt = (n) => Math.round(n || 0).toLocaleString("en-US", { maximumFractionDigits: 0 });
 // ค่านายหน้าปีที่ 1 (%) — ตาราง 7 "ค่าตอบแทนสำหรับตัวแทน" 10-09-2026
 // ผู้ใหญ่ (กรุงเทพ สุดคุ้ม รบข.12/2567): [ทุน <300,000 / 300,000-599,999 / 600,000 ขึ้นไป] x [อายุ 15-45 / 46-55 / 56-65]
@@ -6950,6 +7073,10 @@ function SudKoomDashboard({ onBack }) {
   const [fitScreen, setFitScreen] = useState(false);
   const [guardianGender, setGuardianGender] = useState(init("guardianGender"));
   const [guardianAge, setGuardianAge] = useState(init("guardianAge"));
+  const [dob, setDob] = useState("");
+  const [guardianDob, setGuardianDob] = useState("");
+  useEffect(() => { const a = dobAgeInRange(dob, 0, 99); if (a !== null) setAge(String(a)); }, [dob]);
+  useEffect(() => { const a = dobAgeInRange(guardianDob, 0, 120); if (a !== null) setGuardianAge(String(a)); }, [guardianDob]);
   const [scale, setScale] = useState(1);
   const [scaledHeight, setScaledHeight] = useState(null);
   const outerRef = useRef(null);
@@ -7213,7 +7340,7 @@ function SudKoomDashboard({ onBack }) {
       alt: "\u0E42\u0E25\u0E42\u0E01\u0E49\u0E41\u0E2D\u0E1B",
       className: "w-10 h-10 sm:w-12 sm:h-12 rounded-2xl shadow-md shrink-0 object-cover"
     }
-  ), /* @__PURE__ */ React.createElement("div", { className: "min-w-0" }, /* @__PURE__ */ React.createElement("div", { className: "text-[18px] sm:text-[21px] tracking-[0.05em] sm:tracking-[0.2em] break-words text-blue-800 uppercase font-semibold" }, "\u0E01\u0E23\u0E38\u0E07\u0E40\u0E17\u0E1E\u0E1B\u0E23\u0E30\u0E01\u0E31\u0E19\u0E0A\u0E35\u0E27\u0E34\u0E15"), /* @__PURE__ */ React.createElement("h1", { className: "text-[27px] sm:text-[36px] font-bold leading-tight text-slate-900" }, product.productName, " \u2014 \u0E15\u0E31\u0E27\u0E0A\u0E48\u0E27\u0E22\u0E04\u0E33\u0E19\u0E27\u0E13\u0E1C\u0E25\u0E1B\u0E23\u0E30\u0E42\u0E22\u0E0A\u0E19\u0E4C"))), /* @__PURE__ */ React.createElement("div", { className: "flex flex-col items-end gap-1.5 shrink-0 ml-auto" }, /* @__PURE__ */ React.createElement("div", { className: "text-[15px] sm:text-[18px] font-mono text-slate-400 bg-slate-100 px-2 py-1 rounded-lg" }, APP_VERSION), /* @__PURE__ */ React.createElement("div", { className: "flex gap-1.5" }, /* @__PURE__ */ React.createElement("button", { onClick: () => setShareMode("agent"), className: "text-[18px] sm:text-[21px] font-semibold text-blue-900 bg-white border border-sky-200 px-2.5 py-1 rounded-lg" }, "\u2699\uFE0F \u0E02\u0E49\u0E2D\u0E21\u0E39\u0E25\u0E15\u0E31\u0E27\u0E41\u0E17\u0E19"), /* @__PURE__ */ React.createElement("button", { onClick: () => {
+  ), /* @__PURE__ */ React.createElement("div", { className: "min-w-0" }, /* @__PURE__ */ React.createElement("div", { className: "text-[18px] sm:text-[21px] tracking-[0.05em] sm:tracking-[0.2em] break-words text-blue-800 uppercase font-semibold" }, "\u0E01\u0E23\u0E38\u0E07\u0E40\u0E17\u0E1E\u0E1B\u0E23\u0E30\u0E01\u0E31\u0E19\u0E0A\u0E35\u0E27\u0E34\u0E15"), /* @__PURE__ */ React.createElement("h1", { className: "text-[27px] sm:text-[36px] font-bold leading-tight text-slate-900" }, product.productName, " \u2014 \u0E15\u0E31\u0E27\u0E0A\u0E48\u0E27\u0E22\u0E04\u0E33\u0E19\u0E27\u0E13\u0E1C\u0E25\u0E1B\u0E23\u0E30\u0E42\u0E22\u0E0A\u0E19\u0E4C"))), /* @__PURE__ */ React.createElement("div", { className: "flex flex-col items-end gap-1.5 shrink-0 ml-auto" }, /* @__PURE__ */ React.createElement("div", { className: "flex gap-1.5" }, /* @__PURE__ */ React.createElement("button", { onClick: () => setShareMode("agent"), className: "text-[18px] sm:text-[21px] font-semibold text-blue-900 bg-white border border-sky-200 px-2.5 py-1 rounded-lg" }, "\u2699\uFE0F \u0E02\u0E49\u0E2D\u0E21\u0E39\u0E25\u0E15\u0E31\u0E27\u0E41\u0E17\u0E19"), /* @__PURE__ */ React.createElement("button", { onClick: () => {
     if (window.confirm("\u0E25\u0E49\u0E32\u0E07\u0E04\u0E48\u0E32\u0E17\u0E35\u0E48\u0E01\u0E23\u0E2D\u0E01\u0E17\u0E31\u0E49\u0E07\u0E2B\u0E21\u0E14\u0E01\u0E25\u0E31\u0E1A\u0E40\u0E1B\u0E47\u0E19\u0E04\u0E48\u0E32\u0E40\u0E23\u0E34\u0E48\u0E21\u0E15\u0E49\u0E19?")) resetAll();
   }, className: "text-[18px] sm:text-[21px] font-semibold text-slate-500 bg-white border border-sky-200 px-2.5 py-1 rounded-lg" }, "\u21BA \u0E25\u0E49\u0E32\u0E07\u0E04\u0E48\u0E32")))), /* @__PURE__ */ React.createElement("div", { className: "mt-3 text-[18px] sm:text-[21px] text-blue-900 bg-gradient-to-r from-amber-50 to-yellow-50 border border-amber-200 rounded-xl px-3 py-2 font-medium" }, "\u0E41\u0E2D\u0E1B\u0E19\u0E35\u0E49\u0E08\u0E31\u0E14\u0E17\u0E33\u0E02\u0E36\u0E49\u0E19\u0E40\u0E1E\u0E37\u0E48\u0E2D\u0E19\u0E33\u0E40\u0E2A\u0E19\u0E2D\u0E41\u0E25\u0E30\u0E2D\u0E18\u0E34\u0E1A\u0E32\u0E22\u0E1C\u0E25\u0E1B\u0E23\u0E30\u0E42\u0E22\u0E0A\u0E19\u0E4C \u0E2A\u0E33\u0E2B\u0E23\u0E31\u0E1A\u0E17\u0E35\u0E21\u0E07\u0E32\u0E19\u0E1B\u0E49\u0E32\u0E40\u0E1B\u0E47\u0E14\u0E40\u0E17\u0E48\u0E32\u0E19\u0E31\u0E49\u0E19")), /* @__PURE__ */ React.createElement("div", { className: "bg-white rounded-2xl p-4 sm:p-5 mb-5 border border-sky-100 shadow-sm print:hidden" }, /* @__PURE__ */ React.createElement("div", { className: "mb-5" }, /* @__PURE__ */ React.createElement("div", { className: "text-[21px] text-slate-500 mb-2 font-medium flex items-center gap-2" }, "\u0E01\u0E25\u0E38\u0E48\u0E21\u0E1C\u0E25\u0E34\u0E15\u0E20\u0E31\u0E13\u0E11\u0E4C", productAuto && /* @__PURE__ */ React.createElement("span", { className: "text-[18px] font-normal text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full" }, "\u0E40\u0E25\u0E37\u0E2D\u0E01\u0E2D\u0E31\u0E15\u0E42\u0E19\u0E21\u0E31\u0E15\u0E34\u0E15\u0E32\u0E21\u0E2D\u0E32\u0E22\u0E38")), /* @__PURE__ */ React.createElement("div", { className: "grid grid-cols-2 gap-2" }, /* @__PURE__ */ React.createElement(
     "button",
@@ -7244,18 +7371,18 @@ function SudKoomDashboard({ onBack }) {
       className: "mt-2 text-[18px] text-blue-700 font-medium underline"
     },
     "\u0E01\u0E25\u0E31\u0E1A\u0E44\u0E1B\u0E40\u0E25\u0E37\u0E2D\u0E01\u0E2D\u0E31\u0E15\u0E42\u0E19\u0E21\u0E31\u0E15\u0E34\u0E15\u0E32\u0E21\u0E2D\u0E32\u0E22\u0E38"
-  )), /* @__PURE__ */ React.createElement("div", { className: "mb-5" }, /* @__PURE__ */ React.createElement("div", { className: "text-[21px] text-slate-500 mb-2 font-medium" }, "\u0E41\u0E1A\u0E1A\u0E1B\u0E23\u0E30\u0E01\u0E31\u0E19"), /* @__PURE__ */ React.createElement("div", { className: "grid grid-cols-3 gap-2" }, Object.keys(product.plans).map((p) => /* @__PURE__ */ React.createElement("button", { key: p, onClick: () => setPlan(p), className: `${pillBase} ${plan === p ? pillOn : pillOff}` }, p))), /* @__PURE__ */ React.createElement("div", { className: "text-[21px] text-slate-400 mt-2" }, "\u0E23\u0E30\u0E22\u0E30\u0E40\u0E27\u0E25\u0E32\u0E40\u0E2D\u0E32\u0E1B\u0E23\u0E30\u0E01\u0E31\u0E19 ", planMeta.term, " \u0E1B\u0E35 \xB7 \u0E0A\u0E33\u0E23\u0E30\u0E40\u0E1A\u0E35\u0E49\u0E22 ", planMeta.pay, " \u0E1B\u0E35 \xB7 \u0E40\u0E07\u0E34\u0E19\u0E04\u0E37\u0E19\u0E1E\u0E34\u0E40\u0E28\u0E29 ", (planMeta.bonus * 100).toFixed(0), "%")), /* @__PURE__ */ React.createElement("div", { className: "grid grid-cols-2 gap-3 mb-2" }, /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { className: "text-[21px] text-slate-500 mb-2 font-medium" }, "\u0E40\u0E1E\u0E28"), /* @__PURE__ */ React.createElement("div", { className: "grid grid-cols-2 gap-2" }, /* @__PURE__ */ React.createElement("button", { onClick: () => setGender("male"), className: `${pillBase} ${gender === "male" ? pillOn : pillOff}` }, "\u0E0A\u0E32\u0E22"), /* @__PURE__ */ React.createElement("button", { onClick: () => setGender("female"), className: `${pillBase} ${gender === "female" ? pillOn : pillOff}` }, "\u0E2B\u0E0D\u0E34\u0E07"))), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { className: "text-[21px] text-slate-500 mb-2 font-medium" }, "\u0E2D\u0E32\u0E22\u0E38 (", product.minAge, "\u2013", product.maxAge, " \u0E1B\u0E35)"), /* @__PURE__ */ React.createElement(
+  )), /* @__PURE__ */ React.createElement("div", { className: "mb-5" }, /* @__PURE__ */ React.createElement("div", { className: "text-[21px] text-slate-500 mb-2 font-medium" }, "\u0E41\u0E1A\u0E1A\u0E1B\u0E23\u0E30\u0E01\u0E31\u0E19"), /* @__PURE__ */ React.createElement("div", { className: "grid grid-cols-3 gap-2" }, Object.keys(product.plans).map((p) => /* @__PURE__ */ React.createElement("button", { key: p, onClick: () => setPlan(p), className: `${pillBase} ${plan === p ? pillOn : pillOff}` }, p))), /* @__PURE__ */ React.createElement("div", { className: "text-[21px] text-slate-400 mt-2" }, "\u0E23\u0E30\u0E22\u0E30\u0E40\u0E27\u0E25\u0E32\u0E40\u0E2D\u0E32\u0E1B\u0E23\u0E30\u0E01\u0E31\u0E19 ", planMeta.term, " \u0E1B\u0E35 \xB7 \u0E0A\u0E33\u0E23\u0E30\u0E40\u0E1A\u0E35\u0E49\u0E22 ", planMeta.pay, " \u0E1B\u0E35 \xB7 \u0E40\u0E07\u0E34\u0E19\u0E04\u0E37\u0E19\u0E1E\u0E34\u0E40\u0E28\u0E29 ", (planMeta.bonus * 100).toFixed(0), "%")), /* @__PURE__ */ React.createElement("div", { className: "grid grid-cols-2 gap-3 mb-2" }, /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { className: "text-[21px] text-slate-500 mb-2 font-medium" }, "วันเกิด (พ.ศ.)"), /* @__PURE__ */ React.createElement(DobInput, { value: dob, onChange: setDob, className: inputCls + " placeholder:text-slate-300" })), /* @__PURE__ */ React.createElement("div", { className: "col-span-2 order-last" }, /* @__PURE__ */ React.createElement("div", { className: "text-[21px] text-slate-500 mb-2 font-medium" }, "\u0E40\u0E1E\u0E28"), /* @__PURE__ */ React.createElement("div", { className: "grid grid-cols-2 gap-2" }, /* @__PURE__ */ React.createElement("button", { onClick: () => setGender("male"), className: `${pillBase} ${gender === "male" ? pillOn : pillOff}` }, "\u0E0A\u0E32\u0E22"), /* @__PURE__ */ React.createElement("button", { onClick: () => setGender("female"), className: `${pillBase} ${gender === "female" ? pillOn : pillOff}` }, "\u0E2B\u0E0D\u0E34\u0E07"))), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { className: "text-[21px] text-slate-500 mb-2 font-medium" }, "\u0E2D\u0E32\u0E22\u0E38 (", product.minAge, "\u2013", product.maxAge, " \u0E1B\u0E35)"), /* @__PURE__ */ React.createElement(
     NumberField,
     {
       value: age,
-      onChange: (raw) => setAge(raw),
+      onChange: (raw) => { if (dob && String(dobAgeInRange(dob, 0, 99)) !== String(raw)) setDob(""); setAge(raw); },
       className: `${inputCls} ${ageOutOfRange ? "border-orange-400 focus:border-orange-500" : ""}`
     }
-  ))), ageOutOfRange && /* @__PURE__ */ React.createElement("div", { className: "mb-4 text-[21px] text-orange-600 flex gap-1.5" }, /* @__PURE__ */ React.createElement(Info, { size: 16, className: "shrink-0 mt-0.5" }), product.productName, " \u0E23\u0E31\u0E1A\u0E1B\u0E23\u0E30\u0E01\u0E31\u0E19\u0E20\u0E31\u0E22\u0E17\u0E35\u0E48\u0E2D\u0E32\u0E22\u0E38 ", product.minAge, "\u2013", product.maxAge, " \u0E1B\u0E35\u0E40\u0E17\u0E48\u0E32\u0E19\u0E31\u0E49\u0E19 \u0E01\u0E23\u0E38\u0E13\u0E32\u0E01\u0E23\u0E2D\u0E01\u0E2D\u0E32\u0E22\u0E38\u0E43\u0E19\u0E0A\u0E48\u0E27\u0E07\u0E19\u0E35\u0E49\u0E40\u0E1E\u0E37\u0E48\u0E2D\u0E04\u0E33\u0E19\u0E27\u0E13\u0E1C\u0E25\u0E1B\u0E23\u0E30\u0E42\u0E22\u0E0A\u0E19\u0E4C"), isKids && /* @__PURE__ */ React.createElement("div", { className: "mb-5 pt-4 border-t border-sky-100" }, /* @__PURE__ */ React.createElement("div", { className: "text-[21px] text-slate-500 mb-2 font-medium" }, "\u0E02\u0E49\u0E2D\u0E21\u0E39\u0E25\u0E1C\u0E39\u0E49\u0E1B\u0E01\u0E04\u0E23\u0E2D\u0E07 (\u0E1C\u0E39\u0E49\u0E0A\u0E33\u0E23\u0E30\u0E40\u0E1A\u0E35\u0E49\u0E22) \u2014 \u0E2A\u0E33\u0E2B\u0E23\u0E31\u0E1A\u0E04\u0E33\u0E19\u0E27\u0E13\u0E40\u0E1A\u0E35\u0E49\u0E22 \u0E04\u0E0A."), /* @__PURE__ */ React.createElement("div", { className: "grid grid-cols-2 gap-3" }, /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { className: "text-[21px] text-slate-500 mb-2 font-medium" }, "\u0E40\u0E1E\u0E28\u0E1C\u0E39\u0E49\u0E1B\u0E01\u0E04\u0E23\u0E2D\u0E07"), /* @__PURE__ */ React.createElement("div", { className: "grid grid-cols-2 gap-2" }, /* @__PURE__ */ React.createElement("button", { onClick: () => setGuardianGender("male"), className: `${pillBase} ${guardianGender === "male" ? pillOn : pillOff}` }, "\u0E0A\u0E32\u0E22"), /* @__PURE__ */ React.createElement("button", { onClick: () => setGuardianGender("female"), className: `${pillBase} ${guardianGender === "female" ? pillOn : pillOff}` }, "\u0E2B\u0E0D\u0E34\u0E07"))), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { className: "text-[21px] text-slate-500 mb-2 font-medium" }, "\u0E2D\u0E32\u0E22\u0E38\u0E1C\u0E39\u0E49\u0E1B\u0E01\u0E04\u0E23\u0E2D\u0E07 (20\u201355 \u0E1B\u0E35)"), /* @__PURE__ */ React.createElement(
+  ))), ageOutOfRange && /* @__PURE__ */ React.createElement("div", { className: "mb-4 text-[21px] text-orange-600 flex gap-1.5" }, /* @__PURE__ */ React.createElement(Info, { size: 16, className: "shrink-0 mt-0.5" }), product.productName, " \u0E23\u0E31\u0E1A\u0E1B\u0E23\u0E30\u0E01\u0E31\u0E19\u0E20\u0E31\u0E22\u0E17\u0E35\u0E48\u0E2D\u0E32\u0E22\u0E38 ", product.minAge, "\u2013", product.maxAge, " \u0E1B\u0E35\u0E40\u0E17\u0E48\u0E32\u0E19\u0E31\u0E49\u0E19 \u0E01\u0E23\u0E38\u0E13\u0E32\u0E01\u0E23\u0E2D\u0E01\u0E2D\u0E32\u0E22\u0E38\u0E43\u0E19\u0E0A\u0E48\u0E27\u0E07\u0E19\u0E35\u0E49\u0E40\u0E1E\u0E37\u0E48\u0E2D\u0E04\u0E33\u0E19\u0E27\u0E13\u0E1C\u0E25\u0E1B\u0E23\u0E30\u0E42\u0E22\u0E0A\u0E19\u0E4C"), isKids && /* @__PURE__ */ React.createElement("div", { className: "mb-5 pt-4 border-t border-sky-100" }, /* @__PURE__ */ React.createElement("div", { className: "text-[21px] text-slate-500 mb-2 font-medium" }, "\u0E02\u0E49\u0E2D\u0E21\u0E39\u0E25\u0E1C\u0E39\u0E49\u0E1B\u0E01\u0E04\u0E23\u0E2D\u0E07 (\u0E1C\u0E39\u0E49\u0E0A\u0E33\u0E23\u0E30\u0E40\u0E1A\u0E35\u0E49\u0E22) \u2014 \u0E2A\u0E33\u0E2B\u0E23\u0E31\u0E1A\u0E04\u0E33\u0E19\u0E27\u0E13\u0E40\u0E1A\u0E35\u0E49\u0E22 \u0E04\u0E0A."), /* @__PURE__ */ React.createElement("div", { className: "grid grid-cols-2 gap-3" }, /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { className: "text-[21px] text-slate-500 mb-2 font-medium" }, "วันเกิด (พ.ศ.)"), /* @__PURE__ */ React.createElement(DobInput, { value: guardianDob, onChange: setGuardianDob, className: inputCls + " placeholder:text-slate-300" })), /* @__PURE__ */ React.createElement("div", { className: "col-span-2 order-last" }, /* @__PURE__ */ React.createElement("div", { className: "text-[21px] text-slate-500 mb-2 font-medium" }, "\u0E40\u0E1E\u0E28\u0E1C\u0E39\u0E49\u0E1B\u0E01\u0E04\u0E23\u0E2D\u0E07"), /* @__PURE__ */ React.createElement("div", { className: "grid grid-cols-2 gap-2" }, /* @__PURE__ */ React.createElement("button", { onClick: () => setGuardianGender("male"), className: `${pillBase} ${guardianGender === "male" ? pillOn : pillOff}` }, "\u0E0A\u0E32\u0E22"), /* @__PURE__ */ React.createElement("button", { onClick: () => setGuardianGender("female"), className: `${pillBase} ${guardianGender === "female" ? pillOn : pillOff}` }, "\u0E2B\u0E0D\u0E34\u0E07"))), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { className: "text-[21px] text-slate-500 mb-2 font-medium" }, "\u0E2D\u0E32\u0E22\u0E38\u0E1C\u0E39\u0E49\u0E1B\u0E01\u0E04\u0E23\u0E2D\u0E07 (20\u201355 \u0E1B\u0E35)"), /* @__PURE__ */ React.createElement(
     NumberField,
     {
       value: guardianAge,
-      onChange: (raw) => setGuardianAge(raw),
+      onChange: (raw) => { if (guardianDob && String(dobAgeInRange(guardianDob, 0, 120)) !== String(raw)) setGuardianDob(""); setGuardianAge(raw); },
       className: `${inputCls} ${guardianAgeOutOfRange ? "border-orange-400 focus:border-orange-500" : ""}`
     }
   ))), guardianAgeOutOfRange && /* @__PURE__ */ React.createElement("div", { className: "mt-3 text-[21px] text-orange-600 flex gap-1.5" }, /* @__PURE__ */ React.createElement(Info, { size: 16, className: "shrink-0 mt-0.5" }), "\u0E2A\u0E31\u0E0D\u0E0D\u0E32\u0E40\u0E1E\u0E34\u0E48\u0E21\u0E40\u0E15\u0E34\u0E21 \u0E04\u0E0A. \u0E23\u0E31\u0E1A\u0E1C\u0E39\u0E49\u0E1B\u0E01\u0E04\u0E23\u0E2D\u0E07(\u0E1C\u0E39\u0E49\u0E0A\u0E33\u0E23\u0E30\u0E40\u0E1A\u0E35\u0E49\u0E22)\u0E2D\u0E32\u0E22\u0E38 20\u201355 \u0E1B\u0E35\u0E40\u0E17\u0E48\u0E32\u0E19\u0E31\u0E49\u0E19")), /* @__PURE__ */ React.createElement("div", { className: "mb-4" }, /* @__PURE__ */ React.createElement("div", { className: "text-[21px] text-slate-500 mb-2 font-medium" }, "\u0E01\u0E33\u0E2B\u0E19\u0E14\u0E08\u0E32\u0E01"), /* @__PURE__ */ React.createElement("div", { className: "grid grid-cols-2 gap-2" }, /* @__PURE__ */ React.createElement(
@@ -7362,7 +7489,7 @@ function SudKoomDashboard({ onBack }) {
         onPointerLeave: handlePointerUp
       }
     )
-  )), /* @__PURE__ */ React.createElement("div", { className: "text-[21px] text-slate-400 mt-4 leading-relaxed flex gap-2 print:hidden" }, /* @__PURE__ */ React.createElement(Info, { size: 16, className: "shrink-0 mt-0.5" }), "\u0E15\u0E31\u0E27\u0E40\u0E25\u0E02\u0E04\u0E33\u0E19\u0E27\u0E13\u0E08\u0E32\u0E01\u0E2D\u0E31\u0E15\u0E23\u0E32\u0E40\u0E1A\u0E35\u0E49\u0E22\u0E1B\u0E23\u0E30\u0E01\u0E31\u0E19\u0E20\u0E31\u0E22\u0E17\u0E32\u0E07\u0E01\u0E32\u0E23\u0E02\u0E2D\u0E07\u0E1A\u0E23\u0E34\u0E29\u0E31\u0E17\u0E41\u0E25\u0E30\u0E40\u0E1B\u0E47\u0E19\u0E04\u0E48\u0E32\u0E1B\u0E23\u0E30\u0E21\u0E32\u0E13\u0E40\u0E1E\u0E37\u0E48\u0E2D\u0E1B\u0E23\u0E30\u0E01\u0E2D\u0E1A\u0E01\u0E32\u0E23\u0E19\u0E33\u0E40\u0E2A\u0E19\u0E2D\u0E40\u0E17\u0E48\u0E32\u0E19\u0E31\u0E49\u0E19 \u0E40\u0E07\u0E34\u0E19\u0E04\u0E37\u0E19\u0E1E\u0E34\u0E40\u0E28\u0E29\u0E41\u0E25\u0E30\u0E1C\u0E25\u0E1B\u0E23\u0E30\u0E42\u0E22\u0E0A\u0E19\u0E4C\u0E01\u0E23\u0E13\u0E35\u0E40\u0E2A\u0E35\u0E22\u0E0A\u0E35\u0E27\u0E34\u0E15\u0E08\u0E48\u0E32\u0E22\u0E08\u0E23\u0E34\u0E07\u0E15\u0E32\u0E21\u0E40\u0E07\u0E37\u0E48\u0E2D\u0E19\u0E44\u0E02\u0E01\u0E23\u0E21\u0E18\u0E23\u0E23\u0E21\u0E4C \u0E42\u0E23\u0E04\u0E23\u0E49\u0E32\u0E22\u0E41\u0E23\u0E07 4 \u0E42\u0E23\u0E04\u0E41\u0E25\u0E30\u0E04\u0E38\u0E49\u0E21\u0E04\u0E23\u0E2D\u0E07\u0E1C\u0E39\u0E49\u0E0A\u0E33\u0E23\u0E30\u0E40\u0E1A\u0E35\u0E49\u0E22 (\u0E04\u0E0A.) \u0E2A\u0E33\u0E2B\u0E23\u0E31\u0E1A\u0E40\u0E14\u0E47\u0E01\u0E40\u0E1B\u0E47\u0E19\u0E1C\u0E25\u0E1B\u0E23\u0E30\u0E42\u0E22\u0E0A\u0E19\u0E4C\u0E08\u0E32\u0E01\u0E2A\u0E31\u0E0D\u0E0D\u0E32\u0E40\u0E1E\u0E34\u0E48\u0E21\u0E40\u0E15\u0E34\u0E21\u0E17\u0E35\u0E48\u0E15\u0E49\u0E2D\u0E07\u0E0B\u0E37\u0E49\u0E2D\u0E41\u0E19\u0E1A \u0E40\u0E1A\u0E35\u0E49\u0E22 \u0E04\u0E0A. \u0E04\u0E33\u0E19\u0E27\u0E13\u0E08\u0E32\u0E01\u0E40\u0E1A\u0E35\u0E49\u0E22\u0E01\u0E23\u0E21\u0E18\u0E23\u0E23\u0E21\u0E4C\u0E2B\u0E25\u0E31\u0E01\u0E40\u0E1E\u0E35\u0E22\u0E07\u0E2D\u0E22\u0E48\u0E32\u0E07\u0E40\u0E14\u0E35\u0E22\u0E27 \u0E2B\u0E32\u0E01\u0E41\u0E19\u0E1A\u0E2A\u0E31\u0E0D\u0E0D\u0E32\u0E40\u0E1E\u0E34\u0E48\u0E21\u0E40\u0E15\u0E34\u0E21\u0E2D\u0E37\u0E48\u0E19 (\u0E40\u0E0A\u0E48\u0E19 \u0E0B\u0E35\u0E44\u0E2D \u0E04\u0E34\u0E14\u0E2A\u0E4C) \u0E40\u0E1A\u0E35\u0E49\u0E22\u0E08\u0E23\u0E34\u0E07\u0E08\u0E30\u0E2A\u0E39\u0E07\u0E01\u0E27\u0E48\u0E32\u0E19\u0E35\u0E49\u0E40\u0E25\u0E47\u0E01\u0E19\u0E49\u0E2D\u0E22\u0E40\u0E19\u0E37\u0E48\u0E2D\u0E07\u0E08\u0E32\u0E01\u0E10\u0E32\u0E19\u0E40\u0E1A\u0E35\u0E49\u0E22\u0E17\u0E35\u0E48\u0E43\u0E0A\u0E49\u0E04\u0E33\u0E19\u0E27\u0E13 \u0E04\u0E0A. \u0E08\u0E30\u0E23\u0E27\u0E21\u0E40\u0E1A\u0E35\u0E49\u0E22\u0E02\u0E2D\u0E07\u0E2A\u0E31\u0E0D\u0E0D\u0E32\u0E40\u0E1E\u0E34\u0E48\u0E21\u0E40\u0E15\u0E34\u0E21\u0E19\u0E31\u0E49\u0E19\u0E14\u0E49\u0E27\u0E22 \u0E42\u0E1B\u0E23\u0E14\u0E22\u0E37\u0E19\u0E22\u0E31\u0E19\u0E15\u0E31\u0E27\u0E40\u0E25\u0E02\u0E01\u0E31\u0E1A\u0E43\u0E1A\u0E40\u0E2A\u0E19\u0E2D\u0E23\u0E32\u0E04\u0E32\u0E08\u0E23\u0E34\u0E07\u0E01\u0E48\u0E2D\u0E19\u0E19\u0E33\u0E40\u0E2A\u0E19\u0E2D\u0E25\u0E39\u0E01\u0E04\u0E49\u0E32")), showComm && React.createElement(CommissionPopup, { result: commResult, onClose: () => setShowComm(false) }), shareMode && /* @__PURE__ */ React.createElement(
+  )), /* @__PURE__ */ React.createElement("div", { className: "text-[21px] text-slate-400 mt-4 leading-relaxed flex gap-2 print:hidden" }, /* @__PURE__ */ React.createElement(Info, { size: 16, className: "shrink-0 mt-0.5" }), "\u0E15\u0E31\u0E27\u0E40\u0E25\u0E02\u0E04\u0E33\u0E19\u0E27\u0E13\u0E08\u0E32\u0E01\u0E2D\u0E31\u0E15\u0E23\u0E32\u0E40\u0E1A\u0E35\u0E49\u0E22\u0E1B\u0E23\u0E30\u0E01\u0E31\u0E19\u0E20\u0E31\u0E22\u0E17\u0E32\u0E07\u0E01\u0E32\u0E23\u0E02\u0E2D\u0E07\u0E1A\u0E23\u0E34\u0E29\u0E31\u0E17\u0E41\u0E25\u0E30\u0E40\u0E1B\u0E47\u0E19\u0E04\u0E48\u0E32\u0E1B\u0E23\u0E30\u0E21\u0E32\u0E13\u0E40\u0E1E\u0E37\u0E48\u0E2D\u0E1B\u0E23\u0E30\u0E01\u0E2D\u0E1A\u0E01\u0E32\u0E23\u0E19\u0E33\u0E40\u0E2A\u0E19\u0E2D\u0E40\u0E17\u0E48\u0E32\u0E19\u0E31\u0E49\u0E19 \u0E40\u0E07\u0E34\u0E19\u0E04\u0E37\u0E19\u0E1E\u0E34\u0E40\u0E28\u0E29\u0E41\u0E25\u0E30\u0E1C\u0E25\u0E1B\u0E23\u0E30\u0E42\u0E22\u0E0A\u0E19\u0E4C\u0E01\u0E23\u0E13\u0E35\u0E40\u0E2A\u0E35\u0E22\u0E0A\u0E35\u0E27\u0E34\u0E15\u0E08\u0E48\u0E32\u0E22\u0E08\u0E23\u0E34\u0E07\u0E15\u0E32\u0E21\u0E40\u0E07\u0E37\u0E48\u0E2D\u0E19\u0E44\u0E02\u0E01\u0E23\u0E21\u0E18\u0E23\u0E23\u0E21\u0E4C \u0E42\u0E23\u0E04\u0E23\u0E49\u0E32\u0E22\u0E41\u0E23\u0E07 4 \u0E42\u0E23\u0E04\u0E41\u0E25\u0E30\u0E04\u0E38\u0E49\u0E21\u0E04\u0E23\u0E2D\u0E07\u0E1C\u0E39\u0E49\u0E0A\u0E33\u0E23\u0E30\u0E40\u0E1A\u0E35\u0E49\u0E22 (\u0E04\u0E0A.) \u0E2A\u0E33\u0E2B\u0E23\u0E31\u0E1A\u0E40\u0E14\u0E47\u0E01\u0E40\u0E1B\u0E47\u0E19\u0E1C\u0E25\u0E1B\u0E23\u0E30\u0E42\u0E22\u0E0A\u0E19\u0E4C\u0E08\u0E32\u0E01\u0E2A\u0E31\u0E0D\u0E0D\u0E32\u0E40\u0E1E\u0E34\u0E48\u0E21\u0E40\u0E15\u0E34\u0E21\u0E17\u0E35\u0E48\u0E15\u0E49\u0E2D\u0E07\u0E0B\u0E37\u0E49\u0E2D\u0E41\u0E19\u0E1A \u0E40\u0E1A\u0E35\u0E49\u0E22 \u0E04\u0E0A. \u0E04\u0E33\u0E19\u0E27\u0E13\u0E08\u0E32\u0E01\u0E40\u0E1A\u0E35\u0E49\u0E22\u0E01\u0E23\u0E21\u0E18\u0E23\u0E23\u0E21\u0E4C\u0E2B\u0E25\u0E31\u0E01\u0E40\u0E1E\u0E35\u0E22\u0E07\u0E2D\u0E22\u0E48\u0E32\u0E07\u0E40\u0E14\u0E35\u0E22\u0E27 \u0E2B\u0E32\u0E01\u0E41\u0E19\u0E1A\u0E2A\u0E31\u0E0D\u0E0D\u0E32\u0E40\u0E1E\u0E34\u0E48\u0E21\u0E40\u0E15\u0E34\u0E21\u0E2D\u0E37\u0E48\u0E19 (\u0E40\u0E0A\u0E48\u0E19 \u0E0B\u0E35\u0E44\u0E2D \u0E04\u0E34\u0E14\u0E2A\u0E4C) \u0E40\u0E1A\u0E35\u0E49\u0E22\u0E08\u0E23\u0E34\u0E07\u0E08\u0E30\u0E2A\u0E39\u0E07\u0E01\u0E27\u0E48\u0E32\u0E19\u0E35\u0E49\u0E40\u0E25\u0E47\u0E01\u0E19\u0E49\u0E2D\u0E22\u0E40\u0E19\u0E37\u0E48\u0E2D\u0E07\u0E08\u0E32\u0E01\u0E10\u0E32\u0E19\u0E40\u0E1A\u0E35\u0E49\u0E22\u0E17\u0E35\u0E48\u0E43\u0E0A\u0E49\u0E04\u0E33\u0E19\u0E27\u0E13 \u0E04\u0E0A. \u0E08\u0E30\u0E23\u0E27\u0E21\u0E40\u0E1A\u0E35\u0E49\u0E22\u0E02\u0E2D\u0E07\u0E2A\u0E31\u0E0D\u0E0D\u0E32\u0E40\u0E1E\u0E34\u0E48\u0E21\u0E40\u0E15\u0E34\u0E21\u0E19\u0E31\u0E49\u0E19\u0E14\u0E49\u0E27\u0E22 \u0E42\u0E1B\u0E23\u0E14\u0E22\u0E37\u0E19\u0E22\u0E31\u0E19\u0E15\u0E31\u0E27\u0E40\u0E25\u0E02\u0E01\u0E31\u0E1A\u0E43\u0E1A\u0E40\u0E2A\u0E19\u0E2D\u0E23\u0E32\u0E04\u0E32\u0E08\u0E23\u0E34\u0E07\u0E01\u0E48\u0E2D\u0E19\u0E19\u0E33\u0E40\u0E2A\u0E19\u0E2D\u0E25\u0E39\u0E01\u0E04\u0E49\u0E32")), /* @__PURE__ */ React.createElement("div", { className: "text-[14px] text-slate-400 text-center mt-6" }, APP_VERSION), showComm && React.createElement(CommissionPopup, { result: commResult, onClose: () => setShowComm(false) }), shareMode && /* @__PURE__ */ React.createElement(
     ShareModal,
     {
       mode: shareMode,
