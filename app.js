@@ -8,7 +8,7 @@ const BRAND = {
     ink: "#000000", sub: "#404040", danger: "#B93232", warn: "#6B4508",
     label: "#000000", nameBlue: "#1668D6", mainBlue: "#0C2F63", dataBlack: "#000000",
 };
-const APP_VERSION = "v2.44.1 (2569-10-13)";
+const APP_VERSION = "v2.44.2 (2569-10-13)";
 const RATE_SOURCE = "อัตราเบี้ยตามคู่มือตัวแทน V.14 (14-02-2026)"; // วันที่ตารางค่าคอมอยู่ในป๊อปอัปค่าคอม (ตัวแทนเท่านั้น)
 const CASES_KEY = "blacal-cases-v1"; // อัปเดตเลขนี้ทุกครั้งที่มีการแก้ไข/เพิ่มแบบประกันใหม่ เพื่อให้รู้ว่าไฟล์ที่ใช้อยู่เป็นเวอร์ชันล่าสุดหรือไม่
 // ปัดเศษแบบคู่มือ (ทศนิยมตั้งแต่ 0.5 ปัดขึ้น) — กันเลขทศนิยมของคอมพิวเตอร์ เช่น 7663.4999999 ที่ควรเป็น 7663.5 → 7664
@@ -2160,6 +2160,24 @@ const SUPER_MALE = [1.39, 1.56, 1.66, 1.73, 1.74, 1.73, 1.70, 1.66, 1.61, 1.56, 
 const SUPER_MAX_SI = 3000000, SUPER_MIN_SI = 100000;
 /* ============================== HELPERS ============================== */
 const bandIndex = (age, bands) => bands.findIndex(([lo, hi]) => age >= lo && age <= hi);
+// ช่องอัตราเบี้ยที่เอกสารไม่ตรงกันเอง — แสดงคำเตือนให้ตัวแทนตรวจสอบกับบริษัทก่อนเสนอ
+// key: id|gender|age(หรือช่วงอายุ)|แผน[|ส่วนแรก|ชั้นอาชีพ]
+const RATE_DOUBT = {
+    "UNJAI|female|24|1000000": { manual: 9006, app: 9066, why: "ตารางรายงวดในคู่มือคำนวณย้อนได้ 9,066" },
+    "UNJAI|female|26|500000": { manual: 5253, app: 5254, why: "ตารางรายงวดในคู่มือเข้ากันได้ทั้ง 2 ค่า" },
+    "UNJAI|female|31|300000": { manual: 4056, app: 4054, why: "ตารางรายงวดในคู่มือคำนวณย้อนได้ 4,054" },
+    "UNJAI|female|41|1000000": { manual: 15793, app: 15493, why: "ตารางรายงวดในคู่มือคำนวณย้อนได้ใกล้ 15,494" },
+    "UNJAI|female|55|500000": { manual: 13595, app: 13592, why: "ตารางรายงวดในคู่มือไม่ตรงกับทั้ง 2 ค่า" },
+    "UNJAI|female|56|1000000": { manual: 25990, app: 25991, why: "ตารางรายงวดในคู่มือคำนวณย้อนได้ 25,991" },
+    "UNJAI|male|63|300000": { manual: 11952, app: 11953, why: "ตารางรายงวดในคู่มือไม่ตรงกับทั้ง 2 ค่า" },
+    "UNJAI|male|67|750000": { manual: 30142, app: 30145, why: "ตารางรายงวดในคู่มือไม่ตรงกับทั้ง 2 ค่า" },
+    "UNJAI|female|69|400000": { manual: 21310, app: 21315, why: "ตารางรายงวดในคู่มือคำนวณย้อนได้ 21,315" },
+    "HH|female|81-85|1000000|30000|c3": { manual: 243457, app: 143457, why: "ช่องอื่นของชั้นอาชีพ 3 ทุกช่อง = ชั้น 1-2 × 1.4 ซึ่งได้ 143,457" },
+};
+function rateDoubtText(key) {
+    const d = RATE_DOUBT[key];
+    return d ? `⚠️ อัตราเบี้ยช่องนี้ในคู่มือไม่ตรงกันเอง: คู่มือรายปีพิมพ์ ${d.manual.toLocaleString("th-TH")} บาท แต่${d.why} — แอปใช้ ${d.app.toLocaleString("th-TH")} บาท กรุณาตรวจสอบกับบริษัทก่อนเสนอลูกค้า` : "";
+}
 const PAY_MODE = [
     { key: "year", label: "รายปี", factor: 1 },
     { key: "half", label: "ราย 6 เดือน", factor: 0.52 },
@@ -3111,6 +3129,12 @@ function App() {
             return mainDisabled(p);
         return riderDisabled(p);
     }
+    function rateDoubtFor(id) {
+        if (id === "UNJAI") return rateDoubtText(`UNJAI|${gender}|${age}|${unjaiPlan}`);
+        if (id === "HH") { const bi = bandIndex(age, VH_BANDS); const b = bi >= 0 ? VH_BANDS[bi] : null; return b ? rateDoubtText(`HH|${gender}|${b[0]}-${b[1]}|${hhPlan}|${hhDeduct}|${occClass === 3 ? "c3" : "c12"}`) : ""; }
+        return "";
+    }
+    const doubtNote = (id) => { const t = rateDoubtFor(id); return t ? React.createElement("p", { className: "text-[17px] mt-2 px-3 py-2 rounded-lg", style: { background: "#FFF1E6", color: BRAND.danger, border: "1px solid #F3C6A5" } }, t) : null; };
     const compareBtn = (id) => React.createElement("button", { onClick: () => setHealthCompare(id), className: "w-full mt-2 rounded-xl py-2.5 text-[19px] font-semibold", style: { background: "#FFFFFF", color: BRAND.navy, border: `1.5px solid ${BRAND.sky}` } }, "📊 เทียบแผนนี้ทั้งแพ็กเกจ (เบี้ยรวม + ความคุ้มครอง)");
     function renderProductChildren(p) {
         switch (p.id) {
@@ -3137,8 +3161,8 @@ function App() {
                 React.createElement(NumInput, { value: sudSI, onChange: setSudSI, min: 0, step: 50000 }), riderMinHint(sudSI, 100000)));
             case "LIFE99": return selected.LIFE99 && (React.createElement(PlanRow, { label: "\u0E17\u0E38\u0E19\u0E1B\u0E23\u0E30\u0E01\u0E31\u0E19\u0E20\u0E31\u0E22 (\u0E1A\u0E32\u0E17)" },
                 React.createElement(NumInput, { value: life99SI, onChange: setLife99SI, min: 0, step: 50000 })));
-            case "UNJAI": return selected.UNJAI && (React.createElement(PlanRow, { label: "\u0E41\u0E1C\u0E19\u0E04\u0E27\u0E32\u0E21\u0E04\u0E38\u0E49\u0E21\u0E04\u0E23\u0E2D\u0E07 (\u0E17\u0E38\u0E19\u0E2D\u0E35\u0E0B\u0E35\u0E41\u0E04\u0E23\u0E4C)" },
-                React.createElement(Chips, { options: UNJAI_PLANS, value: unjaiPlan, onChange: setUnjaiPlan, fmt: baht })));
+            case "UNJAI": return selected.UNJAI && React.createElement(React.Fragment, null, (React.createElement(PlanRow, { label: "\u0E41\u0E1C\u0E19\u0E04\u0E27\u0E32\u0E21\u0E04\u0E38\u0E49\u0E21\u0E04\u0E23\u0E2D\u0E07 (\u0E17\u0E38\u0E19\u0E2D\u0E35\u0E0B\u0E35\u0E41\u0E04\u0E23\u0E4C)" },
+                React.createElement(Chips, { options: UNJAI_PLANS, value: unjaiPlan, onChange: setUnjaiPlan, fmt: baht }))), doubtNote("UNJAI"));
             case "CANCERMAX": return selected.CANCERMAX && (React.createElement(PlanRow, { label: "แผนความคุ้มครอง (ทุนเฟิสต์ แคนเซอร์)" },
                 React.createElement(Chips, { options: CANCERMAX_PLANS.map((pl) => pl.key), value: cancermaxPlan, onChange: setCancermaxPlan, fmt: (k) => { const pl = CANCERMAX_PLANS.find((pp) => pp.key === k); return "ทุนมะเร็ง " + baht(pl.first); } })));
             case "PLUS2": return selected.PLUS2 && (React.createElement(React.Fragment, null,
@@ -3239,7 +3263,7 @@ function App() {
                 React.createElement(PlanRow, { label: "แผนความคุ้มครอง (วงเงินต่อครั้ง)" },
                     React.createElement(Chips, { options: HH_PLANS, value: hhPlan, onChange: setHhPlan, fmt: baht })),
                 React.createElement(PlanRow, { label: "ความรับผิดส่วนแรก" },
-                    React.createElement(Chips, { options: HH_DEDUCT, value: hhDeduct, onChange: setHhDeduct, fmt: baht })))), compareBtn("HH"));
+                    React.createElement(Chips, { options: HH_DEDUCT, value: hhDeduct, onChange: setHhDeduct, fmt: baht })))), compareBtn("HH"), doubtNote("HH"));
             case "OPDP": return selected.OPDP && (React.createElement("p", { className: "text-[19px] px-1", style: { color: BRAND.sub } },
                 opdpAmountForPh(phPlan) > 0 ? `วงเงิน ${baht(opdpAmountForPh(phPlan))} ต่อครั้ง (กำหนดตาม เพรสทีจ เฮลธ์ แผน ${baht(phPlan)})` : "ต้องเลือก เพรสทีจ เฮลธ์ ปลดล็อค แผน 20 หรือ 30 ล้าน"));
             case "ACC1": return selected.ACC1 && (React.createElement(React.Fragment, null,
@@ -5674,6 +5698,7 @@ function App() {
             if (lifeYear > 0 && healthYear > 0 && Math.min(lifeYear, 100000) + Math.min(healthYear, 25000) > 100000) warns.push("เบี้ยชีวิต + สุขภาพรวมกัน ลดหย่อนได้ไม่เกิน 100,000 บาท");
         }
         if (cards.filter((c) => ["VH", "VHKIDS", "HHP", "HH", "PH"].includes(c.id)).length > 1) warns.push("เลือกสุขภาพผู้ป่วยในมากกว่า 1 แบบ — ตรวจว่าตั้งใจซื้อซ้อนกันจริง");
+        ["UNJAI", "HH"].forEach((id) => { if (selected[id]) { const t = rateDoubtFor(id); if (t) warns.push(t); } });
         if (selected.ACC2) warns.push("อบ.2 ขายเฉพาะผู้มีอาชีพ/รายได้ประจำ (ไม่ขายนักเรียน แม่บ้าน พระ)");
         if (selected.OPDP) warns.push("OPD สบายใจ เพรสทีจ: ถ้า เพรสทีจ เฮลธ์ มีเบี้ยเพิ่มตามอาชีพ/สุขภาพ จะซื้อไม่ได้");
         if (selected.HS999 && mode === "month") warns.push("แฮปปี้เซฟวิ่ง 999 รายเดือน: ชำระงวดแรก 2 งวด");
