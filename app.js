@@ -8,10 +8,12 @@ const BRAND = {
     ink: "#000000", sub: "#404040", danger: "#B93232", warn: "#6B4508",
     label: "#000000", nameBlue: "#1668D6", mainBlue: "#0C2F63", dataBlack: "#000000",
 };
-const APP_VERSION = "v2.44.0 (2569-10-13)";
+const APP_VERSION = "v2.44.1 (2569-10-13)";
 const RATE_SOURCE = "อัตราเบี้ยตามคู่มือตัวแทน V.14 (14-02-2026)"; // วันที่ตารางค่าคอมอยู่ในป๊อปอัปค่าคอม (ตัวแทนเท่านั้น)
 const CASES_KEY = "blacal-cases-v1"; // อัปเดตเลขนี้ทุกครั้งที่มีการแก้ไข/เพิ่มแบบประกันใหม่ เพื่อให้รู้ว่าไฟล์ที่ใช้อยู่เป็นเวอร์ชันล่าสุดหรือไม่
-const fmt = (n) => (n === null || n === undefined || isNaN(n) ? "0" : Math.round(n).toLocaleString("th-TH"));
+// ปัดเศษแบบคู่มือ (ทศนิยมตั้งแต่ 0.5 ปัดขึ้น) — กันเลขทศนิยมของคอมพิวเตอร์ เช่น 7663.4999999 ที่ควรเป็น 7663.5 → 7664
+function roundHalfUp(x) { return Math.round(+(+x).toFixed(8)); }
+const fmt = (n) => (n === null || n === undefined || isNaN(n) ? "0" : roundHalfUp(n).toLocaleString("th-TH"));
 const baht = (n) => (n === null || n === undefined ? "-" : (typeof n === "string" ? n : fmt(n) + " บาท"));
 /* ============================== วันเกิด → อายุ (ระเบียบการรับประกัน หน้า 17 "การคิดอายุ") ==============================
    อายุ = วันนี้ − วันเกิด ใช้อายุใกล้สุด: เศษตั้งแต่ 6 เดือนขึ้นไปปัดเป็น 1 ปี ต่ำกว่าปัดทิ้ง
@@ -178,7 +180,7 @@ function groupRuns(values) {
 // items = [{ pct, age }] ของปีกรมธรรม์ที่ 1..(ปีก่อนครบกำหนด) — age = อายุครบ ณ วันที่ได้รับเงินคืน (วันครบรอบปีกรมธรรม์)
 // 1) ชั้นฐาน "ทุกปี" (ค่าที่พบบ่อยสุดและทุกปีในช่วงนั้นได้ไม่น้อยกว่าค่านี้) 2) ส่วนที่เหลือจัดเป็นกลุ่ม "ทุก N ปี"
 function cashBackLines(items, si) {
-    const r4 = (x) => Math.round(x * 10000) / 10000;
+    const r4 = (x) => roundHalfUp(x * 10000) / 10000;
     const rem = items.map((it) => r4(it.pct || 0));
     const n = rem.length, groups = [];
     const pctTxt = (v) => String(r4(v));
@@ -210,12 +212,12 @@ function cashBackLines(items, si) {
     groups.sort((x, y) => x.idx[0] - y.idx[0] || x.step - y.step);
     return groups.map((g) => {
         const a = g.idx[0], b = g.idx[g.idx.length - 1];
-        const amt = baht(Math.round(si * g.v / 100));
+        const amt = baht(roundHalfUp(si * g.v / 100));
         const yrs = a === b ? `ปีกรมธรรม์ที่ ${a + 1} (อายุครบ ${items[a].age} ปี)` : `ปีกรมธรรม์ที่ ${a + 1}-${b + 1} (อายุครบ ${items[a].age}-${items[b].age} ปี)`;
         if (g.idx.length === 1)
             return [`เงินคืน ${pctTxt(g.v)}% ของทุน`, `${amt} ครั้งเดียว ${yrs}`];
         const every = g.step === 1 ? "ทุกปี" : `ทุก ${g.step} ปี`;
-        return [`เงินคืน ${pctTxt(g.v)}% ของทุน ${every}`, `${amt}/ครั้ง ${yrs} · รวม ${g.idx.length} ครั้ง = ${baht(Math.round(si * g.v / 100) * g.idx.length)}`];
+        return [`เงินคืน ${pctTxt(g.v)}% ของทุน ${every}`, `${amt}/ครั้ง ${yrs} · รวม ${g.idx.length} ครั้ง = ${baht(roundHalfUp(si * g.v / 100) * g.idx.length)}`];
     });
 }
 // 4 คำถามที่ลูกค้าอยากรู้ + เรื่องที่ควรรู้ก่อนตัดสินใจ
@@ -341,7 +343,7 @@ function ZoomImage(props) {
 function ImageZoomViewer({ src, alt, onClose }) {
     const [z, setZ] = React.useState(1);
     const boxRef = React.useRef(null), pinch = React.useRef(null), pending = React.useRef(null), zRef = React.useRef(1);
-    const clamp = (v) => Math.min(6, Math.max(1, Math.round(v * 100) / 100));
+    const clamp = (v) => Math.min(6, Math.max(1, roundHalfUp(v * 100) / 100));
     function zoomTo(nz, px, py) {
         nz = clamp(nz);
         const el = boxRef.current, oz = zRef.current;
@@ -378,7 +380,7 @@ function ImageZoomViewer({ src, alt, onClose }) {
     return React.createElement("div", { style: { position: "fixed", inset: 0, zIndex: 200, background: "rgba(0,0,0,0.92)", display: "flex", flexDirection: "column" } },
         React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8, padding: "10px 12px", paddingTop: "calc(10px + env(safe-area-inset-top, 0px))", color: "#fff" } },
             React.createElement("button", { type: "button", style: btn, onClick: () => zoomTo(zRef.current - 0.5) }, "−"),
-            React.createElement("span", { style: { minWidth: 70, textAlign: "center", fontSize: 20, fontWeight: 600 } }, `${Math.round(z * 100)}%`),
+            React.createElement("span", { style: { minWidth: 70, textAlign: "center", fontSize: 20, fontWeight: 600 } }, `${roundHalfUp(z * 100)}%`),
             React.createElement("button", { type: "button", style: btn, onClick: () => zoomTo(zRef.current + 0.5) }, "+"),
             React.createElement("span", { style: { flex: 1, fontSize: 16, opacity: 0.75, lineHeight: 1.3 } }, "ถ่างนิ้ว / แตะ 2 ครั้ง เพื่อซูม"),
             React.createElement("button", { type: "button", style: Object.assign({}, btn, { fontSize: 20 }), onClick: onClose }, "✕ ปิด")),
@@ -1031,7 +1033,7 @@ const ACC_RATES = {
         [8808, 12540, 20019, 38694], [11000, 15733, 25216, 48899], [13715, 19714, 31733, 61751], [17789, 25725, 41618, 81318], [27100, 39568, 64529, 126894]],
 };
 const ACC_BENEFIT = (plan) => ({
-    death: plan, loss1: Math.round(plan * 0.6), fingers: Math.round(plan * 0.25),
+    death: plan, loss1: roundHalfUp(plan * 0.6), fingers: roundHalfUp(plan * 0.25),
     medExpense: { 200000: 20000, 300000: 30000, 500000: 50000, 1000000: 100000 }[plan],
     fracture: { 200000: 10000, 300000: 15000, 500000: 25000, 1000000: 50000 }[plan],
 });
@@ -2487,8 +2489,8 @@ function App() {
         const rows = pl.rows || [];
         const premiumRows = rows.filter((r) => r.premium > 0);
         let ciPerYear = 0;
-        if (SAVINGS_DEFS[id] && SAVINGS_DEFS[id].ciPct) ciPerYear = Math.round(mainSIOf(id) * SAVINGS_DEFS[id].ciPct / 100);
-        if (id === "PENSIONCARE888") ciPerYear = Math.round(mainSIOf(id) * PENSIONCARE888_CI_PCT);
+        if (SAVINGS_DEFS[id] && SAVINGS_DEFS[id].ciPct) ciPerYear = roundHalfUp(mainSIOf(id) * SAVINGS_DEFS[id].ciPct / 100);
+        if (id === "PENSIONCARE888") ciPerYear = roundHalfUp(mainSIOf(id) * PENSIONCARE888_CI_PCT);
         const calc = CALC[id] ? CALC[id]() : null;
         const fb = calc && calc.ok ? customerBenefits(finalizeBenefits(id, calc.benefits, calc.premium), id) : [];
         return {
@@ -3166,10 +3168,10 @@ function App() {
                         return (React.createElement("div", { key: t, className: "grid text-[16px] border-t", style: { gridTemplateColumns: "1fr 1.1fr 1.2fr 1fr 1.1fr", borderColor: "#EEF3F7" } },
                             React.createElement("div", { className: "px-2 py-2 font-medium", style: { color: BRAND.navy } }, row.label),
                             row.ok ? (React.createElement(React.Fragment, null,
-                                React.createElement("div", { className: "px-2 py-2", style: { color: BRAND.dataBlack } }, baht(Math.round(row.premium))),
-                                React.createElement("div", { className: "px-2 py-2", style: { color: BRAND.dataBlack } }, baht(Math.round(row.totalPremium))),
-                                React.createElement("div", { className: "px-2 py-2 font-semibold", style: { color: BRAND.greenDeep } }, baht(Math.round(row.pension))),
-                                React.createElement("div", { className: "px-2 py-2", style: { color: BRAND.dataBlack } }, baht(Math.round(row.totalPensionPaid))))) : (React.createElement("div", { className: "px-2 py-2 col-span-4", style: { color: BRAND.sub } }, row.msg))));
+                                React.createElement("div", { className: "px-2 py-2", style: { color: BRAND.dataBlack } }, baht(roundHalfUp(row.premium))),
+                                React.createElement("div", { className: "px-2 py-2", style: { color: BRAND.dataBlack } }, baht(roundHalfUp(row.totalPremium))),
+                                React.createElement("div", { className: "px-2 py-2 font-semibold", style: { color: BRAND.greenDeep } }, baht(roundHalfUp(row.pension))),
+                                React.createElement("div", { className: "px-2 py-2", style: { color: BRAND.dataBlack } }, baht(roundHalfUp(row.totalPensionPaid))))) : (React.createElement("div", { className: "px-2 py-2 col-span-4", style: { color: BRAND.sub } }, row.msg))));
                     })),
                 React.createElement(PlanRow, { label: "\u0E40\u0E25\u0E37\u0E2D\u0E01\u0E07\u0E27\u0E14\u0E17\u0E35\u0E48\u0E08\u0E30\u0E43\u0E0A\u0E49\u0E04\u0E33\u0E19\u0E27\u0E13\u0E23\u0E27\u0E21\u0E01\u0E31\u0E1A\u0E2A\u0E31\u0E0D\u0E0D\u0E32\u0E40\u0E1E\u0E34\u0E48\u0E21\u0E40\u0E15\u0E34\u0E21\u0E2D\u0E37\u0E48\u0E19" },
                     React.createElement(Chips, { options: HAPPYPENSION_TERMS, value: happypensionTerm, onChange: setHappypensionTerm, fmt: (t) => HAPPYPENSION_TERM_LABELS[t] })),
@@ -3346,7 +3348,7 @@ function App() {
                     const row = pension888Row();
                     return row.ok && (React.createElement("p", { className: "text-[19px] px-1", style: { color: BRAND.sub } },
                         "\u0E17\u0E38\u0E19\u0E1B\u0E23\u0E30\u0E01\u0E31\u0E19\u0E20\u0E31\u0E22\u0E17\u0E35\u0E48\u0E04\u0E33\u0E19\u0E27\u0E13\u0E44\u0E14\u0E49: ",
-                        baht(Math.round(row.effectiveSI))));
+                        baht(roundHalfUp(row.effectiveSI))));
                 })(),
                 pension888Row().ok && (React.createElement("button", { onClick: () => setPensionScheduleOpen((o) => (Object.assign(Object.assign({}, o), { PENSION888: !o.PENSION888 }))), className: "w-full text-[21px] font-semibold px-4 py-2.5 rounded-xl mt-1", style: { background: BRAND.bg, color: BRAND.navy, border: "1px solid #D7E8F0" } }, pensionScheduleOpen.PENSION888 ? "▴ ซ่อนตารางบำนาญ" : "▾ ดูตารางการจ่ายบำนาญ + จุดคุ้มทุน")),
                 pensionScheduleOpen.PENSION888 && (() => {
@@ -3363,7 +3365,7 @@ function App() {
                     const row = pensioncare888Row();
                     return row.ok && (React.createElement("p", { className: "text-[19px] px-1", style: { color: BRAND.sub } },
                         "\u0E17\u0E38\u0E19\u0E1B\u0E23\u0E30\u0E01\u0E31\u0E19\u0E20\u0E31\u0E22\u0E17\u0E35\u0E48\u0E04\u0E33\u0E19\u0E27\u0E13\u0E44\u0E14\u0E49: ",
-                        baht(Math.round(row.effectiveSI))));
+                        baht(roundHalfUp(row.effectiveSI))));
                 })(),
                 pensioncare888Row().ok && (React.createElement("button", { onClick: () => setPensionScheduleOpen((o) => (Object.assign(Object.assign({}, o), { PENSIONCARE888: !o.PENSIONCARE888 }))), className: "w-full text-[21px] font-semibold px-4 py-2.5 rounded-xl mt-1", style: { background: BRAND.bg, color: BRAND.navy, border: "1px solid #D7E8F0" } }, pensionScheduleOpen.PENSIONCARE888 ? "▴ ซ่อนตารางบำนาญ" : "▾ ดูตารางการจ่ายบำนาญ + จุดคุ้มทุน")),
                 pensionScheduleOpen.PENSIONCARE888 && (() => {
@@ -3600,8 +3602,8 @@ function App() {
         return { ok: true, premium, benefits: [
                 ["เสียชีวิตทุกกรณี", baht(sudSI) + " (หรือเบี้ยสะสม แล้วแต่มากกว่า)"],
                 ...(sudFreeEnd > age ? [
-                    ["เสียชีวิตจากอุบัติเหตุ: รับเพิ่ม (แถมฟรี)", baht(Math.round(sudSI * 0.5)) + " (รวมเป็น " + baht(Math.round(sudSI * 1.5)) + `) · คุ้มครองถึงอายุ ${sudFreeEnd} ปี (อีก ${sudFreeEnd - age} ปี)`],
-                    ["ทุพพลภาพถาวรสิ้นเชิง: รับเงิน (แถมฟรี)", baht(Math.min(Math.round(sudSI * 0.5), 5000000)) + ` · คุ้มครองถึงอายุ ${sudFreeEnd} ปี (อีก ${sudFreeEnd - age} ปี)`],
+                    ["เสียชีวิตจากอุบัติเหตุ: รับเพิ่ม (แถมฟรี)", baht(roundHalfUp(sudSI * 0.5)) + " (รวมเป็น " + baht(roundHalfUp(sudSI * 1.5)) + `) · คุ้มครองถึงอายุ ${sudFreeEnd} ปี (อีก ${sudFreeEnd - age} ปี)`],
+                    ["ทุพพลภาพถาวรสิ้นเชิง: รับเงิน (แถมฟรี)", baht(Math.min(roundHalfUp(sudSI * 0.5), 5000000)) + ` · คุ้มครองถึงอายุ ${sudFreeEnd} ปี (อีก ${sudFreeEnd - age} ปี)`],
                 ] : [["แถมฟรี: อุบัติเหตุ/ทุพพลภาพ", "ไม่ได้รับ เพราะคุ้มครองได้ไม่เกินอายุ 60 ปี"]]),
                 ["มีชีวิตอยู่จนครบกำหนดสัญญา (อายุ 99 ปี)", "รับ " + baht(sudSI) + " หรือเบี้ยที่ชำระแล้วสะสม แล้วแต่จำนวนใดมากกว่า"],
                 ...tpWaiverLines(20),
@@ -3642,7 +3644,7 @@ function App() {
                 ["ทุนประกันโรคร้ายแรง (สัญญาเพิ่มเติม อีซี แคร์)", baht(unjaiPlan)],
                 ["เสียชีวิตทุกกรณี", "รับ 100% ของทุนประกันชีวิต = " + baht(UNJAI_LIFE_SI)],
                 ["เจ็บป่วยด้วยโรคร้ายแรง 10 โรค (มะเร็งระยะลุกลาม เนื้องอกในสมอง โรคหัวใจ 4 กลุ่ม หลอดเลือดสมอง 2 กลุ่ม ปลอกประสาทอักเสบ MS สมองอักเสบ)", "รับ " + baht(unjaiPlan) + " (หักส่วนที่จ่ายมะเร็งระยะไม่ลุกลามไปแล้ว ถ้ามี)"],
-                ["มะเร็งระยะไม่ลุกลาม (Carcinoma in Situ)", "รับ " + baht(Math.round(unjaiPlan * 0.2)) + " ต่อครั้งที่ตรวจพบใหม่ (20% ของทุนโรคร้ายแรง)"],
+                ["มะเร็งระยะไม่ลุกลาม (Carcinoma in Situ)", "รับ " + baht(roundHalfUp(unjaiPlan * 0.2)) + " ต่อครั้งที่ตรวจพบใหม่ (20% ของทุนโรคร้ายแรง)"],
                 ...tpWaiverLines(90 - age),
                 ["ครบกำหนดสัญญา (อายุ 90 ปี)", "รับคืน 100% ของทุนประกันชีวิต = " + baht(UNJAI_LIFE_SI)],
                 ["ระยะเวลาคุ้มครอง", "รับประกันตั้งแต่อายุ 20 ถึง 75 ปี ชำระเบี้ยและคุ้มครองถึงอายุ 90 ปี"],
@@ -3672,7 +3674,7 @@ function App() {
                 ["เสียชีวิตทุกกรณี", "รับ 100% ของทุนประกันชีวิต = " + baht(plan.life)],
                 ["เสียชีวิตจากโรคมะเร็ง", "รับเพิ่มอีก " + baht(plan.ending) + " (รวมเป็น " + baht(plan.life + plan.ending) + ")"],
                 ["นอนโรงพยาบาลเพราะมะเร็ง", baht(plan.daily) + " ต่อวัน · สูงสุด 100 วันต่อครั้ง ไม่เกิน 500 วันตลอดสัญญา · ทำเคมีบำบัด/ฉายแสงที่อยู่ รพ. เกิน 6 ชม. นับเป็น 1 วัน"],
-                ["ตรวจพบมะเร็งระยะไม่ลุกลาม", "รับ " + baht(Math.round(plan.first * 0.2)) + " ต่อชนิดของมะเร็ง (20%)"],
+                ["ตรวจพบมะเร็งระยะไม่ลุกลาม", "รับ " + baht(roundHalfUp(plan.first * 0.2)) + " ต่อชนิดของมะเร็ง (20%)"],
                 ["ตรวจพบมะเร็งระยะลุกลาม", "รับ " + baht(plan.first) + " (หักส่วนที่จ่ายมะเร็งระยะไม่ลุกลามไปแล้ว ถ้ามี)"],
                 ["หมายเหตุ", "ความคุ้มครองมะเร็งเริ่มหลังพ้น 90 วันนับจากวันเริ่มสัญญา"],
                 ...tpWaiverLines(90 - age),
@@ -3736,8 +3738,8 @@ function App() {
                     return (React.createElement("div", { key: t, className: "grid text-[16px] border-t", style: { gridTemplateColumns: "1.1fr 1fr 1.2fr", borderColor: "#EEF3F7", background: value === t ? "#F3FBEF" : "transparent" } },
                         React.createElement("div", { className: "px-2 py-2 font-medium", style: { color: BRAND.navy } }, row.label),
                         row.ok ? (React.createElement(React.Fragment, null,
-                            React.createElement("div", { className: "px-2 py-2", style: { color: BRAND.dataBlack } }, baht(Math.round(row.premium))),
-                            React.createElement("div", { className: "px-2 py-2", style: { color: BRAND.dataBlack } }, baht(Math.round(row.totalPremium))))) : (React.createElement("div", { className: "px-2 py-2 col-span-2", style: { color: BRAND.sub } }, row.msg))));
+                            React.createElement("div", { className: "px-2 py-2", style: { color: BRAND.dataBlack } }, baht(roundHalfUp(row.premium))),
+                            React.createElement("div", { className: "px-2 py-2", style: { color: BRAND.dataBlack } }, baht(roundHalfUp(row.totalPremium))))) : (React.createElement("div", { className: "px-2 py-2 col-span-2", style: { color: BRAND.sub } }, row.msg))));
                 })),
             React.createElement(PlanRow, { label: "เลือกระยะชำระที่จะใช้คำนวณรวมกับสัญญาเพิ่มเติมอื่น" },
                 React.createElement(Chips, { options: opt.terms, value, onChange, fmt: (t) => t + " ปี" })));
@@ -3847,7 +3849,7 @@ function App() {
                 ["กลุ่มโรคอวัยวะ/ระบบการทำงานสำคัญ (ไต ตับ ปอด ฯลฯ)", baht(supSI) + " (100%)"],
                 ["กลุ่มภาวะติดเชื้อ/บาดเจ็บรุนแรง", baht(supSI) + " (100%)"],
                 ["กลุ่มโรคร้ายแรงอื่นๆ (ตาบอด อัลไซเมอร์ พาร์กินสัน ฯลฯ)", baht(supSI) + " (100%)"],
-                ["4 โรคเฉพาะเด็ก หากเกิดขึ้นครั้งแรกก่อนอายุครบ 17 ปีบริบูรณ์", "จ่าย 50% ของทุนประกันภัย = " + baht(Math.round(supSI * 0.5)) + " เฉพาะ: ไข้รูมาติกที่ทำให้หัวใจผิดปกติ, คาวาซากิที่มีภาวะแทรกซ้อนหัวใจ, เบาหวาน, และภาวะน้ำคั่งในสมองที่ต้องผ่าตัดใส่สายระบาย (โรคร้ายแรงอื่นนอกเหนือจาก 4 โรคนี้ยังจ่าย 100% ตามปกติแม้เกิดก่อนอายุ 17 ปี)"],
+                ["4 โรคเฉพาะเด็ก หากเกิดขึ้นครั้งแรกก่อนอายุครบ 17 ปีบริบูรณ์", "จ่าย 50% ของทุนประกันภัย = " + baht(roundHalfUp(supSI * 0.5)) + " เฉพาะ: ไข้รูมาติกที่ทำให้หัวใจผิดปกติ, คาวาซากิที่มีภาวะแทรกซ้อนหัวใจ, เบาหวาน, และภาวะน้ำคั่งในสมองที่ต้องผ่าตัดใส่สายระบาย (โรคร้ายแรงอื่นนอกเหนือจาก 4 โรคนี้ยังจ่าย 100% ตามปกติแม้เกิดก่อนอายุ 17 ปี)"],
                 ["ครอบคลุมทั้งหมด", "47 โรค/ภาวะ"],
                 ["ระยะเวลาคุ้มครอง", "รับประกันตั้งแต่อายุ 1 ถึง 65 ปี และสามารถต่ออายุความคุ้มครองต่อเนื่องได้ถึงอายุ 79 ปี"],
             ] };
@@ -4138,7 +4140,7 @@ function App() {
             return { ok: false, msg: `ทุนประกัน ${baht(HAPPYCI_MIN_SI)}-${baht(HAPPYCI_MAX_SI)}ต่อกรมธรรม์` };
         const rate = (gender === "female" ? HAPPYCI_FEMALE : HAPPYCI_MALE)[age][ti];
         const premium = (rate * happyciSI) / 1000;
-        const partialAmt = Math.round(happyciSI * 0.2);
+        const partialAmt = roundHalfUp(happyciSI * 0.2);
         return { ok: true, premium, benefits: [
                 ["ระยะเวลาชำระเบี้ยที่เลือก", happyciTerm === 20 ? "20 ปี" : "ถึงอายุ 99 ปี"],
                 ["ทุนประกันภัย", baht(happyciSI)],
@@ -4163,7 +4165,7 @@ function App() {
         const table = llcVariant === "99" ? (gender === "female" ? LLC99_FEMALE : LLC99_MALE) : (gender === "female" ? LLC10_FEMALE : LLC10_MALE);
         const rate = table[idx];
         const premium = (rate * llcSI) / 1000;
-        const annualPayout = Math.round(llcSI * 0.10);
+        const annualPayout = roundHalfUp(llcSI * 0.10);
         return { ok: true, premium, benefits: [
                 ["แบบที่เลือก", LLC_VARIANT_LABELS[llcVariant]],
                 ["ทุนประกันภัย", baht(llcSI)],
@@ -4281,8 +4283,8 @@ function App() {
         const deathAfterPensionNote = "รับเงินเท่ากับเบี้ยประกันชีวิตที่ชำระสะสมจริง หักด้วยเงินบำนาญที่ได้รับไปแล้วทั้งหมด (ไม่รวมเงินบำนาญเพิ่มพิเศษจากเงินปันผล) ให้แก่ผู้รับประโยชน์ — หากเงินบำนาญที่ได้รับไปแล้วมากกว่าเบี้ยที่ชำระสะสม จะไม่มีเงินคืนเพิ่มเติม และกรมธรรม์สิ้นผลบังคับทันที";
         return { ok: true, premium: row.premium, benefits: [
                 ["งวดชำระเบี้ยที่เลือกใช้คำนวณรวม", row.label],
-                ["บำนาญรายปีที่จะได้รับ (อายุครบ 60-99 ปี)", baht(Math.round(row.pension)) + " ต่อปี"],
-                ["รวมบำนาญที่จะได้รับตลอดโครงการ (40 ปี)", baht(Math.round(row.totalPensionPaid))],
+                ["บำนาญรายปีที่จะได้รับ (อายุครบ 60-99 ปี)", baht(roundHalfUp(row.pension)) + " ต่อปี"],
+                ["รวมบำนาญที่จะได้รับตลอดโครงการ (40 ปี)", baht(roundHalfUp(row.totalPensionPaid))],
                 ["หากเสียชีวิตก่อนอายุ 60 ปี", "รับเงินคืนสูงสุดระหว่าง 110% ของเบี้ยที่ชำระสะสม หรือมูลค่าเวนคืนกรมธรรม์ แล้วแต่จำนวนใดมากกว่า"],
                 ["หากเสียชีวิตระหว่างรับบำนาญ (อายุ 60-98 ปี)", deathAfterPensionNote],
                 ["โอกาสรับเงินบำนาญเพิ่มพิเศษ (ไม่รับประกัน)", "บริษัทอาจพิจารณาเพิ่มเงินบำนาญให้ตามผลตอบแทนเงินปันผล ณ วันครบรอบปีกรมธรรม์ที่อายุครบ 59 ปี จ่ายในอัตราเดียวกับบำนาญหลัก (0.01% หรือ 20% แล้วแต่งวด) หากมี"],
@@ -4306,9 +4308,9 @@ function App() {
         return { ok: true, premium, benefits: [
                 ["ระยะเวลาชำระเบี้ยที่เลือก", happysavingTerm + " ปี"],
                 ["ทุนประกันภัย", baht(si)],
-                ["เงินคืนรายปี", baht(Math.round(si * 0.04)) + " ต่อปี (4% ของทุนประกันภัย) ตั้งแต่ปีกรมธรรม์ที่ 1 จนถึงอายุครบ 98 ปี"],
+                ["เงินคืนรายปี", baht(roundHalfUp(si * 0.04)) + " ต่อปี (4% ของทุนประกันภัย) ตั้งแต่ปีกรมธรรม์ที่ 1 จนถึงอายุครบ 98 ปี"],
                 ["เสียชีวิต ปีกรมธรรม์ที่ 1-5", [1, 2, 3, 4, 5].map((k) => `ปี ${k}: ${baht(si * k)} (${k * 100}%)`).join(" · ") + " — หรือ 105% ของเบี้ยสะสม แล้วแต่อย่างใดมากกว่า"],
-                ["เสียชีวิต ปีกรมธรรม์ที่ 6 เป็นต้นไป", `เพิ่มปีละ 10% ของทุน (${baht(Math.round(si * 0.1))}) จาก 500% (${baht(si * 5)}) จนถึง 700% (${baht(si * 7)}) แล้วคงที่ถึงอายุ 99 ปี`],
+                ["เสียชีวิต ปีกรมธรรม์ที่ 6 เป็นต้นไป", `เพิ่มปีละ 10% ของทุน (${baht(roundHalfUp(si * 0.1))}) จาก 500% (${baht(si * 5)}) จนถึง 700% (${baht(si * 7)}) แล้วคงที่ถึงอายุ 99 ปี`],
                 ["ครบกำหนดสัญญา (อายุ 99 ปี)", `${baht(si * 7)} (700% ของทุน) หรือเบี้ยสะสมตามจริง แล้วแต่อย่างใดมากกว่า`],
                 ...tpWaiverLines(happysavingTerm),
                 ["เงินปันผล", "ไม่รับประกัน ขึ้นอยู่กับผลตอบแทนการลงทุนของบริษัทในแต่ละปี"],
@@ -4430,13 +4432,13 @@ function App() {
         return { ok: true, premium, benefits: [
                 ["ทุนประกันภัย", baht(happykidSI)],
                 ["เสียชีวิต ปีกรมธรรม์ที่ 1-10", baht(happykidSI) + " (100% ของทุนประกันภัย)"],
-                ["เสียชีวิต ปีกรมธรรม์ที่ 11-20", baht(Math.round(happykidSI * 1.2)) + " (120% ของทุนประกันภัย)"],
-                ["เสียชีวิต ปีกรมธรรม์ที่ 21 เป็นต้นไป", baht(Math.round(happykidSI * 2.2)) + " (220% ของทุนประกันภัย)"],
-                ["เงินคืนรายปี", baht(Math.round(happykidSI * 0.01)) + " ต่อปี (1% ของทุนประกันภัย) ทุกปีกรมธรรม์ ถึงอายุครบ 98 ปี"],
-                ["เงินคืนพิเศษ ปีกรมธรรม์ที่ 21", baht(Math.round(happykidSI * 0.2)) + " (20% ของทุนประกันภัย)"],
-                ["ครบกำหนดสัญญา (อายุ 99 ปี)", baht(Math.round(happykidSI * 2.2)) + " (220% ของทุนประกันภัย)"],
+                ["เสียชีวิต ปีกรมธรรม์ที่ 11-20", baht(roundHalfUp(happykidSI * 1.2)) + " (120% ของทุนประกันภัย)"],
+                ["เสียชีวิต ปีกรมธรรม์ที่ 21 เป็นต้นไป", baht(roundHalfUp(happykidSI * 2.2)) + " (220% ของทุนประกันภัย)"],
+                ["เงินคืนรายปี", baht(roundHalfUp(happykidSI * 0.01)) + " ต่อปี (1% ของทุนประกันภัย) ทุกปีกรมธรรม์ ถึงอายุครบ 98 ปี"],
+                ["เงินคืนพิเศษ ปีกรมธรรม์ที่ 21", baht(roundHalfUp(happykidSI * 0.2)) + " (20% ของทุนประกันภัย)"],
+                ["ครบกำหนดสัญญา (อายุ 99 ปี)", baht(roundHalfUp(happykidSI * 2.2)) + " (220% ของทุนประกันภัย)"],
                 ["เงื่อนไขกรณีเสียชีวิต", "จ่ายตามข้างต้น หรือเบี้ยที่ชำระสะสม หักเงินคืนที่รับไปแล้ว แล้วแต่จำนวนใดมากกว่า"],
-                ["คุ้มครองผู้ชำระเบี้ย (แถมฟรี)", `ถ้าผู้ชำระเบี้ย (พ่อแม่/ผู้ปกครอง) เสียชีวิตหรือทุพพลภาพถาวรสิ้นเชิง รับ ${baht(Math.round(happykidSI * 0.5))} (50% ของทุน) และไม่ต้องจ่ายเบี้ยที่เหลือ`],
+                ["คุ้มครองผู้ชำระเบี้ย (แถมฟรี)", `ถ้าผู้ชำระเบี้ย (พ่อแม่/ผู้ปกครอง) เสียชีวิตหรือทุพพลภาพถาวรสิ้นเชิง รับ ${baht(roundHalfUp(happykidSI * 0.5))} (50% ของทุน) และไม่ต้องจ่ายเบี้ยที่เหลือ`],
                 ["สัญญาเพิ่มเติม", "แถมฟรี เพเยอร์ โพรเทค (ทุพพลภาพผู้ชำระเบี้ย) · ต้องซื้อ คช. (คุ้มครองการชำระเบี้ย) เพิ่ม"],
             ] };
     }
@@ -4578,9 +4580,9 @@ function App() {
                 ["เสียชีวิต ปีกรมธรรม์ที่ 4-10", baht(si * 4) + " (400% ของทุนประกันภัย)"],
                 ["หมายเหตุกรณีเสียชีวิต", "จ่ายตาม % ข้างต้น หรือเบี้ยประกันชีวิตสะสม แล้วแต่อย่างใดมากกว่า"],
                 ["เสียชีวิตจากอุบัติเหตุ (แถมฟรี)", `รับเพิ่มอีก ${baht(Math.min(si, 10000000))} จากข้างต้น เมื่อเสียชีวิตภายใน 180 วันหลังเกิดอุบัติเหตุ · ไม่คุ้มครองขณะขับขี่หรือโดยสารรถจักรยานยนต์`],
-                ["เงินคืน 4% ของทุน ทุกปี (การันตี)", `${baht(Math.round(si * 0.04))}/ปี ปีกรมธรรม์ที่ 1-9 · รวม 9 ครั้ง = ${baht(Math.round(si * 0.04) * 9)}`],
-                ["ครบกำหนดสัญญา (ปีกรมธรรม์ที่ 10)", baht(Math.round(si * 4.24)) + " (284% เงินคืนครบกำหนด + 140% เงินคืนพิเศษ = 424%)"],
-                ["ผลประโยชน์รวมตลอดสัญญา (การันตี)", baht(Math.round(si * 4.6)) + " (460% ของทุนประกันภัย หากมีชีวิตอยู่ครบสัญญา)"],
+                ["เงินคืน 4% ของทุน ทุกปี (การันตี)", `${baht(roundHalfUp(si * 0.04))}/ปี ปีกรมธรรม์ที่ 1-9 · รวม 9 ครั้ง = ${baht(roundHalfUp(si * 0.04) * 9)}`],
+                ["ครบกำหนดสัญญา (ปีกรมธรรม์ที่ 10)", baht(roundHalfUp(si * 4.24)) + " (284% เงินคืนครบกำหนด + 140% เงินคืนพิเศษ = 424%)"],
+                ["ผลประโยชน์รวมตลอดสัญญา (การันตี)", baht(roundHalfUp(si * 4.6)) + " (460% ของทุนประกันภัย หากมีชีวิตอยู่ครบสัญญา)"],
             ] };
     }
     function calcPSAVE126() {
@@ -4604,9 +4606,9 @@ function App() {
                 ["เสียชีวิต ปีกรมธรรม์ที่ 6-12", baht(si * 6) + " (600% ของทุนประกันภัย)"],
                 ["หมายเหตุกรณีเสียชีวิต", "จ่ายตาม % ข้างต้น หรือเบี้ยประกันชีวิตสะสม แล้วแต่อย่างใดมากกว่า"],
                 ["เสียชีวิตจากอุบัติเหตุ (แถมฟรี)", `รับเพิ่มอีก ${baht(Math.min(si * 3, 6000000))} จากข้างต้น เมื่อเสียชีวิตภายใน 180 วันหลังเกิดอุบัติเหตุ · ไม่คุ้มครองขณะขับขี่หรือโดยสารรถจักรยานยนต์`],
-                ["เงินคืน 6% ของทุน ทุกปี (การันตี)", `${baht(Math.round(si * 0.06))}/ปี ปีกรมธรรม์ที่ 1-11 · รวม 11 ครั้ง = ${baht(Math.round(si * 0.06) * 11)}`],
-                ["ครบกำหนดสัญญา (ปีกรมธรรม์ที่ 12)", baht(Math.round(si * 6.2)) + " (440% เงินคืนครบกำหนด + 180% เงินคืนพิเศษ = 620%)"],
-                ["ผลประโยชน์รวมตลอดสัญญา (การันตี)", baht(Math.round(si * 6.86)) + " (686% ของทุนประกันภัย หากมีชีวิตอยู่ครบสัญญา)"],
+                ["เงินคืน 6% ของทุน ทุกปี (การันตี)", `${baht(roundHalfUp(si * 0.06))}/ปี ปีกรมธรรม์ที่ 1-11 · รวม 11 ครั้ง = ${baht(roundHalfUp(si * 0.06) * 11)}`],
+                ["ครบกำหนดสัญญา (ปีกรมธรรม์ที่ 12)", baht(roundHalfUp(si * 6.2)) + " (440% เงินคืนครบกำหนด + 180% เงินคืนพิเศษ = 620%)"],
+                ["ผลประโยชน์รวมตลอดสัญญา (การันตี)", baht(roundHalfUp(si * 6.86)) + " (686% ของทุนประกันภัย หากมีชีวิตอยู่ครบสัญญา)"],
             ] };
     }
     // ตารางอ้างอิงสำหรับแบบสะสมทรัพย์ชุดใหม่ 8 แบบ (HS208...TAXSAVER105) ใช้เครื่องยนต์คำนวณกลางร่วมกัน ลดความเสี่ยงพิมพ์ผิด
@@ -4643,7 +4645,7 @@ function App() {
     function savingsBenefitLines(def, si) {
         const lines = [];
         const sch = def.schedule;
-        const amt = (p) => baht(Math.round(si * p / 100));
+        const amt = (p) => baht(roundHalfUp(si * p / 100));
         let i = 0;
         while (i < sch.length) {
             const step = i + 1 < sch.length ? sch[i + 1][0] - sch[i][0] : 0;
@@ -4662,9 +4664,9 @@ function App() {
         if (def.deathMaxPremium) lines.push(["เงื่อนไขกรณีเสียชีวิต", "จ่ายตามข้างต้น หรือเบี้ยที่จ่ายสะสมมาแล้ว แล้วแต่อย่างใดมากกว่า"]);
         const lastCash = sch[sch.length - 1][1];
         lines.push(...cashBackLines(sch.slice(0, -1).map(([, c], k) => ({ pct: c, age: age + k + 1 })), si));
-        lines.push([`ครบกำหนดสัญญา ปีกรมธรรม์ที่ ${sch.length} (อายุครบ ${age + sch.length} ปี)`, baht(Math.round(si * lastCash / 100)) + ` (${lastCash}% ของทุน)`]);
+        lines.push([`ครบกำหนดสัญญา ปีกรมธรรม์ที่ ${sch.length} (อายุครบ ${age + sch.length} ปี)`, baht(roundHalfUp(si * lastCash / 100)) + ` (${lastCash}% ของทุน)`]);
         const totalPct = sch.reduce((t, r) => t + r[1], 0);
-        lines.push(["รวมเงินคืนตลอดสัญญา (การันตี)", baht(Math.round(si * totalPct / 100)) + ` (${Math.round(totalPct * 100) / 100}% ของทุน)`]);
+        lines.push(["รวมเงินคืนตลอดสัญญา (การันตี)", baht(roundHalfUp(si * totalPct / 100)) + ` (${roundHalfUp(totalPct * 100) / 100}% ของทุน)`]);
         return lines;
     }
     function calcGenericSavings(id) {
@@ -4686,7 +4688,7 @@ function App() {
                 ...savingsBenefitLines(def, si),
                 ...(def.extraLines ? def.extraLines(si) : []),
                 ...(def.ciPct ? [
-                    ["แถมฟรี: คุ้มครอง 8 โรคร้ายแรง", baht(Math.round(si * def.ciPct / 100)) + ` ต่อปี (${def.ciPct}% ของทุน) จ่ายทุกปีหลังตรวจพบครั้งแรก ตราบที่มีชีวิต ไม่เกินปีกรมธรรม์ที่ ${def.ciYears} (ถึงอายุ ${age + def.ciYears} ปี) · รอคอย 90 วัน · จ่ายได้ 1 โรคตลอดสัญญา`],
+                    ["แถมฟรี: คุ้มครอง 8 โรคร้ายแรง", baht(roundHalfUp(si * def.ciPct / 100)) + ` ต่อปี (${def.ciPct}% ของทุน) จ่ายทุกปีหลังตรวจพบครั้งแรก ตราบที่มีชีวิต ไม่เกินปีกรมธรรม์ที่ ${def.ciYears} (ถึงอายุ ${age + def.ciYears} ปี) · รอคอย 90 วัน · จ่ายได้ 1 โรคตลอดสัญญา`],
                     TERMINAL_LINE,
                     TERMINAL_DEF_LINE,
                 ] : []),
@@ -4751,11 +4753,11 @@ function App() {
         if (!row.ok)
             return { ok: false, msg: row.msg };
         return { ok: true, premium: row.premium, benefits: [
-                ["ทุนประกันภัย", baht(Math.round(row.effectiveSI))],
+                ["ทุนประกันภัย", baht(roundHalfUp(row.effectiveSI))],
                 ["ส่วนลดอัตราเบี้ย", row.discount > 0 ? (row.discount * 100) + "%" : "ไม่มี"],
-                ["บำนาญงวดแรก (อายุครบ 60 ปี)", baht(Math.round(row.firstPension)) + " (30% ของทุนประกันภัย)"],
-                ["บำนาญงวดถัดไป (อายุครบ 61-88 ปี)", baht(Math.round(row.annualPension)) + " ต่อปี (8% ของทุนประกันภัย)"],
-                ["รวมบำนาญที่จะได้รับตลอดโครงการ (29 งวด)", baht(Math.round(row.totalPensionPaid))],
+                ["บำนาญงวดแรก (อายุครบ 60 ปี)", baht(roundHalfUp(row.firstPension)) + " (30% ของทุนประกันภัย)"],
+                ["บำนาญงวดถัดไป (อายุครบ 61-88 ปี)", baht(roundHalfUp(row.annualPension)) + " ต่อปี (8% ของทุนประกันภัย)"],
+                ["รวมบำนาญที่จะได้รับตลอดโครงการ (29 งวด)", baht(roundHalfUp(row.totalPensionPaid))],
                 ["หากเสียชีวิตก่อนอายุ 60 ปี", "รับ 105% ของเบี้ยที่ชำระสะสม หรือมูลค่าเวนคืนกรมธรรม์ แล้วแต่จำนวนใดมากกว่า"],
                 ["หากเสียชีวิตระหว่างรับบำนาญ (อายุ 60-88 ปี)", "รับเบี้ยที่ชำระสะสมจริง หักด้วยบำนาญที่ได้รับไปแล้ว (ถ้าบำนาญที่ได้รับมากกว่าเบี้ยสะสม จะไม่มีเงินคืนเพิ่ม)"],
             ] };
@@ -4795,7 +4797,7 @@ function App() {
             }
             else if (effectiveSI > PENSIONCARE888_MAX_SI) {
                 ok = false;
-                msg = `ทุนที่คำนวณได้ ${baht(Math.round(effectiveSI))} เกินทุนสูงสุด ${baht(PENSIONCARE888_MAX_SI)} ต่อราย`;
+                msg = `ทุนที่คำนวณได้ ${baht(roundHalfUp(effectiveSI))} เกินทุนสูงสุด ${baht(PENSIONCARE888_MAX_SI)} ต่อราย`;
             }
         }
         const firstPension = ok ? effectiveSI * PENSION888_FIRST_PENSION_PCT : 0;
@@ -4811,13 +4813,13 @@ function App() {
         if (!row.ok)
             return { ok: false, msg: row.msg };
         return { ok: true, premium: row.premium, benefits: [
-                ["ทุนประกันภัย", baht(Math.round(row.effectiveSI))],
+                ["ทุนประกันภัย", baht(roundHalfUp(row.effectiveSI))],
                 ["ส่วนลดอัตราเบี้ย", row.discount > 0 ? (row.discount * 100) + "%" : "ไม่มี"],
-                ["บำนาญงวดแรก (อายุครบ 60 ปี)", baht(Math.round(row.firstPension)) + " (30% ของทุนประกันภัย)"],
-                ["บำนาญงวดถัดไป (อายุครบ 61-88 ปี)", baht(Math.round(row.annualPension)) + " ต่อปี (8% ของทุนประกันภัย)"],
-                ["รวมบำนาญที่จะได้รับตลอดโครงการ (29 งวด)", baht(Math.round(row.totalPensionPaid))],
+                ["บำนาญงวดแรก (อายุครบ 60 ปี)", baht(roundHalfUp(row.firstPension)) + " (30% ของทุนประกันภัย)"],
+                ["บำนาญงวดถัดไป (อายุครบ 61-88 ปี)", baht(roundHalfUp(row.annualPension)) + " ต่อปี (8% ของทุนประกันภัย)"],
+                ["รวมบำนาญที่จะได้รับตลอดโครงการ (29 งวด)", baht(roundHalfUp(row.totalPensionPaid))],
                 ["หากเสียชีวิตก่อนอายุ 60 ปี", "รับ 105% ของเบี้ยที่ชำระสะสม หรือมูลค่าเวนคืนกรมธรรม์ แล้วแต่จำนวนใดมากกว่า"],
-                ["แถมฟรี: คุ้มครอง 8 โรคร้ายแรง", baht(Math.round(row.effectiveSI * PENSIONCARE888_CI_PCT)) + " ต่อปี (8% ของทุน) จ่ายทุกปีหลังตรวจพบครั้งแรก ตราบที่มีชีวิต ไม่เกินอายุ 88 ปี · รอคอย 90 วัน · จ่ายได้ 1 โรคตลอดสัญญา"],
+                ["แถมฟรี: คุ้มครอง 8 โรคร้ายแรง", baht(roundHalfUp(row.effectiveSI * PENSIONCARE888_CI_PCT)) + " ต่อปี (8% ของทุน) จ่ายทุกปีหลังตรวจพบครั้งแรก ตราบที่มีชีวิต ไม่เกินอายุ 88 ปี · รอคอย 90 วัน · จ่ายได้ 1 โรคตลอดสัญญา"],
                 ["หากเสียชีวิตระหว่างรับบำนาญ (อายุ 60-88 ปี)", "รับเบี้ยที่ชำระสะสมจริง หักด้วยบำนาญที่ได้รับไปแล้ว (ถ้าบำนาญที่ได้รับมากกว่าเบี้ยสะสม จะไม่มีเงินคืนเพิ่ม)"],
             ] };
     }
@@ -5024,7 +5026,7 @@ function App() {
                 return { rows: [], irr: null };
             const table = happysavingTerm === 5 ? (gender === "female" ? HAPPYSAVING5_FEMALE : HAPPYSAVING5_MALE) : (gender === "female" ? HAPPYSAVING10_FEMALE : HAPPYSAVING10_MALE);
             const rate = table[age];
-            const yearlyPremium = Math.round(getDisplayPremium(id, (rate * si) / 1000));
+            const yearlyPremium = roundHalfUp(getDisplayPremium(id, (rate * si) / 1000));
             const totalYears = 99 - age; // คุ้มครองถึงอายุ 99 ปี
             let cumPremium = 0;
             const rows = [];
@@ -5036,13 +5038,13 @@ function App() {
                 let cashPct, note = "";
                 if (isLast) {
                     const maturity = Math.max(si * 7, cumPremium); // 700% ของทุนประกันภัย หรือเบี้ยที่จ่ายจริงสะสม แล้วแต่มากกว่า
-                    cashPct = Math.round((maturity / si) * 10000) / 100;
+                    cashPct = roundHalfUp((maturity / si) * 10000) / 100;
                     note = "ครบกำหนดสัญญา (อายุ 99 ปี) รับ 700% ของทุนประกันภัย หรือเบี้ยที่จ่ายจริงสะสม แล้วแต่จำนวนใดมากกว่า";
                 }
                 else {
                     cashPct = 4;
                 }
-                rows.push({ year: n, age: age + n - 1, premium, cashPct, cashBaht: Math.round(si * (cashPct / 100)), coverageBaht: Math.round(Math.max(si * (deathPct / 100), cumPremium * 1.05)), /* เสียชีวิต = % ทุน หรือ 105% ของเบี้ยสะสม */ note: n === happysavingTerm ? "ชำระเบี้ยปีสุดท้าย" : note });
+                rows.push({ year: n, age: age + n - 1, premium, cashPct, cashBaht: roundHalfUp(si * (cashPct / 100)), coverageBaht: roundHalfUp(Math.max(si * (deathPct / 100), cumPremium * 1.05)), /* เสียชีวิต = % ทุน หรือ 105% ของเบี้ยสะสม */ note: n === happysavingTerm ? "ชำระเบี้ยปีสุดท้าย" : note });
             }
             const irr = calcIRR((() => {
                 const cf = new Array(totalYears + 1).fill(0);
@@ -5078,7 +5080,7 @@ function App() {
         else {
             return { rows: [], irr: null };
         }
-        const yearlyPremium = Math.round(getDisplayPremium(id, (rate * si) / 1000));
+        const yearlyPremium = roundHalfUp(getDisplayPremium(id, (rate * si) / 1000));
         let cumPremiumS = 0;
         const deathMaxPrem = DEATH_MAX_PREMIUM_IDS.includes(id);
         const rows = scheduleDef.map(([deathPct, cashPct], i) => {
@@ -5089,8 +5091,8 @@ function App() {
             return {
                 year, age: age + i,
                 premium: premiumThisYear,
-                cashPct, cashBaht: Math.round(si * (cashPct / 100)),
-                coverageBaht: Math.round(deathMaxPrem ? Math.max(si * (deathPct / 100), cumPremiumS) : si * (deathPct / 100)),
+                cashPct, cashBaht: roundHalfUp(si * (cashPct / 100)),
+                coverageBaht: roundHalfUp(deathMaxPrem ? Math.max(si * (deathPct / 100), cumPremiumS) : si * (deathPct / 100)),
                 note: year === payYears ? "ชำระเบี้ยปีสุดท้าย" : isLastYear ? "ครบกำหนดสัญญา รับเงินคืนครบกำหนด+เงินคืนพิเศษ" : "",
             };
         });
@@ -5111,10 +5113,10 @@ function App() {
     function buildComparisonRows(si) {
         const results = [];
         const pushResult = (id, name, rate, payYears, scheduleDef) => {
-            const yearlyPremium = Math.round((rate * si) / 1000);
+            const yearlyPremium = roundHalfUp((rate * si) / 1000);
             const rows = scheduleDef.map(([deathPct, cashPct], i) => {
                 const year = i + 1;
-                return { year, premium: year <= payYears ? yearlyPremium : 0, cashBaht: Math.round(si * (cashPct / 100)) };
+                return { year, premium: year <= payYears ? yearlyPremium : 0, cashBaht: roundHalfUp(si * (cashPct / 100)) };
             });
             const cf = new Array(scheduleDef.length + 1).fill(0);
             rows.forEach((r) => { if (r.premium > 0)
@@ -5132,14 +5134,14 @@ function App() {
             const term = 5; // ใช้ระยะเวลาชำระเบี้ย 5 ปี (สั้นสุด) เป็นค่าเริ่มต้นสำหรับเปรียบเทียบ
             const table = gender === "female" ? HAPPYSAVING5_FEMALE : HAPPYSAVING5_MALE;
             const totalYears = 99 - age;
-            const yearlyPremium = Math.round((table[age] * si) / 1000);
+            const yearlyPremium = roundHalfUp((table[age] * si) / 1000);
             let cumPremium = 0;
             const rows = [];
             for (let n = 1; n <= totalYears; n++) {
                 const premium = n <= term ? yearlyPremium : 0;
                 cumPremium += premium;
                 const isLast = n === totalYears;
-                const cashBaht = isLast ? Math.round(Math.max(si * 7, cumPremium)) : Math.round(si * 0.04);
+                const cashBaht = isLast ? roundHalfUp(Math.max(si * 7, cumPremium)) : roundHalfUp(si * 0.04);
                 rows.push({ year: n, premium, cashBaht });
             }
             const cf = new Array(totalYears + 1).fill(0);
@@ -5162,7 +5164,7 @@ function App() {
             if (!row.ok)
                 return { rows: [], breakEvenAge: null };
             const si = row.effectiveSI;
-            const yearlyPremium = Math.round(row.premium);
+            const yearlyPremium = roundHalfUp(row.premium);
             const rows = [];
             let cumPremium = 0, cumPension = 0, breakEvenAge = null;
             for (let a = age; a <= PENSION888_PENSION_END_AGE; a++) {
@@ -5170,14 +5172,14 @@ function App() {
                 cumPremium += premium;
                 let pension = 0;
                 if (a === PENSION888_PENSION_START_AGE)
-                    pension = Math.round(si * PENSION888_FIRST_PENSION_PCT);
+                    pension = roundHalfUp(si * PENSION888_FIRST_PENSION_PCT);
                 else if (a > PENSION888_PENSION_START_AGE)
-                    pension = Math.round(si * PENSION888_ANNUAL_PENSION_PCT);
+                    pension = roundHalfUp(si * PENSION888_ANNUAL_PENSION_PCT);
                 cumPension += pension;
                 if (breakEvenAge === null && cumPremium > 0 && cumPension >= cumPremium)
                     breakEvenAge = a;
                 // กรณีเสียชีวิต: ก่อนอายุ 60 = 105% ของเบี้ยสะสม (หรือมูลค่าเวนคืน ซึ่งอาจสูงกว่า ไม่รวมในตัวเลขนี้); ระหว่างรับบำนาญ = เบี้ยสะสม - บำนาญที่ได้รับไปแล้ว (ต่ำสุด 0)
-                const deathBenefit = a < PENSION888_PENSION_START_AGE ? Math.round(cumPremium * 1.05) : Math.max(0, cumPremium - cumPension);
+                const deathBenefit = a < PENSION888_PENSION_START_AGE ? roundHalfUp(cumPremium * 1.05) : Math.max(0, cumPremium - cumPension);
                 rows.push({ age: a, premium, pension, cumPremium, cumPension, deathBenefit, note: a === PENSION888_PENSION_START_AGE ? "เริ่มรับบำนาญ (งวดแรก 30%)" : "" });
             }
             return { rows, breakEvenAge };
@@ -5187,7 +5189,7 @@ function App() {
             if (!row.ok)
                 return { rows: [], breakEvenAge: null };
             const si = row.effectiveSI;
-            const yearlyPremium = Math.round(row.premium);
+            const yearlyPremium = roundHalfUp(row.premium);
             const rows = [];
             let cumPremium = 0, cumPension = 0, breakEvenAge = null;
             for (let a = age; a <= PENSION888_PENSION_END_AGE; a++) {
@@ -5195,14 +5197,14 @@ function App() {
                 cumPremium += premium;
                 let pension = 0;
                 if (a === PENSION888_PENSION_START_AGE)
-                    pension = Math.round(si * PENSION888_FIRST_PENSION_PCT);
+                    pension = roundHalfUp(si * PENSION888_FIRST_PENSION_PCT);
                 else if (a > PENSION888_PENSION_START_AGE)
-                    pension = Math.round(si * PENSION888_ANNUAL_PENSION_PCT);
+                    pension = roundHalfUp(si * PENSION888_ANNUAL_PENSION_PCT);
                 cumPension += pension;
                 if (breakEvenAge === null && cumPremium > 0 && cumPension >= cumPremium)
                     breakEvenAge = a;
                 // กรณีเสียชีวิต: ก่อนอายุ 60 = 105% ของเบี้ยสะสม (หรือมูลค่าเวนคืน ซึ่งอาจสูงกว่า ไม่รวมในตัวเลขนี้); ระหว่างรับบำนาญ = เบี้ยสะสม - บำนาญที่ได้รับไปแล้ว (ต่ำสุด 0)
-                const deathBenefit = a < PENSION888_PENSION_START_AGE ? Math.round(cumPremium * 1.05) : Math.max(0, cumPremium - cumPension);
+                const deathBenefit = a < PENSION888_PENSION_START_AGE ? roundHalfUp(cumPremium * 1.05) : Math.max(0, cumPremium - cumPension);
                 rows.push({ age: a, premium, pension, cumPremium, cumPension, deathBenefit, note: a === PENSION888_PENSION_START_AGE ? "เริ่มรับบำนาญ (งวดแรก 30%)" : "" });
             }
             return { rows, breakEvenAge };
@@ -5215,14 +5217,14 @@ function App() {
             const rows = [];
             let cumPremium = 0, cumPension = 0, breakEvenAge = null;
             for (let a = age; a <= 98; a++) {
-                const premium = a < age + payYears ? Math.round(row.premium) : 0;
+                const premium = a < age + payYears ? roundHalfUp(row.premium) : 0;
                 cumPremium += premium;
-                const pension = a >= 60 ? Math.round(row.pension) : 0;
+                const pension = a >= 60 ? roundHalfUp(row.pension) : 0;
                 cumPension += pension;
                 if (breakEvenAge === null && cumPremium > 0 && cumPension >= cumPremium)
                     breakEvenAge = a;
                 // กรณีเสียชีวิต: ก่อนอายุ 60 = 110% ของเบี้ยสะสม (หรือมูลค่าเวนคืน ซึ่งอาจสูงกว่า ไม่รวมในตัวเลขนี้); ตั้งแต่อายุ 60 = เบี้ยสะสม - บำนาญที่ได้รับไปแล้ว (ต่ำสุด 0)
-                const deathBenefit = a < 60 ? Math.round(cumPremium * 1.10) : Math.max(0, cumPremium - cumPension);
+                const deathBenefit = a < 60 ? roundHalfUp(cumPremium * 1.10) : Math.max(0, cumPremium - cumPension);
                 rows.push({ age: a, premium, pension, cumPremium, cumPension, deathBenefit, note: a === 60 ? "เริ่มรับบำนาญ" : "" });
             }
             return { rows, breakEvenAge };
@@ -5340,11 +5342,11 @@ function App() {
             case "HAPPYPENSION": {
                 const row = happypensionTerm ? happypensionRow(happypensionTerm) : null;
                 return [
-                    { icon: "🏖️", value: row && row.ok ? baht(Math.round(row.pension)) + "/ปี" : "-", label: "บำนาญรายปีที่จะได้รับ" },
+                    { icon: "🏖️", value: row && row.ok ? baht(roundHalfUp(row.pension)) + "/ปี" : "-", label: "บำนาญรายปีที่จะได้รับ" },
                 ];
             }
             case "HAPPYSAVING": return [
-                { icon: "💰", value: baht(Math.round(happysavingSI * 0.04)) + "/ปี", label: "เงินคืนรายปี (4% ของทุนประกันภัย)" },
+                { icon: "💰", value: baht(roundHalfUp(happysavingSI * 0.04)) + "/ปี", label: "เงินคืนรายปี (4% ของทุนประกันภัย)" },
             ];
             case "HAPPYWL": return [
                 { icon: "❤️", value: baht(happywlSI), label: "คุ้มครองชีวิต" },
@@ -5377,16 +5379,16 @@ function App() {
             case "PENSION888": {
                 const row = pension888Row();
                 return row.ok ? [
-                    { icon: "🏖️", value: baht(Math.round(row.firstPension)), label: "บำนาญงวดแรก (อายุ 60)" },
-                    { icon: "🏖️", value: baht(Math.round(row.annualPension)) + "/ปี", label: "บำนาญอายุ 61-88 ปี" },
+                    { icon: "🏖️", value: baht(roundHalfUp(row.firstPension)), label: "บำนาญงวดแรก (อายุ 60)" },
+                    { icon: "🏖️", value: baht(roundHalfUp(row.annualPension)) + "/ปี", label: "บำนาญอายุ 61-88 ปี" },
                 ] : [];
             }
             case "PENSIONCARE888": {
                 const row = pensioncare888Row();
                 return row.ok ? [
-                    { icon: "🎗️", value: baht(Math.round(row.effectiveSI * PENSIONCARE888_CI_PCT)) + "/ปี", label: "ตรวจพบ 8 โรคร้ายแรง (แถมฟรี ถึงอายุ 88)" },
-                    { icon: "🏖️", value: baht(Math.round(row.firstPension)), label: "บำนาญงวดแรก (อายุ 60)" },
-                    { icon: "🏖️", value: baht(Math.round(row.annualPension)) + "/ปี", label: "บำนาญอายุ 61-88 ปี" },
+                    { icon: "🎗️", value: baht(roundHalfUp(row.effectiveSI * PENSIONCARE888_CI_PCT)) + "/ปี", label: "ตรวจพบ 8 โรคร้ายแรง (แถมฟรี ถึงอายุ 88)" },
+                    { icon: "🏖️", value: baht(roundHalfUp(row.firstPension)), label: "บำนาญงวดแรก (อายุ 60)" },
+                    { icon: "🏖️", value: baht(roundHalfUp(row.annualPension)) + "/ปี", label: "บำนาญอายุ 61-88 ปี" },
                 ] : [];
             }
             default: {
@@ -5398,9 +5400,9 @@ function App() {
                 const last = sav.sch[sav.sch.length - 1][1];
                 return [
                     { icon: "❤️", value: baht(sav.si), label: "ทุนประกันภัย (คุ้มครองชีวิต)" },
-                    { icon: "💰", value: baht(Math.round(sav.si * total / 100)), label: `รับเงินรวมตลอดสัญญา ${sav.sch.length} ปี (การันตี)` },
-                    { icon: "🎁", value: baht(Math.round(sav.si * last / 100)), label: "รับวันครบกำหนดสัญญา" },
-                    ...(SAVINGS_DEFS[id] && SAVINGS_DEFS[id].ciPct ? [{ icon: "🎗️", value: baht(Math.round(sav.si * SAVINGS_DEFS[id].ciPct / 100)) + "/ปี", label: `ตรวจพบ 8 โรคร้ายแรง (แถมฟรี ${SAVINGS_DEFS[id].ciYears} ปี)` }] : []),
+                    { icon: "💰", value: baht(roundHalfUp(sav.si * total / 100)), label: `รับเงินรวมตลอดสัญญา ${sav.sch.length} ปี (การันตี)` },
+                    { icon: "🎁", value: baht(roundHalfUp(sav.si * last / 100)), label: "รับวันครบกำหนดสัญญา" },
+                    ...(SAVINGS_DEFS[id] && SAVINGS_DEFS[id].ciPct ? [{ icon: "🎗️", value: baht(roundHalfUp(sav.si * SAVINGS_DEFS[id].ciPct / 100)) + "/ปี", label: `ตรวจพบ 8 โรคร้ายแรง (แถมฟรี ${SAVINGS_DEFS[id].ciYears} ปี)` }] : []),
                 ];
             }
         }
@@ -5535,9 +5537,9 @@ function App() {
         if (PENSION_IDS.includes(id))
             rows.push(["ลดหย่อนภาษี", "เบี้ยบำนาญลดหย่อนได้ 15% ของเงินได้ ไม่เกิน 200,000 บาท/ปี (รวมกองทุนเพื่อการเกษียณไม่เกิน 500,000 บาท)"]);
         else if (p.isMain && yrs >= 10 && annualPremium > 0)
-            rows.push(["ลดหย่อนภาษี", `เบี้ยประกันชีวิตลดหย่อนได้ตามจ่ายจริง ไม่เกิน 100,000 บาท/ปี (แผนนี้ลดหย่อนได้ ${baht(Math.min(Math.round(annualPremium), 100000))}/ปี)`]);
+            rows.push(["ลดหย่อนภาษี", `เบี้ยประกันชีวิตลดหย่อนได้ตามจ่ายจริง ไม่เกิน 100,000 บาท/ปี (แผนนี้ลดหย่อนได้ ${baht(Math.min(roundHalfUp(annualPremium), 100000))}/ปี)`]);
         else if (HEALTH_TAX_IDS.includes(id) && annualPremium > 0)
-            rows.push(["ลดหย่อนภาษี", `เบี้ยประกันสุขภาพลดหย่อนได้ไม่เกิน 25,000 บาท/ปี (แผนนี้ ${baht(Math.min(Math.round(annualPremium), 25000))}/ปี) และรวมกับเบี้ยประกันชีวิตไม่เกิน 100,000 บาท`]);
+            rows.push(["ลดหย่อนภาษี", `เบี้ยประกันสุขภาพลดหย่อนได้ไม่เกิน 25,000 บาท/ปี (แผนนี้ ${baht(Math.min(roundHalfUp(annualPremium), 25000))}/ปี) และรวมกับเบี้ยประกันชีวิตไม่เกิน 100,000 บาท`]);
         else if (["ACC", "ACC3"].includes(id))
             rows.push(["ลดหย่อนภาษี", "เบี้ยส่วนค่ารักษาพยาบาลลดหย่อนได้ ไม่เกิน 25,000 บาท/ปี (รวมกับเบี้ยประกันชีวิตไม่เกิน 100,000 บาท)"]);
         return rows.map((b) => (Array.isArray(b) ? [plainKey(String(b[0])), b[1], ...b.slice(2)] : b));
@@ -5578,7 +5580,7 @@ function App() {
             });
             if (items.some((p) => p.id === "CS")) res.CS = calcCS({ baseSum });
             let total = 0, totalYear = 0;
-            items.forEach((p) => { const r = res[p.id]; if (r && r.ok) { total += r.premium * factorOf(p.id); totalYear += r.premium; } });
+            items.forEach((p) => { const r = res[p.id]; if (r && r.ok) { total += roundHalfUp(r.premium * factorOf(p.id)); totalYear += roundHalfUp(r.premium); } });
             return { plan, label: cfg.label(plan), res, total, totalYear, ok: !!(res[id] && res[id].ok), msg: res[id] ? res[id].msg : "" };
         });
         const ordered = (lists) => { const seen = []; lists.forEach((l) => l.forEach((k) => { if (!seen.includes(k)) seen.push(k); })); return seen; };
@@ -5658,16 +5660,17 @@ function App() {
             c.commPerPay = rate === null ? null : (c.premium || 0) * c.factor * rate / 100;
             c.commYear1 = rate === null ? null : c.commPerPay * c.commN;
         });
-        const totalYear = cards.reduce((s, c) => s + (c.premium || 0), 0);
-        const totalPay = cards.reduce((s, c) => s + (c.premium || 0) * c.factor, 0);
+        // เบี้ยรวม = ผลรวมของเบี้ยแต่ละรายการที่ปัดเศษแล้ว (คู่มือปัดเศษทีละสัญญา)
+        const totalYear = cards.reduce((s, c) => s + roundHalfUp(c.premium || 0), 0);
+        const totalPay = cards.reduce((s, c) => s + roundHalfUp((c.premium || 0) * c.factor), 0);
         const singleCard = cards.find((c) => c.single);
         // ⚠️ เช็กก่อนเสนอ (เฉพาะตัวแทน ไม่ส่งถึงลูกค้า)
         const warns = [];
         const lifeYear = cards.filter((c) => c.isMain && !PENSION_IDS.includes(c.id)).reduce((t, c) => t + (c.premium || 0), 0);
         const healthYear = cards.filter((c) => HEALTH_TAX_IDS.includes(c.id)).reduce((t, c) => t + (c.premium || 0), 0);
         {
-            if (lifeYear > 100000) warns.push(`เบี้ยประกันชีวิตรวม ${baht(Math.round(lifeYear))}/ปี เกินเพดานลดหย่อน 100,000 บาท (ส่วนเกินลดหย่อนไม่ได้)`);
-            if (healthYear > 25000) warns.push(`เบี้ยสุขภาพรวม ${baht(Math.round(healthYear))}/ปี ลดหย่อนได้สูงสุด 25,000 บาท`);
+            if (lifeYear > 100000) warns.push(`เบี้ยประกันชีวิตรวม ${baht(roundHalfUp(lifeYear))}/ปี เกินเพดานลดหย่อน 100,000 บาท (ส่วนเกินลดหย่อนไม่ได้)`);
+            if (healthYear > 25000) warns.push(`เบี้ยสุขภาพรวม ${baht(roundHalfUp(healthYear))}/ปี ลดหย่อนได้สูงสุด 25,000 บาท`);
             if (lifeYear > 0 && healthYear > 0 && Math.min(lifeYear, 100000) + Math.min(healthYear, 25000) > 100000) warns.push("เบี้ยชีวิต + สุขภาพรวมกัน ลดหย่อนได้ไม่เกิน 100,000 บาท");
         }
         if (cards.filter((c) => ["VH", "VHKIDS", "HHP", "HH", "PH"].includes(c.id)).length > 1) warns.push("เลือกสุขภาพผู้ป่วยในมากกว่า 1 แบบ — ตรวจว่าตั้งใจซื้อซ้อนกันจริง");
@@ -5855,7 +5858,7 @@ function App() {
                                 "(\u0E40\u0E1A\u0E35\u0E49\u0E22\u0E23\u0E27\u0E21\u0E15\u0E25\u0E2D\u0E14\u0E42\u0E04\u0E23\u0E07\u0E01\u0E32\u0E23 ",
                                 mainPolicyPaymentYears(c.id),
                                 " \u0E1B\u0E35 \u2248 ",
-                                baht(Math.round(c.premium * mainPolicyPaymentYears(c.id))),
+                                baht(roundHalfUp(c.premium * mainPolicyPaymentYears(c.id))),
                                 ")")),
                             OCC_EXTRA_MAIN_IDS.includes(c.id) && (React.createElement("p", { className: "text-[17px] mt-2 px-3 py-2 rounded-lg", style: { background: "#FFF8E6", color: "#7A5A00", border: "1px solid #F3DFA8" } }, OCC_EXTRA_NOTE)),
                             OCC_EXTRA_WITH_RIDER_MAIN_IDS.includes(c.id) && result.cards.some((x) => !x.isMain) && (React.createElement("p", { className: "text-[17px] mt-2 px-3 py-2 rounded-lg", style: { background: "#FFF8E6", color: "#7A5A00", border: "1px solid #F3DFA8" } }, OCC_EXTRA_RIDER_NOTE)),
@@ -5894,7 +5897,7 @@ function App() {
                                 React.createElement("td", { className: "px-3 py-2", style: { color: BRAND.dataBlack } },
                                     r.label,
                                     i === 0 ? " (ปัจจุบัน)" : ""),
-                                React.createElement("td", { className: "px-3 py-2 text-right font-medium", style: { color: i === 0 ? BRAND.greenDeep : BRAND.dataBlack } }, baht(Math.round(r.premium)))))))))),
+                                React.createElement("td", { className: "px-3 py-2 text-right font-medium", style: { color: i === 0 ? BRAND.greenDeep : BRAND.dataBlack } }, baht(roundHalfUp(r.premium)))))))))),
                     React.createElement("button", { onClick: () => setScheduleModal(null), className: "w-full mt-4 rounded-xl py-3 text-[24px] font-medium text-white flex items-center justify-center gap-1 shrink-0", style: { background: BRAND.navy } },
                         React.createElement("span", { style: { fontSize: 18 } }, "✕"),
                         " \u0E1B\u0E34\u0E14")))),
@@ -5978,13 +5981,13 @@ function App() {
                                         h("td", { className: cell, style: Object.assign({}, stickyTd, { color: BRAND.sub }) }, r.k),
                                         c.cols.map((col, i) => h("td", { key: col.plan, className: cell + " font-semibold", style: Object.assign({ color: BRAND.dataBlack }, colStyle(col)) },
                                             !col.ok ? (r.id === c.id ? h("span", { className: "font-normal text-[15px]", style: { color: BRAND.danger } }, col.msg) : "")
-                                                : r.vals[i] == null ? h("span", { className: "font-normal text-[15px]", style: { color: BRAND.danger } }, r.msgs[i] || "-") : baht(Math.round(r.vals[i])))))),
+                                                : r.vals[i] == null ? h("span", { className: "font-normal text-[15px]", style: { color: BRAND.danger } }, r.msgs[i] || "-") : baht(roundHalfUp(r.vals[i])))))),
                                     h("tr", { style: { borderTop: "2px solid #CDE8B8", background: "#E8F6DD" } },
                                         h("td", { className: cell + " font-semibold", style: Object.assign({}, stickyTd, { color: BRAND.navyDeep, background: "#E8F6DD" }) }, c.totalRow.k),
-                                        c.cols.map((col, i) => h("td", { key: col.plan, className: cell + " font-bold text-[19px]", style: { color: BRAND.greenDeep } }, col.ok ? baht(Math.round(c.totalRow.vals[i])) : ""))),
+                                        c.cols.map((col, i) => h("td", { key: col.plan, className: cell + " font-bold text-[19px]", style: { color: BRAND.greenDeep } }, col.ok ? baht(roundHalfUp(c.totalRow.vals[i])) : ""))),
                                     c.totalYearRow && h("tr", { style: { borderTop: "1px solid #EEF3F7" } },
                                         h("td", { className: cell, style: Object.assign({}, stickyTd, { color: BRAND.sub }) }, c.totalYearRow.k),
-                                        c.cols.map((col, i) => h("td", { key: col.plan, className: cell, style: Object.assign({ color: BRAND.dataBlack }, colStyle(col)) }, col.ok ? baht(Math.round(c.totalYearRow.vals[i])) : ""))),
+                                        c.cols.map((col, i) => h("td", { key: col.plan, className: cell, style: Object.assign({ color: BRAND.dataBlack }, colStyle(col)) }, col.ok ? baht(roundHalfUp(c.totalYearRow.vals[i])) : ""))),
                                     fullRow("bh", "🏥 ความคุ้มครอง (แถวสีเขียว = แต่ละแผนต่างกัน)"),
                                     benefitRows,
                                     h("tr", { style: { borderTop: "1px solid #D7E8F0" } },
@@ -6762,7 +6765,7 @@ const FREQ = {
 };
 const ROUNDING_EDGE = 0.49;
 const APP_VERSION = "สุดคุ้ม v1.7 · 2026-10-13";
-const fmt = (n) => Math.round(n || 0).toLocaleString("en-US", { maximumFractionDigits: 0 });
+const fmt = (n) => roundHalfUp(n || 0).toLocaleString("en-US", { maximumFractionDigits: 0 });
 // ค่านายหน้าปีที่ 1 (%) — ตาราง 7 "ค่าตอบแทนสำหรับตัวแทน" 10-09-2026
 // ผู้ใหญ่ (กรุงเทพ สุดคุ้ม รบข.12/2567): [ทุน <300,000 / 300,000-599,999 / 600,000 ขึ้นไป] x [อายุ 15-45 / 46-55 / 56-65]
 // เด็ก (กรุงเทพ สมาร์ท คิดส์ รบข.2/2568 อายุ 0-14): [ทุน <300,000 / 300,000-599,999 / 600,000 ขึ้นไป]
@@ -6933,7 +6936,7 @@ function skNotesRaw(d) {
   if (d.ov && d.ov.notes) return d.ov.notes;
   const n = ["ส่วนอุบัติเหตุที่แถมฟรี ไม่คุ้มครองขณะมึนเมาหรือใช้สารเสพติดจนครองสติไม่ได้, การทำร้ายตัวเอง, การทะเลาะวิวาท, การแข่งรถหรือแข่งเรือ"];
   if (d.isKids) n.push("4 โรคร้ายแรงของเด็ก มีระยะเวลารอคอย 90 วัน นับจากวันเริ่มคุ้มครอง");
-  if (d.pay > 0) n.push(`ลดหย่อนภาษีเบี้ยประกันชีวิตได้ตามจ่ายจริง ไม่เกิน 100,000 บาท/ปี (แผนนี้ ${baht(Math.min(Math.round(d.totalPremium / d.pay), 100000))}/ปี)`);
+  if (d.pay > 0) n.push(`ลดหย่อนภาษีเบี้ยประกันชีวิตได้ตามจ่ายจริง ไม่เกิน 100,000 บาท/ปี (แผนนี้ ${baht(Math.min(roundHalfUp(d.totalPremium / d.pay), 100000))}/ปี)`);
   return n;
 }
 // บรรทัดสรุปที่แก้ไขได้ก่อนส่ง (ไม่รวมตาราง)
@@ -6973,7 +6976,7 @@ function buildSKText(d) {
   out.push(`\u{1F6E1}\uFE0F \u0E17\u0E38\u0E19\u0E1B\u0E23\u0E30\u0E01\u0E31\u0E19 ${baht(d.sumInsured)}`);
   const gain = d.maturity - d.totalPremium;
   out.push("", "\u{1F4AC} \u0E2A\u0E23\u0E38\u0E1B\u0E07\u0E48\u0E32\u0E22\u0E46", `\u0E08\u0E48\u0E32\u0E22\u0E40\u0E1A\u0E35\u0E49\u0E22\u0E23\u0E27\u0E21 ${baht(d.totalPremium)} \u0E04\u0E23\u0E1A ${d.term} \u0E1B\u0E35\u0E23\u0E31\u0E1A\u0E04\u0E37\u0E19 ${baht(d.maturity)}${gain > 0 ? ` \u0E44\u0E14\u0E49\u0E21\u0E32\u0E01\u0E01\u0E27\u0E48\u0E32\u0E17\u0E35\u0E48\u0E08\u0E48\u0E32\u0E22 ${baht(gain)}` : ""}`);
-  out.push(`\u{1F381} เงินคืนพิเศษ ${d.bonusPct}% ของเบี้ยทุกปีที่ชำระ: ${baht(Math.round(d.totalBonus / d.pay))}/ปี × ${d.pay} ปี = ${baht(d.totalBonus)} (สะสมไว้ จ่ายจริงตอนครบสัญญาหรือเสียชีวิต)`);
+  out.push(`\u{1F381} เงินคืนพิเศษ ${d.bonusPct}% ของเบี้ยทุกปีที่ชำระ: ${baht(roundHalfUp(d.totalBonus / d.pay))}/ปี × ${d.pay} ปี = ${baht(d.totalBonus)} (สะสมไว้ จ่ายจริงตอนครบสัญญาหรือเสียชีวิต)`);
   out.push(`⏳ คุ้มครอง ${d.term} ปี ถึงอายุ ${Number(d.age) + d.term} ปี · ชำระเบี้ย ${d.pay} ปี`);
   out.push("", "\u2501\u2501 \u0E04\u0E27\u0E32\u0E21\u0E04\u0E38\u0E49\u0E21\u0E04\u0E23\u0E2D\u0E07\u0E23\u0E30\u0E2B\u0E27\u0E48\u0E32\u0E07\u0E2A\u0E31\u0E0D\u0E0D\u0E32 \u2501\u2501");
   skCoverage(d).forEach((c) => {
@@ -7642,7 +7645,7 @@ function SudKoomDashboard({ onBack }) {
     "button",
     {
       onClick: () => {
-        setPremiumInput(String(Math.round(perInstallmentDisplay)));
+        setPremiumInput(String(roundHalfUp(perInstallmentDisplay)));
         setMode("premium");
       },
       className: `${pillBase} ${mode === "premium" ? pillOn : pillOff}`
@@ -7652,7 +7655,7 @@ function SudKoomDashboard({ onBack }) {
     "button",
     {
       onClick: () => {
-        setSumInsuredInput(String(Math.round(sumInsured)));
+        setSumInsuredInput(String(roundHalfUp(sumInsured)));
         setMode("sumInsured");
       },
       className: `${pillBase} ${mode === "sumInsured" ? pillOn : pillOff}`
