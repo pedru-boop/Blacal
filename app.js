@@ -8,7 +8,7 @@ const BRAND = {
     ink: "#000000", sub: "#404040", danger: "#B93232", warn: "#6B4508",
     label: "#000000", nameBlue: "#1668D6", mainBlue: "#0C2F63", dataBlack: "#000000",
 };
-const APP_VERSION = "v2.41.0 (2569-10-12)";
+const APP_VERSION = "v2.42.0 (2569-10-13)";
 const RATE_SOURCE = "อัตราเบี้ยตามคู่มือตัวแทน V.14 (14-02-2026)"; // วันที่ตารางค่าคอมอยู่ในป๊อปอัปค่าคอม (ตัวแทนเท่านั้น)
 const CASES_KEY = "blacal-cases-v1"; // อัปเดตเลขนี้ทุกครั้งที่มีการแก้ไข/เพิ่มแบบประกันใหม่ เพื่อให้รู้ว่าไฟล์ที่ใช้อยู่เป็นเวอร์ชันล่าสุดหรือไม่
 const fmt = (n) => (n === null || n === undefined || isNaN(n) ? "0" : Math.round(n).toLocaleString("th-TH"));
@@ -2020,36 +2020,36 @@ const HH_BEN = {
     prePost: { 1000000: 2000, 5000000: 2000, 10000000: 10000 },
     yearly: { 1000000: 100000, 5000000: 100000, 10000000: 200000 },
 };
-// 7b) แวลู เฮลธ์ คิดส์ พรีเมียร์ รบข.31/2568 — สุขภาพเด็ก อายุแรกเข้า 1 เดือน - 10 ปี
+// 7b) แวลู เฮลธ์ คิดส์ พรีเมียร์ รบข.23/2569 (ยกเลิก รบข.31/2568) — สุขภาพเด็ก อายุแรกเข้า 1 เดือน - 10 ปี
 const VHKIDS_BANDS = [[0, 5], [6, 10], [11, 15], [16, 20], [21, 25], [26, 30], [31, 35], [36, 40], [41, 45], [46, 50], [51, 55], [56, 60], [61, 65], [66, 70], [71, 75], [76, 80], [81, 85], [86, 90], [91, 95], [96, 98]];
-const VHKIDS_PLANS = [3000, 4000, 5000];
+const VHKIDS_PLANS = [2000, 3000, 4000, 5000];
 const VHKIDS_FEMALE = [
-    [43855, 58698, 67698], [20230, 26159, 29809], [15837, 20269, 22350], [14903, 18809, 21051], [16722, 19863, 21714],
-    [17276, 21994, 23416], [18156, 22180, 24861], [18577, 22597, 25542], [19210, 23827, 27019], [19854, 24490, 27869],
-    [23858, 30363, 36720], [28327, 36665, 44813], [54297, 65084, 75626], [66674, 82537, 98040], [99964, 124560, 131336],
-    [141685, 153973, 162465], [169633, 180055, 190317], [186481, 198396, 210128], [200743, 215721, 228840], [219824, 236723, 251526],
+    [36862, 43855, 58698, 67698], [17247, 20230, 26159, 29809], [13775, 15837, 20269, 22350], [13715, 14903, 18809, 21051], [14708, 16722, 19863, 21714],
+    [15279, 17276, 21994, 23416], [15375, 18156, 22180, 24861], [15470, 18577, 22597, 25542], [16213, 19210, 23827, 27019], [17761, 19854, 24490, 27869],
+    [21058, 23858, 30363, 36720], [24738, 28327, 36665, 44813], [49654, 54297, 65084, 75626], [59845, 66674, 82537, 98040], [89376, 99964, 124560, 131336],
+    [125143, 141685, 153973, 162465], [158442, 169633, 180055, 190317], [173688, 186481, 198396, 210128], [188088, 200743, 215721, 228840], [205546, 219824, 236723, 251526],
 ];
 const VHKIDS_MALE = [
-    [43855, 58698, 67698], [20230, 26159, 29809], [15837, 20269, 22350], [14406, 18070, 19188], [14407, 17886, 19429],
-    [15596, 19662, 22014], [15636, 19817, 22591], [15953, 20164, 22618], [16623, 21189, 23850], [17119, 21741, 24558],
-    [20686, 25890, 30976], [24353, 31061, 37617], [49152, 57828, 66307], [59210, 72012, 84523], [88256, 108050, 127394],
-    [123307, 134070, 158536], [146563, 150216, 178135], [157758, 161844, 193068], [168974, 174843, 209763], [183979, 190601, 230000],
+    [36862, 43855, 58698, 67698], [17247, 20230, 26159, 29809], [13775, 15837, 20269, 22350], [13292, 14406, 18070, 19188], [12927, 14407, 17886, 19429],
+    [13464, 15596, 19662, 22014], [13510, 15636, 19817, 22591], [13832, 15953, 20164, 22618], [14318, 16623, 21189, 23850], [15508, 17119, 21741, 24558],
+    [18446, 20686, 25890, 30976], [21466, 24353, 31061, 37617], [45417, 49152, 57828, 66307], [53699, 59210, 72012, 84523], [79736, 88256, 108050, 127394],
+    [110010, 123307, 134070, 158536], [137567, 146563, 150216, 178135], [147697, 157758, 161844, 193068], [159022, 168974, 174843, 209763], [172750, 183979, 190601, 230000],
 ];
 const VHKIDS_CATS = [
-    { no: "1", desc: "ค่าห้อง ค่าอาหาร และค่าบริการโรงพยาบาล (ผู้ป่วยใน) สูงสุด 125 วัน — ห้อง ICU จ่าย 2 เท่า สูงสุด 15 วัน (นับรวมใน 125 วัน)", unit: "ต่อวัน", vals: { 3000: 3000, 4000: 4000, 5000: 5000 } },
-    { no: "2", desc: "ค่าตรวจวินิจฉัย/บำบัดรักษา/โลหิตและส่วนประกอบ/พยาบาล/ยา/เวชภัณฑ์ (รวมหมวดย่อย 2.1-2.4)", unit: "", vals: { 3000: 200000, 4000: 200000, 5000: 400000 }, sharedPlans: [4000, 5000], sharedWithNo: "4" },
-    { no: "2.4", desc: "ค่ายาและเวชภัณฑ์สิ้นเปลืองสำหรับกลับบ้าน (สูงสุด 7 วัน)", unit: "", vals: { 3000: 1000, 4000: 1000, 5000: 1000 } },
-    { no: "3", desc: "ค่าแพทย์ตรวจรักษา สูงสุด 125 วัน", unit: "ต่อวัน", vals: { 3000: 800, 4000: 1000, 5000: 1200 } },
-    { no: "4", desc: "ค่าผ่าตัด (ศัลยกรรม) และหัตถการ (รวมหมวดย่อย 4.1-4.5)", unit: "", vals: { 3000: 100000, 4000: "จ่ายตามจริง สูงสุดรวมไม่เกิน 200,000 บาท", 5000: "จ่ายตามจริง สูงสุดรวมไม่เกิน 400,000 บาท" }, sharedPlans: [4000, 5000], sharedWithNo: "2" },
-    { no: "4.5", desc: "ปลูกถ่ายอวัยวะ (จำกัด 1 ครั้งตลอดชีพของสัญญาเพิ่มเติมนี้)", unit: "", vals: { 3000: 200000, 4000: 200000, 5000: 400000 } },
-    { no: "5", desc: "ผ่าตัดใหญ่ไม่ต้องพักรักษาตัวเป็นผู้ป่วยใน (Day Surgery)", unit: "", vals: { 3000: "จ่ายเสมือนผู้ป่วยใน", 4000: "จ่ายเสมือนผู้ป่วยใน", 5000: "จ่ายเสมือนผู้ป่วยใน" } },
-    { no: "6", desc: "ตรวจวินิจฉัย/รักษาต่อเนื่อง ก่อน-หลังพักรักษาตัว (ผู้ป่วยนอก)", unit: "", vals: { 3000: 3500, 4000: 5000, 5000: 5000 } },
-    { no: "7", desc: "รักษาบาดเจ็บ กรณีผู้ป่วยนอกจากอุบัติเหตุ ภายใน 24 ชม.", unit: "ต่อครั้ง", vals: { 3000: 6000, 4000: 8000, 5000: 8000 } },
-    { no: "8", desc: "เวชศาสตร์ฟื้นฟู หลังพักรักษาตัวเป็นผู้ป่วยใน", unit: "", vals: { 3000: "ไม่คุ้มครอง", 4000: "ไม่คุ้มครอง", 5000: "ไม่คุ้มครอง" } },
-    { no: "9-11", desc: "ล้างไต (โรคไตวายเรื้อรัง) / รังสีรักษา / เคมีบำบัด (โรคเนื้องอกหรือมะเร็ง) ต่อรอบปีกรมธรรม์*", unit: "", vals: { 3000: 35000, 4000: 50000, 5000: 50000 } },
-    { no: "12", desc: "รถพยาบาลฉุกเฉิน", unit: "ต่อครั้ง", vals: { 3000: 3000, 4000: 4000, 5000: 5000 } },
-    { no: "13", desc: "ผ่าตัดเล็ก", unit: "ต่อครั้ง", vals: { 3000: 9000, 4000: 10000, 5000: 10000 } },
-    { no: "เพิ่มเติม", desc: "ค่ารักษาพยาบาลผู้ป่วยนอก ต่อครั้ง (สูงสุด 1 ครั้ง/วัน และสูงสุด 30 ครั้ง/รอบปีกรมธรรม์)", unit: "", vals: { 3000: 2000, 4000: 2000, 5000: 2000 } },
+    { no: "1", desc: "ค่าห้อง ค่าอาหาร และค่าบริการโรงพยาบาล (ผู้ป่วยใน) สูงสุด 125 วัน — ห้อง ICU จ่าย 2 เท่า สูงสุด 15 วัน (นับรวมใน 125 วัน)", unit: "ต่อวัน", vals: { 2000: 2000, 3000: 3000, 4000: 4000, 5000: 5000 } },
+    { no: "2", desc: "ค่าตรวจวินิจฉัย/บำบัดรักษา/โลหิตและส่วนประกอบ/พยาบาล/ยา/เวชภัณฑ์ (รวมหมวดย่อย 2.1-2.4)", unit: "", vals: { 2000: 25000, 3000: 30000, 4000: 200000, 5000: 400000 }, sharedPlans: [4000, 5000], sharedWithNo: "4" },
+    { no: "2.4", desc: "ค่ายาและเวชภัณฑ์สิ้นเปลืองสำหรับกลับบ้าน (สูงสุด 7 วัน)", unit: "", vals: { 2000: 1000, 3000: 1000, 4000: 1000, 5000: 1000 } },
+    { no: "3", desc: "ค่าแพทย์ตรวจรักษา สูงสุด 125 วัน", unit: "ต่อวัน", vals: { 2000: 800, 3000: 800, 4000: 1000, 5000: 1200 } },
+    { no: "4", desc: "ค่าผ่าตัด (ศัลยกรรม) และหัตถการ (รวมหมวดย่อย 4.1-4.4)", unit: "", vals: { 2000: 60000, 3000: 100000, 4000: "จ่ายตามจริง สูงสุดรวมไม่เกิน 200,000 บาท", 5000: "จ่ายตามจริง สูงสุดรวมไม่เกิน 400,000 บาท" }, sharedPlans: [4000, 5000], sharedWithNo: "2" },
+    { no: "4.5", desc: "ปลูกถ่ายอวัยวะ (จำกัด 1 ครั้งตลอดชีพของสัญญาเพิ่มเติมนี้)", unit: "", vals: { 2000: 120000, 3000: 200000, 4000: 200000, 5000: 400000 } },
+    { no: "5", desc: "ผ่าตัดใหญ่ไม่ต้องพักรักษาตัวเป็นผู้ป่วยใน (Day Surgery)", unit: "", vals: { 2000: "จ่ายเสมือนผู้ป่วยใน", 3000: "จ่ายเสมือนผู้ป่วยใน", 4000: "จ่ายเสมือนผู้ป่วยใน", 5000: "จ่ายเสมือนผู้ป่วยใน" } },
+    { no: "6", desc: "ตรวจวินิจฉัย/รักษาต่อเนื่อง ก่อน-หลังพักรักษาตัว (ผู้ป่วยนอก)", unit: "", vals: { 2000: 3000, 3000: 3500, 4000: 5000, 5000: 5000 } },
+    { no: "7", desc: "รักษาบาดเจ็บ กรณีผู้ป่วยนอกจากอุบัติเหตุ ภายใน 24 ชม.", unit: "ต่อครั้ง", vals: { 2000: 4000, 3000: 6000, 4000: 8000, 5000: 8000 } },
+    { no: "8", desc: "เวชศาสตร์ฟื้นฟู หลังพักรักษาตัวเป็นผู้ป่วยใน", unit: "", vals: { 2000: "ไม่คุ้มครอง", 3000: "ไม่คุ้มครอง", 4000: "ไม่คุ้มครอง", 5000: "ไม่คุ้มครอง" } },
+    { no: "9-11", desc: "ล้างไต (โรคไตวายเรื้อรัง) / รังสีรักษา / เคมีบำบัด (โรคเนื้องอกหรือมะเร็ง) ต่อรอบปีกรมธรรม์*", unit: "", vals: { 2000: 20000, 3000: 35000, 4000: 50000, 5000: 50000 } },
+    { no: "12", desc: "รถพยาบาลฉุกเฉิน", unit: "ต่อครั้ง", vals: { 2000: 2000, 3000: 3000, 4000: 4000, 5000: 5000 } },
+    { no: "13", desc: "ผ่าตัดเล็ก", unit: "ต่อครั้ง", vals: { 2000: 6000, 3000: 9000, 4000: 10000, 5000: 10000 } },
+    { no: "เพิ่มเติม", desc: "ค่ารักษาพยาบาลผู้ป่วยนอก ต่อครั้ง (สูงสุด 1 ครั้ง/วัน และสูงสุด 30 ครั้ง/รอบปีกรมธรรม์)", unit: "", vals: { 2000: 2000, 3000: 2000, 4000: 2000, 5000: 2000 } },
 ];
 // 8) คช. คุ้มครองการชำระเบี้ย รบข.1/2545, 22/2551, 64/2567
 const CS_BANDS = [[20, 30], [31, 35], [36, 40], [41, 45], [46, 50], [51, 55]];
@@ -2097,7 +2097,15 @@ const SINGLE_PREMIUM_MAIN_IDS = ["HRP9901", "HAPPYWL9901"]; // ชำระเ�
 const YEAR_OR_MONTH_MAIN_IDS = ["HS2515"]; // รายปี หรือ รายเดือนเท่านั้น (รายเดือน = เบี้ยรายปี ÷ 12)
 // แบบประกันหลักที่ไม่อนุญาตให้ผู้เยาว์ซื้อ คช. (หรือไม่อนุญาตให้ซื้อสัญญาเพิ่มเติมใดๆ)
 // แบบประกันหลักที่ผู้เยาว์ (0-14 ปี) ต้องซื้อ คช. ด้วย (ห่วงรัก 99/20 เฉพาะอายุ 0-4 ปี)
-const CS_REQUIRED_MAIN_IDS = ["CANCERMAX", "HAPPYKID", "HRPDIV", "HS1810", "HS2515", "HAPPYSAVING", "PUNSUK"];
+const CS_REQUIRED_MAIN_IDS = ["SUD", "LIFE99", "CANCERMAX", "HAPPYKID", "HRPDIV", "HS1810", "HS2515", "HAPPYSAVING", "PUNSUK"];
+// แบบประกันหลักที่ไม่อนุญาตให้ซื้อ ฉก. / ฉป. (คู่มือ: เพรสทีจ ไลฟ์ ข้อ 6, แฮปปี้ โฮลไลฟ์ ข้อ 6, แฮปปี้ โฮลไลฟ์ 9901 ข้อ 4)
+const CHAK_FORBIDDEN_MAIN_IDS = ["PRESTIGE", "HAPPYWL", "HAPPYWL9901"];
+// ตลอดชีพ 99/99 ซื้อสัญญาเพิ่มเติมได้เฉพาะ สุขภาพ / OPD / คช. เท่านั้น (คู่มือหน้า 2)
+const LIFE99_ALLOWED_RIDER_IDS = ["VH", "VHKIDS", "HH", "HHP", "PH", "OPD", "OPDP", "CS"];
+// ผู้เยาว์อายุต่ำกว่า 15 ปี: ทุนประกันแบบตลอดชีพ / คุ้มครองจำกัดเวลา สูงสุด 10 ล้านบาท (ระเบียบการรับประกัน รบข.27/2558)
+// ไม่รวมแฮปปี้ โฮลไลฟ์ / 9901 (คู่มือยกเว้นเงื่อนไขนี้) และแบบสะสมทรัพย์ (ไม่จำกัด)
+const MINOR_SI_CAP_MAIN_IDS = ["SUD", "LIFE99", "PRESTIGE", "HRP9920", "HRPDIV", "HRP9901", "HAPPYKID"];
+const MINOR_SI_CAP = 10000000;
 // แบบประกันหลักที่ไม่อนุญาตให้ซื้อสัญญาเพิ่มเติมใดๆ
 const NO_RIDER_MAIN_IDS = ["UNJAI", "PSAVE104", "PSAVE126"];
 // แบบที่ผลประโยชน์กรณีเสียชีวิต = % ของทุน หรือเบี้ยประกันชีวิตสะสม แล้วแต่อย่างใดมากกว่า
@@ -2136,11 +2144,11 @@ const PRODUCTS = [
     { id: "CS", name: "คุ้มครองการชำระเบี้ย (คช.)", tag: "คุ้มครองผู้ชำระเบี้ย (ผู้ปกครอง 20-55 ปี) สำหรับผู้เยาว์ 0-14 ปี · ระยะคุ้มครองตามระยะชำระเบี้ยของแบบหลัก", ageMin: 0, ageMax: 14, coverAge: 21, isTop: true, renewalNote: "ปรับตามเบี้ยที่คุ้มครอง",
         occNote: "ไม่ขึ้นกับชั้นอาชีพ", siNote: "เบี้ยคิดจากผลรวมเบี้ยประกันภัยของทุกแบบที่เลือกไว้" },
     { id: "SUD", name: "ตลอดชีพ สุดคุ้ม", tag: "แบบประกันหลัก · ชำระเบี้ย 20 ปี", ageMin: 0, ageMax: 70, coverAge: 99, isMain: true, renewalNote: "เบี้ยคงที่",
-        occNote: "รับประกันเฉพาะชั้นอาชีพ 1-2 เท่านั้น (ไม่รับชั้นอาชีพ 3)", siNote: "ทุนประกันขั้นต่ำ 100,000 บาท · ถ้าทุนต่ำกว่า 500,000 บาท ต้องซื้อสัญญาเพิ่มเติมอย่างน้อย 1 รายการควบคู่ด้วย (ทุนตั้งแต่ 500,000 บาทขึ้นไป ซื้อเดี่ยวได้) · เลือกได้เพียง 1 แบบ จาก 30 แบบทุนประกันหลัก" },
+        occNote: "รับประกันเฉพาะชั้นอาชีพ 1-2 เท่านั้น (ไม่รับชั้นอาชีพ 3)", siNote: "ทุนประกันขั้นต่ำ 100,000 บาท · ถ้าทุนต่ำกว่า 500,000 บาท ต้องซื้อสัญญาเพิ่มเติมอย่างน้อย 1 รายการควบคู่ด้วย (ทุนตั้งแต่ 500,000 บาทขึ้นไป ซื้อเดี่ยวได้) · ผู้เยาว์ 0-14 ปี บังคับซื้อ คช. · ผู้เยาว์ต่ำกว่า 15 ปี ทุนสูงสุด 10 ล้านบาท · เลือกได้เพียง 1 แบบ จาก 30 แบบทุนประกันหลัก" },
     { id: "LIFE99", name: "บีแอลเอ ตลอดชีพ 99/99", tag: "แบบประกันหลัก · ชำระเบี้ยถึงอายุ 99 ปี", ageMin: 0, ageMax: 80, coverAge: 99, isMain: true, renewalNote: "เบี้ยคงที่",
-        occNote: "รับได้ทุกชั้นอาชีพ", siNote: "ทุนประกันขั้นต่ำ 50,000 บาท ไม่จำกัดสูงสุด · เลือกได้เพียง 1 แบบ จาก 30 แบบทุนประกันหลัก" },
+        occNote: "รับได้ทุกชั้นอาชีพ", siNote: "ทุนประกันขั้นต่ำ 50,000 บาท ไม่จำกัดสูงสุด (ผู้เยาว์ต่ำกว่า 15 ปี สูงสุด 10 ล้านบาท) · ซื้อสัญญาเพิ่มเติมได้เฉพาะสุขภาพ / OPD / คช. · ผู้เยาว์ 0-14 ปี บังคับซื้อ คช. · เลือกได้เพียง 1 แบบ จาก 30 แบบทุนประกันหลัก" },
     { id: "PRESTIGE", name: "เพรสทีจ ไลฟ์ และเพรสทีจ ไลฟ์ 99/20", tag: "แบบประกันหลัก · เลือกระยะชำระเบี้ย 5/10/15/20 ปี ทุนสูง", ageMin: 0, ageMax: 70, coverAge: 99, isMain: true, renewalNote: "เบี้ยคงที่",
-        occNote: "รับประกันเฉพาะชั้นอาชีพ 1-2 เท่านั้น (ไม่รับชั้นอาชีพ 3)", siNote: "ทุนประกันขั้นต่ำ 5,000,000 บาท ไม่จำกัดสูงสุด · ระยะ 5/10 ปี อายุรับประกันถึง 70 ปี · ระยะ 15/20 ปี อายุรับประกันถึง 65 ปี · ไม่สามารถซื้อ คช. ร่วมกับแบบนี้ได้ · เลือกได้เพียง 1 แบบ จาก 30 แบบทุนประกันหลัก" },
+        occNote: "รับประกันเฉพาะชั้นอาชีพ 1-2 เท่านั้น (ไม่รับชั้นอาชีพ 3)", siNote: "ทุนประกันขั้นต่ำ 5,000,000 บาท ไม่จำกัดสูงสุด · ระยะ 5/10 ปี อายุรับประกันถึง 70 ปี · ระยะ 15/20 ปี อายุรับประกันถึง 65 ปี · ไม่สามารถซื้อ คช. / ฉก. / ฉป. ร่วมกับแบบนี้ได้ · ผู้เยาว์ต่ำกว่า 15 ปี ทุนสูงสุด 10 ล้านบาท · เลือกได้เพียง 1 แบบ จาก 30 แบบทุนประกันหลัก" },
     { id: "UNJAI", name: "บีแอลเอ อุ่นใจ โรคร้าย", tag: "แบบประกันหลัก · แพ็กเกจชีวิต + โรคร้ายแรง 11 โรค", ageMin: 20, ageMax: 75, coverAge: 90, isMain: true, renewalNote: "เบี้ยคงที่",
         occNote: "รับได้ทุกชั้นอาชีพ", siNote: "แพ็กเกจปิด 7 แผนสำเร็จรูป (ทุนชีวิต 50,000 บาทคงที่ + ทุนอีซีแคร์ 100,000-1,000,000 บาท) · ไม่สามารถซื้อสัญญาเพิ่มเติมอื่นเพิ่มได้ · เลือกได้เพียง 1 แบบ จาก 30 แบบทุนประกันหลัก" },
     { id: "CANCERMAX", name: "บีแอลเอ แคนเซอร์ แม็กซ์", tag: "แบบประกันหลัก · แพ็กเกจชีวิต + คุ้มครองมะเร็ง 3 สัญญา", ageMin: 0, ageMax: 70, coverAge: 90, isMain: true, renewalNote: "เบี้ยคงที่",
@@ -2184,7 +2192,7 @@ const PRODUCTS = [
     { id: "HAPPYSAVING", name: "บีแอลเอ แฮปปี้เซฟวิ่ง 99/5 และ 99/10 (มีเงินปันผล)", tag: "แบบประกันหลัก · สร้างมูลค่าออม เลือกชำระเบี้ย 5/10 ปี", ageMin: 0, ageMax: 70, coverAge: 99, isMain: true, renewalNote: "เบี้ยคงที่",
         occNote: "รับได้ทุกชั้นอาชีพ", siNote: "ทุนประกันขั้นต่ำ 50,000 บาท ไม่จำกัดสูงสุด · รับเงินคืนรายปี 4% ของทุนประกันภัยทุกปี + คุ้มครองชีวิตเพิ่มขึ้นตามปีกรมธรรม์ (100%→700%) · เลือกได้เพียง 1 แบบ จาก 30 แบบทุนประกันหลัก" },
     { id: "HAPPYWL", name: "แฮปปี้ โฮลไลฟ์ (มีเงินปันผล)", tag: "แบบประกันหลัก · เลือกระยะชำระเบี้ย 5/10/15 ปี ทุนสูง", ageMin: 0, ageMax: 65, coverAge: 99, isMain: true, renewalNote: "เบี้ยคงที่",
-        occNote: "รับประกันเฉพาะชั้นอาชีพ 1-2 เท่านั้น (ไม่รับชั้นอาชีพ 3)", siNote: "ทุนประกันขั้นต่ำ 500,000 บาท สูงสุด 100,000,000 บาท (รวมทุกกรมธรรม์ตระกูลเพรสทีจา ไลฟ์/แฮปปี้ โฮลไลฟ์) · เลือกได้เพียง 1 แบบ จาก 30 แบบทุนประกันหลัก" },
+        occNote: "รับประกันเฉพาะชั้นอาชีพ 1-2 เท่านั้น (ไม่รับชั้นอาชีพ 3)", siNote: "ทุนประกันขั้นต่ำ 500,000 บาท สูงสุด 100,000,000 บาท (รวมทุกกรมธรรม์ตระกูลเพรสทีจา ไลฟ์/แฮปปี้ โฮลไลฟ์) · ห้ามซื้อ ฉก. / ฉป. และ คช. · เลือกได้เพียง 1 แบบ จาก 30 แบบทุนประกันหลัก" },
     { id: "HRP9920", name: "ห่วงรัก พรีเมียร์ (99/20)", tag: "แบบประกันหลัก · ชำระเบี้ย 20 ปี", ageMin: 0, ageMax: 70, coverAge: 99, isMain: true, renewalNote: "เบี้ยคงที่",
         occNote: "รับได้ทุกชั้นอาชีพ", siNote: "ทุนประกันขั้นต่ำ 200,000 บาท ไม่จำกัดสูงสุด · ทุนต่ำกว่า 500,000 บาท ต้องซื้อสัญญาเพิ่มเติมอย่างน้อย 1 รายการ · ผู้เยาว์อายุ 0-4 ปี ต้องซื้อ คช. · เลือกได้เพียง 1 แบบ จาก 30 แบบทุนประกันหลัก" },
     { id: "HRPDIV", name: "ห่วงรัก พรีเมียร์ (มีเงินปันผล)", tag: "แบบประกันหลัก · เลือกระยะชำระเบี้ย 5/10/15/20 ปี", ageMin: 0, ageMax: 70, coverAge: 99, isMain: true, renewalNote: "เบี้ยคงที่",
@@ -2192,7 +2200,7 @@ const PRODUCTS = [
     { id: "HRP9901", name: "ห่วงรัก พรีเมียร์ 9901 (มีเงินปันผล)", tag: "แบบประกันหลัก · ชำระเบี้ยครั้งเดียว", ageMin: 0, ageMax: 70, coverAge: 99, isMain: true, renewalNote: "เบี้ยคงที่",
         occNote: "รับได้ทุกชั้นอาชีพ", siNote: "ทุนประกันขั้นต่ำ 100,000 บาท ไม่จำกัดสูงสุด · ชำระเบี้ยครั้งเดียว · เลือกได้เพียง 1 แบบ จาก 30 แบบทุนประกันหลัก" },
     { id: "HAPPYWL9901", name: "แฮปปี้ โฮลไลฟ์ 9901 (มีเงินปันผล)", tag: "แบบประกันหลัก · ชำระเบี้ยครั้งเดียว ทุนสูง", ageMin: 0, ageMax: 65, coverAge: 99, isMain: true, renewalNote: "เบี้ยคงที่",
-        occNote: "รับประกันเฉพาะชั้นอาชีพ 1-2 เท่านั้น (ไม่รับชั้นอาชีพ 3)", siNote: "ทุนประกันขั้นต่ำ 500,000 บาท สูงสุด 100,000,000 บาท (รวมทุกกรมธรรม์ตระกูลเพรสทีจา ไลฟ์/แฮปปี้ โฮลไลฟ์) · ชำระเบี้ยครั้งเดียว · เลือกได้เพียง 1 แบบ จาก 30 แบบทุนประกันหลัก" },
+        occNote: "รับประกันเฉพาะชั้นอาชีพ 1-2 เท่านั้น (ไม่รับชั้นอาชีพ 3)", siNote: "ทุนประกันขั้นต่ำ 500,000 บาท สูงสุด 100,000,000 บาท (รวมทุกกรมธรรม์ตระกูลเพรสทีจา ไลฟ์/แฮปปี้ โฮลไลฟ์) · ชำระเบี้ยครั้งเดียว · ห้ามซื้อ ฉก. / ฉป. และ คช. · เลือกได้เพียง 1 แบบ จาก 30 แบบทุนประกันหลัก" },
     { id: "HAPPYKID", name: "กรุงเทพ แฮปปี้ คิดส์ 99/20", tag: "แบบประกันหลัก · สำหรับเด็ก ชำระเบี้ย 20 ปี", ageMin: 0, ageMax: 14, coverAge: 99, isMain: true, renewalNote: "เบี้ยคงที่",
         occNote: "รับได้ทุกชั้นอาชีพ (สำหรับผู้เยาว์)", siNote: "ทุนประกันขั้นต่ำ 150,000 บาท สูงสุด 10,000,000 บาท · แถมฟรีสัญญาเพิ่มเติมเพเยอร์ โพรเทค (ทุพพลภาพผู้ชำระเบี้ย) · ผู้ชำระเบี้ยอายุ 20-55 ปี ต้องซื้อ คช. เพิ่ม (มีค่าเบี้ย) · เลือกได้เพียง 1 แบบ จาก 30 แบบทุนประกันหลัก" },
     { id: "CHAK", name: "เฉพาะกาล (ฉก.)", tag: "คุ้มครองชีวิตเพิ่มเติมชั่วระยะเวลา 5/10/15/18 ปี", ageMin: 15, ageMax: 60, coverAge: 78, renewalNote: "เบี้ยคงที่",
@@ -2784,16 +2792,20 @@ function App() {
             return true; // ต้องมีสัญญาหลักสุขภาพก่อน
         if (p.id === "OPDP" && !(selected.PH && opdpAmountForPh(phPlan) > 0))
             return true; // แนบได้เฉพาะ เพรสทีจ เฮลธ์ ปลดล็อค แผน 20/30 ล้าน
-        if (p.id === "HAPPYCI" && !(selected.SUD || selected.LIFE99 || selected.PRESTIGE || selected.HAPPYSAVING || selected.HAPPYWL || selected.HRP9920 || selected.HRPDIV || selected.HRP9901 || selected.HAPPYWL9901 || selected.HAPPYKID))
+        if (p.id === "HAPPYCI" && !(selected.SUD || selected.PRESTIGE || selected.HAPPYSAVING || selected.HAPPYWL || selected.HRP9920 || selected.HRPDIV || selected.HRP9901 || selected.HAPPYWL9901 || selected.HAPPYKID))
             return true; // ต้องเป็นแบบคุ้มครองถึงอายุ 99 ปี
         if (p.id === "LLC" && selected.PLUS2)
             return true; // ไม่อนุญาตให้ซื้อร่วมกับ คุ้มครอง 2 พลัส
+        if ((p.id === "CHAK" || p.id === "CHAP") && CHAK_FORBIDDEN_MAIN_IDS.some((id) => selected[id]))
+            return true; // เพรสทีจ ไลฟ์ / แฮปปี้ โฮลไลฟ์ / 9901 ห้ามซื้อ ฉก. ฉป.
+        if (selected.LIFE99 && !LIFE99_ALLOWED_RIDER_IDS.includes(p.id))
+            return true; // ตลอดชีพ 99/99 ซื้อได้เฉพาะสัญญาสุขภาพ / OPD / คช.
         return false;
     }
     // รวมรายชื่อแบบประกันที่ "แนะนำ" ตามความกังวลที่ลูกค้าเลือกไว้ทั้งหมด (ใช้ขึ้นป้ายเท่านั้น ไม่ติ๊กเลือกให้อัตโนมัติ)
     // + ถ้าอนุสัญญาที่แนะนำต้องซื้อคู่กับทุนประกันหลัก และยังไม่ได้เลือกทุนหลักไว้ ให้แนะนำทุนหลักที่เบี้ยถูกที่สุดสำหรับอายุนี้มาคู่กันด้วย
     const REQUIRES_ANY_MAIN_IDS = ["ACC", "ACC3", "TPD", "VH", "VHKIDS", "HHP", "RPPR", "HH", "ACC1", "ACC2"]; // ใช้ mainSI ขั้นต่ำ 50,000 บาท จากทุนหลักตัวใดก็ได้
-    const REQUIRES_SPECIFIC_MAIN_IDS = { HAPPYCI: ["SUD", "LIFE99", "PRESTIGE", "HAPPYSAVING", "HAPPYWL", "HRP9920", "HRPDIV", "HRP9901", "HAPPYWL9901", "HAPPYKID"] }; // ต้องเป็นแบบคุ้มครองถึงอายุ 99 ปีเท่านั้น
+    const REQUIRES_SPECIFIC_MAIN_IDS = { HAPPYCI: ["SUD", "PRESTIGE", "HAPPYSAVING", "HAPPYWL", "HRP9920", "HRPDIV", "HRP9901", "HAPPYWL9901", "HAPPYKID"] }; // ต้องเป็นแบบคุ้มครองถึงอายุ 99 ปีเท่านั้น
     const OCC_12_ONLY_IDS = new Set(["SUD", "PLUS2", "PRESTIGE", "HAPPYWL", "HAPPYWL9901"]); // รับประกันเฉพาะชั้นอาชีพ 1-2 เท่านั้น ไม่รับชั้นอาชีพ 3
     // เช็คเงื่อนไขเบื้องต้นก่อนจะแนะนำแบบประกันใดๆ: อายุต้องอยู่ในช่วงรับประกัน และถ้าเป็นแบบที่รับเฉพาะชั้นอาชีพ 1-2 ต้องไม่ใช่ชั้นอาชีพ 3
     function meetsBasicEligibility(id) {
@@ -2832,7 +2844,7 @@ function App() {
         concernRecommendedIds.forEach((id) => {
             let ranked = [];
             if (REQUIRES_ANY_MAIN_IDS.includes(id))
-                ranked = rankMainsForRider(null);
+                ranked = rankMainsForRider(LIFE99_ALLOWED_RIDER_IDS.includes(id) ? null : ["SUD"]); // 99/99 แนบได้เฉพาะสัญญาสุขภาพ
             else if (REQUIRES_SPECIFIC_MAIN_IDS[id])
                 ranked = rankMainsForRider(REQUIRES_SPECIFIC_MAIN_IDS[id]);
             ranked.forEach((mainId, idx) => {
@@ -3008,6 +3020,7 @@ function App() {
         CANCERMAX: "📦 แพ็กเกจปิด (ยกเว้น คช.)",
         HAPPYCI: "🔗 ต้องมีทุนหลักคุ้มครองถึง 99 ปี",
         LLC: "🔗 ต้องมีทุนหลัก (ห้ามคู่ 2 พลัส)",
+        LIFE99: "📋 แนบได้เฉพาะสัญญาสุขภาพ / OPD / คช.",
         OPDP: "🔗 ต้องมี เพรสทีจ เฮลธ์ 20/30 ล้าน",
     };
     function productDisabled(p) {
@@ -5448,6 +5461,8 @@ function App() {
             }
             cards.push({ id: p.id, name: nameFor(p), tag: p.tag, isMain: !!p.isMain, renewalNote: p.renewalNote, premium: r.premium, benefits: finalizeBenefits(p.id, r.benefits, r.premium), highlights: highlightsFor(p.id), category: CATEGORY[p.id] });
         }
+        if (age < 15 && selectedMainId && MINOR_SI_CAP_MAIN_IDS.includes(selectedMainId) && mainSI > MINOR_SI_CAP)
+            errs.push({ product: nameFor(PRODUCTS.find((x) => x.id === selectedMainId)), msg: `ผู้เยาว์อายุต่ำกว่า 15 ปี ทุนประกันแบบตลอดชีพ/คุ้มครองจำกัดเวลา สูงสุด ${baht(MINOR_SI_CAP)} (รวมทุกกรมธรรม์ ตามระเบียบการรับประกัน)` });
         if (csRequired && !selected.CS)
             errs.push({ product: "คช. คุ้มครองการชำระเบี้ย", msg: `แบบ ${(PRODUCTS.find((x) => x.id === csRequiredMainId) || {}).name} กำหนดให้ผู้เยาว์ต้องซื้อ คช. ด้วย` });
         if (errs.length > 0) {
@@ -6083,7 +6098,7 @@ const CHOICE_BADGES = {
     ACC: { n: 4, unit: "แผน", detail: "ทุน 200,000–1,000,000 บาท" },
     ACC3: { n: 3, unit: "แผน", detail: "ค่ารักษา 5,000–15,000 บาท/ครั้ง" },
     VH: { n: 4, unit: "แผน", detail: "แผน 2,000–5,000 บาท" },
-    VHKIDS: { n: 3, unit: "แผน", detail: "แผน 3,000–5,000 บาท" },
+    VHKIDS: { n: 4, unit: "แผน", detail: "แผน 2,000–5,000 บาท" },
     HH: { n: 3, unit: "แผน", detail: "วงเงิน 1–10 ล้านบาท/ปี" },
     HHP: { n: 3, unit: "แผน", detail: "วงเงิน 1–10 ล้านบาท/ปี" },
     PH: { n: 5, unit: "แผน", detail: "วงเงิน 20–200 ล้านบาท/ปี" },
@@ -6508,7 +6523,7 @@ const FREQ = {
   monthly: { label: "\u0E23\u0E32\u0E22\u0E40\u0E14\u0E37\u0E2D\u0E19", perYear: 12, min: 200 }
 };
 const ROUNDING_EDGE = 0.49;
-const APP_VERSION = "สุดคุ้ม v1.6 · 2026-10-12";
+const APP_VERSION = "สุดคุ้ม v1.7 · 2026-10-13";
 const fmt = (n) => Math.round(n || 0).toLocaleString("en-US", { maximumFractionDigits: 0 });
 // ค่านายหน้าปีที่ 1 (%) — ตาราง 7 "ค่าตอบแทนสำหรับตัวแทน" 10-09-2026
 // ผู้ใหญ่ (กรุงเทพ สุดคุ้ม รบข.12/2567): [ทุน <300,000 / 300,000-599,999 / 600,000 ขึ้นไป] x [อายุ 15-45 / 46-55 / 56-65]
@@ -7371,14 +7386,14 @@ function SudKoomDashboard({ onBack }) {
       className: "mt-2 text-[18px] text-blue-700 font-medium underline"
     },
     "\u0E01\u0E25\u0E31\u0E1A\u0E44\u0E1B\u0E40\u0E25\u0E37\u0E2D\u0E01\u0E2D\u0E31\u0E15\u0E42\u0E19\u0E21\u0E31\u0E15\u0E34\u0E15\u0E32\u0E21\u0E2D\u0E32\u0E22\u0E38"
-  )), /* @__PURE__ */ React.createElement("div", { className: "mb-5" }, /* @__PURE__ */ React.createElement("div", { className: "text-[21px] text-slate-500 mb-2 font-medium" }, "\u0E41\u0E1A\u0E1A\u0E1B\u0E23\u0E30\u0E01\u0E31\u0E19"), /* @__PURE__ */ React.createElement("div", { className: "grid grid-cols-3 gap-2" }, Object.keys(product.plans).map((p) => /* @__PURE__ */ React.createElement("button", { key: p, onClick: () => setPlan(p), className: `${pillBase} ${plan === p ? pillOn : pillOff}` }, p))), /* @__PURE__ */ React.createElement("div", { className: "text-[21px] text-slate-400 mt-2" }, "\u0E23\u0E30\u0E22\u0E30\u0E40\u0E27\u0E25\u0E32\u0E40\u0E2D\u0E32\u0E1B\u0E23\u0E30\u0E01\u0E31\u0E19 ", planMeta.term, " \u0E1B\u0E35 \xB7 \u0E0A\u0E33\u0E23\u0E30\u0E40\u0E1A\u0E35\u0E49\u0E22 ", planMeta.pay, " \u0E1B\u0E35 \xB7 \u0E40\u0E07\u0E34\u0E19\u0E04\u0E37\u0E19\u0E1E\u0E34\u0E40\u0E28\u0E29 ", (planMeta.bonus * 100).toFixed(0), "%")), /* @__PURE__ */ React.createElement("div", { className: "grid grid-cols-2 gap-3 mb-2" }, /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { className: "text-[21px] text-slate-500 mb-2 font-medium" }, "วันเกิด (พ.ศ.)"), /* @__PURE__ */ React.createElement(DobInput, { value: dob, onChange: setDob, className: inputCls + " placeholder:text-slate-300" })), /* @__PURE__ */ React.createElement("div", { className: "col-span-2 order-last" }, /* @__PURE__ */ React.createElement("div", { className: "text-[21px] text-slate-500 mb-2 font-medium" }, "\u0E40\u0E1E\u0E28"), /* @__PURE__ */ React.createElement("div", { className: "grid grid-cols-2 gap-2" }, /* @__PURE__ */ React.createElement("button", { onClick: () => setGender("male"), className: `${pillBase} ${gender === "male" ? pillOn : pillOff}` }, "\u0E0A\u0E32\u0E22"), /* @__PURE__ */ React.createElement("button", { onClick: () => setGender("female"), className: `${pillBase} ${gender === "female" ? pillOn : pillOff}` }, "\u0E2B\u0E0D\u0E34\u0E07"))), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { className: "text-[21px] text-slate-500 mb-2 font-medium" }, "\u0E2D\u0E32\u0E22\u0E38 (", product.minAge, "\u2013", product.maxAge, " \u0E1B\u0E35)"), /* @__PURE__ */ React.createElement(
+  )), /* @__PURE__ */ React.createElement("div", { className: "mb-5" }, /* @__PURE__ */ React.createElement("div", { className: "text-[21px] text-slate-500 mb-2 font-medium" }, "\u0E41\u0E1A\u0E1A\u0E1B\u0E23\u0E30\u0E01\u0E31\u0E19"), /* @__PURE__ */ React.createElement("div", { className: "grid grid-cols-3 gap-2" }, Object.keys(product.plans).map((p) => /* @__PURE__ */ React.createElement("button", { key: p, onClick: () => setPlan(p), className: `${pillBase} ${plan === p ? pillOn : pillOff}` }, p))), /* @__PURE__ */ React.createElement("div", { className: "text-[21px] text-slate-400 mt-2" }, "\u0E23\u0E30\u0E22\u0E30\u0E40\u0E27\u0E25\u0E32\u0E40\u0E2D\u0E32\u0E1B\u0E23\u0E30\u0E01\u0E31\u0E19 ", planMeta.term, " \u0E1B\u0E35 \xB7 \u0E0A\u0E33\u0E23\u0E30\u0E40\u0E1A\u0E35\u0E49\u0E22 ", planMeta.pay, " \u0E1B\u0E35 \xB7 \u0E40\u0E07\u0E34\u0E19\u0E04\u0E37\u0E19\u0E1E\u0E34\u0E40\u0E28\u0E29 ", (planMeta.bonus * 100).toFixed(0), "%")), /* @__PURE__ */ React.createElement("div", { className: "grid grid-cols-2 gap-3 mb-2" }, /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { className: "text-[21px] text-slate-500 mb-2 font-medium" }, "วันเกิด (พ.ศ.)"), /* @__PURE__ */ React.createElement(DobInput, { value: dob, onChange: setDob, className: inputCls + " placeholder:text-slate-300" })), /* @__PURE__ */ React.createElement("div", { className: "col-span-2 order-first" }, /* @__PURE__ */ React.createElement("div", { className: "text-[21px] text-slate-500 mb-2 font-medium" }, "\u0E40\u0E1E\u0E28"), /* @__PURE__ */ React.createElement("div", { className: "grid grid-cols-2 gap-2" }, /* @__PURE__ */ React.createElement("button", { onClick: () => setGender("male"), className: `${pillBase} ${gender === "male" ? pillOn : pillOff}` }, "\u0E0A\u0E32\u0E22"), /* @__PURE__ */ React.createElement("button", { onClick: () => setGender("female"), className: `${pillBase} ${gender === "female" ? pillOn : pillOff}` }, "\u0E2B\u0E0D\u0E34\u0E07"))), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { className: "text-[21px] text-slate-500 mb-2 font-medium" }, "\u0E2D\u0E32\u0E22\u0E38 (", product.minAge, "\u2013", product.maxAge, " \u0E1B\u0E35)"), /* @__PURE__ */ React.createElement(
     NumberField,
     {
       value: age,
       onChange: (raw) => { if (dob && String(dobAgeInRange(dob, 0, 99)) !== String(raw)) setDob(""); setAge(raw); },
       className: `${inputCls} ${ageOutOfRange ? "border-orange-400 focus:border-orange-500" : ""}`
     }
-  ))), ageOutOfRange && /* @__PURE__ */ React.createElement("div", { className: "mb-4 text-[21px] text-orange-600 flex gap-1.5" }, /* @__PURE__ */ React.createElement(Info, { size: 16, className: "shrink-0 mt-0.5" }), product.productName, " \u0E23\u0E31\u0E1A\u0E1B\u0E23\u0E30\u0E01\u0E31\u0E19\u0E20\u0E31\u0E22\u0E17\u0E35\u0E48\u0E2D\u0E32\u0E22\u0E38 ", product.minAge, "\u2013", product.maxAge, " \u0E1B\u0E35\u0E40\u0E17\u0E48\u0E32\u0E19\u0E31\u0E49\u0E19 \u0E01\u0E23\u0E38\u0E13\u0E32\u0E01\u0E23\u0E2D\u0E01\u0E2D\u0E32\u0E22\u0E38\u0E43\u0E19\u0E0A\u0E48\u0E27\u0E07\u0E19\u0E35\u0E49\u0E40\u0E1E\u0E37\u0E48\u0E2D\u0E04\u0E33\u0E19\u0E27\u0E13\u0E1C\u0E25\u0E1B\u0E23\u0E30\u0E42\u0E22\u0E0A\u0E19\u0E4C"), isKids && /* @__PURE__ */ React.createElement("div", { className: "mb-5 pt-4 border-t border-sky-100" }, /* @__PURE__ */ React.createElement("div", { className: "text-[21px] text-slate-500 mb-2 font-medium" }, "\u0E02\u0E49\u0E2D\u0E21\u0E39\u0E25\u0E1C\u0E39\u0E49\u0E1B\u0E01\u0E04\u0E23\u0E2D\u0E07 (\u0E1C\u0E39\u0E49\u0E0A\u0E33\u0E23\u0E30\u0E40\u0E1A\u0E35\u0E49\u0E22) \u2014 \u0E2A\u0E33\u0E2B\u0E23\u0E31\u0E1A\u0E04\u0E33\u0E19\u0E27\u0E13\u0E40\u0E1A\u0E35\u0E49\u0E22 \u0E04\u0E0A."), /* @__PURE__ */ React.createElement("div", { className: "grid grid-cols-2 gap-3" }, /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { className: "text-[21px] text-slate-500 mb-2 font-medium" }, "วันเกิด (พ.ศ.)"), /* @__PURE__ */ React.createElement(DobInput, { value: guardianDob, onChange: setGuardianDob, className: inputCls + " placeholder:text-slate-300" })), /* @__PURE__ */ React.createElement("div", { className: "col-span-2 order-last" }, /* @__PURE__ */ React.createElement("div", { className: "text-[21px] text-slate-500 mb-2 font-medium" }, "\u0E40\u0E1E\u0E28\u0E1C\u0E39\u0E49\u0E1B\u0E01\u0E04\u0E23\u0E2D\u0E07"), /* @__PURE__ */ React.createElement("div", { className: "grid grid-cols-2 gap-2" }, /* @__PURE__ */ React.createElement("button", { onClick: () => setGuardianGender("male"), className: `${pillBase} ${guardianGender === "male" ? pillOn : pillOff}` }, "\u0E0A\u0E32\u0E22"), /* @__PURE__ */ React.createElement("button", { onClick: () => setGuardianGender("female"), className: `${pillBase} ${guardianGender === "female" ? pillOn : pillOff}` }, "\u0E2B\u0E0D\u0E34\u0E07"))), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { className: "text-[21px] text-slate-500 mb-2 font-medium" }, "\u0E2D\u0E32\u0E22\u0E38\u0E1C\u0E39\u0E49\u0E1B\u0E01\u0E04\u0E23\u0E2D\u0E07 (20\u201355 \u0E1B\u0E35)"), /* @__PURE__ */ React.createElement(
+  ))), ageOutOfRange && /* @__PURE__ */ React.createElement("div", { className: "mb-4 text-[21px] text-orange-600 flex gap-1.5" }, /* @__PURE__ */ React.createElement(Info, { size: 16, className: "shrink-0 mt-0.5" }), product.productName, " \u0E23\u0E31\u0E1A\u0E1B\u0E23\u0E30\u0E01\u0E31\u0E19\u0E20\u0E31\u0E22\u0E17\u0E35\u0E48\u0E2D\u0E32\u0E22\u0E38 ", product.minAge, "\u2013", product.maxAge, " \u0E1B\u0E35\u0E40\u0E17\u0E48\u0E32\u0E19\u0E31\u0E49\u0E19 \u0E01\u0E23\u0E38\u0E13\u0E32\u0E01\u0E23\u0E2D\u0E01\u0E2D\u0E32\u0E22\u0E38\u0E43\u0E19\u0E0A\u0E48\u0E27\u0E07\u0E19\u0E35\u0E49\u0E40\u0E1E\u0E37\u0E48\u0E2D\u0E04\u0E33\u0E19\u0E27\u0E13\u0E1C\u0E25\u0E1B\u0E23\u0E30\u0E42\u0E22\u0E0A\u0E19\u0E4C"), isKids && /* @__PURE__ */ React.createElement("div", { className: "mb-5 pt-4 border-t border-sky-100" }, /* @__PURE__ */ React.createElement("div", { className: "text-[21px] text-slate-500 mb-2 font-medium" }, "\u0E02\u0E49\u0E2D\u0E21\u0E39\u0E25\u0E1C\u0E39\u0E49\u0E1B\u0E01\u0E04\u0E23\u0E2D\u0E07 (\u0E1C\u0E39\u0E49\u0E0A\u0E33\u0E23\u0E30\u0E40\u0E1A\u0E35\u0E49\u0E22) \u2014 \u0E2A\u0E33\u0E2B\u0E23\u0E31\u0E1A\u0E04\u0E33\u0E19\u0E27\u0E13\u0E40\u0E1A\u0E35\u0E49\u0E22 \u0E04\u0E0A."), /* @__PURE__ */ React.createElement("div", { className: "grid grid-cols-2 gap-3" }, /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { className: "text-[21px] text-slate-500 mb-2 font-medium" }, "วันเกิด (พ.ศ.)"), /* @__PURE__ */ React.createElement(DobInput, { value: guardianDob, onChange: setGuardianDob, className: inputCls + " placeholder:text-slate-300" })), /* @__PURE__ */ React.createElement("div", { className: "col-span-2 order-first" }, /* @__PURE__ */ React.createElement("div", { className: "text-[21px] text-slate-500 mb-2 font-medium" }, "\u0E40\u0E1E\u0E28\u0E1C\u0E39\u0E49\u0E1B\u0E01\u0E04\u0E23\u0E2D\u0E07"), /* @__PURE__ */ React.createElement("div", { className: "grid grid-cols-2 gap-2" }, /* @__PURE__ */ React.createElement("button", { onClick: () => setGuardianGender("male"), className: `${pillBase} ${guardianGender === "male" ? pillOn : pillOff}` }, "\u0E0A\u0E32\u0E22"), /* @__PURE__ */ React.createElement("button", { onClick: () => setGuardianGender("female"), className: `${pillBase} ${guardianGender === "female" ? pillOn : pillOff}` }, "\u0E2B\u0E0D\u0E34\u0E07"))), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { className: "text-[21px] text-slate-500 mb-2 font-medium" }, "\u0E2D\u0E32\u0E22\u0E38\u0E1C\u0E39\u0E49\u0E1B\u0E01\u0E04\u0E23\u0E2D\u0E07 (20\u201355 \u0E1B\u0E35)"), /* @__PURE__ */ React.createElement(
     NumberField,
     {
       value: guardianAge,
