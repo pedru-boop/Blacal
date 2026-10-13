@@ -8,7 +8,7 @@ const BRAND = {
     ink: "#000000", sub: "#404040", danger: "#B93232", warn: "#6B4508",
     label: "#000000", nameBlue: "#1668D6", mainBlue: "#0C2F63", dataBlack: "#000000",
 };
-const APP_VERSION = "v2.43.1 (2569-10-13)";
+const APP_VERSION = "v2.44.0 (2569-10-13)";
 const RATE_SOURCE = "อัตราเบี้ยตามคู่มือตัวแทน V.14 (14-02-2026)"; // วันที่ตารางค่าคอมอยู่ในป๊อปอัปค่าคอม (ตัวแทนเท่านั้น)
 const CASES_KEY = "blacal-cases-v1"; // อัปเดตเลขนี้ทุกครั้งที่มีการแก้ไข/เพิ่มแบบประกันใหม่ เพื่อให้รู้ว่าไฟล์ที่ใช้อยู่เป็นเวอร์ชันล่าสุดหรือไม่
 const fmt = (n) => (n === null || n === undefined || isNaN(n) ? "0" : Math.round(n).toLocaleString("th-TH"));
@@ -842,25 +842,30 @@ function buildQuoteText(q) {
     out.push("", ...(q.notes || shareNotes([])));
     return out.join("\n");
 }
-// ===== ตารางเทียบแผนสุขภาพ (แฮปปี้ เฮลธ์ / พรีเมียร์ / แวลู เฮลธ์ / คิดส์ / เพรสทีจ เฮลธ์) =====
-// c = { name, gender, age, customer, agent, note, cols:[{label, ok, msg}], premiumRows:[{k, cur, vals:[]}], benefitRows:[{k, vals:[]}], notes }
+// ===== ตารางเทียบแพ็กเกจ: ทุนหลัก + สัญญาเพิ่มเติมที่เลือกไว้คงเดิม เปลี่ยนเฉพาะแผนสุขภาพ 1 แบบ =====
+// c = { name, gender, age, customer, agent, note, payLabel, cols:[{label, ok, msg}], premiumRows:[{k, vals}], totalRow, totalYearRow,
+//       blocks:[{ name, same, rows:[{k, vals, same}] }], notes }
+function compareFmtVal(v) { return v == null || v === "" ? "-" : String(v); }
 function buildCompareText(c) {
     const out = [];
+    const okIdx = c.cols.map((col, i) => (col.ok ? i : -1)).filter((i) => i >= 0);
+    const lbl = (i) => c.cols[i].label;
     if (c.customer) out.push(`เรียน คุณ${c.customer}`, "");
-    out.push(`📊 เปรียบเทียบแผน · ${c.name}`);
+    out.push(`📊 เปรียบเทียบแพ็กเกจ · เปลี่ยนแผน ${c.name}`);
     out.push(`👤 ${c.gender === "female" ? "เพศหญิง" : "เพศชาย"} อายุ ${c.age} ปี${c.note ? " · " + c.note : ""}`);
-    const okCols = c.cols.map((col, i) => ({ col, i })).filter((x) => x.col.ok);
-    out.push("", "━━ 💳 เบี้ยประกันรายปี ━━");
-    out.push(`(${okCols.map(({ col }) => col.label).join(" | ")})`);
-    c.premiumRows.forEach((r) => {
-        out.push(`• ${r.k}${r.cur ? " (ปีนี้)" : ""}: ${okCols.map(({ i }) => (r.vals[i] == null ? "-" : fmt(r.vals[i]))).join(" | ")}`);
-    });
+    out.push(`🔀 ทางเลือก: ${okIdx.map((i, n) => `${n + 1}) ${lbl(i)}`).join("  ")}`);
+    out.push("", `━━ 💳 เบี้ยประกัน (${c.payLabel}) ━━`);
+    c.premiumRows.forEach((r) => out.push(`• ${r.k}: ${okIdx.map((i) => (r.vals[i] == null ? "-" : fmt(r.vals[i]))).join(" | ")}`));
+    out.push(`💰 ${c.totalRow.k}: ${okIdx.map((i) => fmt(c.totalRow.vals[i])).join(" | ")}`);
+    if (c.totalYearRow) out.push(`   ${c.totalYearRow.k}: ${okIdx.map((i) => fmt(c.totalYearRow.vals[i])).join(" | ")}`);
     out.push("", "━━ 🏥 ความคุ้มครอง ━━");
-    c.benefitRows.forEach((r) => {
-        const show = (i) => (r.vals[i] == null || r.vals[i] === "" ? "-" : r.vals[i]);
-        if (!r.diff && okCols.every(({ i }) => r.vals[i] != null)) { out.push(`• ${r.k}: ${show(okCols[0].i)} (ทุกแผน)`); return; }
-        out.push(`• ${r.k}`);
-        okCols.forEach(({ col, i }) => out.push(`   ${col.label}: ${show(i)}`));
+    c.blocks.forEach((bl) => {
+        if (!bl.rows.length) return;
+        out.push("", `▸ ${bl.name}${bl.same ? " (เหมือนกันทุกแผน)" : ""}`);
+        bl.rows.forEach((r) => {
+            if (bl.same || r.same) { out.push(`  - ${r.k}: ${compareFmtVal(r.vals[okIdx[0]])}${!bl.same ? " (ทุกแผน)" : ""}`); return; }
+            out.push(`  - ${r.k}: ${okIdx.map((i) => compareFmtVal(r.vals[i])).join(" | ")}`);
+        });
     });
     out.push("", "————————");
     if (c.agent.name) out.push(c.agent.name);
@@ -872,29 +877,41 @@ function buildCompareText(c) {
 function drawCompareImage(c) {
     const P = IMG_P, W = IMG_W;
     const L = makeImgLayout();
-    const cols = c.cols.map((col, i) => ({ col, i })).filter((x) => x.col.ok);
-    const n = Math.max(cols.length, 1);
+    const okIdx = c.cols.map((col, i) => (col.ok ? i : -1)).filter((i) => i >= 0);
+    const n = Math.max(okIdx.length, 1);
     const labelW = (W - P * 2) * (n >= 5 ? 0.28 : 0.32);
     const colW = (W - P * 2 - labelW) / n;
     const fs = n >= 5 ? 21 : 23, lh = n >= 5 ? 29 : 32;
-    let y = imgHeader(L, "เปรียบเทียบแผนประกันสุขภาพ", c.name);
+    let y = imgHeader(L, "เปรียบเทียบแพ็กเกจประกัน", "เปลี่ยนแผน " + c.name);
     y = imgCustomer(L, c, y, c.note ? " · " + c.note : "");
-    const row = (label, vals, opts) => {
+    const bg = (start, h, color) => L.ops.splice(start, 0, { t: "rect", x: P - 12, y, w: W - P * 2 + 24, h, color });
+    // vals: array (หนึ่งค่าต่อคอลัมน์) หรือ string (รวมเป็นช่องเดียวทุกแผน)
+    const row = (label, vals, o) => {
         const pad = 10, start = L.ops.length;
-        let h = L.para(P, y + pad, label, opts.head ? fs : fs - 1, opts.head ? 600 : 500, opts.head ? "#FFFFFF" : BRAND.sub, labelW - 12, lh);
-        vals.forEach((v, j) => { h = Math.max(h, L.para(P + labelW + colW * j + 6, y + pad, v, fs, 600, opts.head ? "#FFFFFF" : (opts.cur ? BRAND.greenDeep : BRAND.navy), colW - 12, lh)); });
+        const head = o.head, color = head ? "#FFFFFF" : (o.total ? BRAND.greenDeep : BRAND.navy);
+        let h = L.para(P, y + pad, label, head ? fs : fs - 1, head || o.total ? 600 : 500, head ? "#FFFFFF" : (o.total ? BRAND.navyDeep : BRAND.sub), labelW - 12, lh);
+        if (typeof vals === "string") h = Math.max(h, L.para(P + labelW + 6, y + pad, vals, fs - 1, 500, BRAND.navy, W - P * 2 - labelW - 12, lh));
+        else vals.forEach((v, j) => { h = Math.max(h, L.para(P + labelW + colW * j + 6, y + pad, v, fs, 600, color, colW - 12, lh)); });
         h += pad * 2;
-        if (opts.head) L.ops.splice(start, 0, { t: "rect", x: P - 12, y, w: W - P * 2 + 24, h, color: BRAND.navy });
-        else if (opts.shade) L.ops.splice(start, 0, { t: "rect", x: P - 12, y, w: W - P * 2 + 24, h, color: opts.diff ? "#F3FBEF" : BRAND.bg });
-        else if (opts.diff) L.ops.splice(start, 0, { t: "rect", x: P - 12, y, w: W - P * 2 + 24, h, color: "#F7FCF3" });
+        if (head) bg(start, h, BRAND.navy); else if (o.total) bg(start, h, "#E8F6DD"); else if (o.diff) bg(start, h, "#F3FBEF"); else if (o.shade) bg(start, h, BRAND.bg);
         y += h;
     };
     const section = (t) => { y += 18; y += L.para(P, y, t, 28, 600, BRAND.navyDeep, W - P * 2, 40) + 6; };
-    row("แผน", cols.map(({ col }) => col.label), { head: true });
-    section("💳 เบี้ยประกันรายปี");
-    c.premiumRows.forEach((r, k) => row(r.k + (r.cur ? " (ปีนี้)" : ""), cols.map(({ i }) => (r.vals[i] == null ? "-" : fmt(r.vals[i]))), { shade: k % 2 === 0, cur: r.cur }));
+    row("ทางเลือก", okIdx.map((i) => c.cols[i].label), { head: true });
+    section(`💳 เบี้ยประกัน (${c.payLabel})`);
+    c.premiumRows.forEach((r, k) => row(r.k, okIdx.map((i) => (r.vals[i] == null ? "-" : fmt(r.vals[i]))), { shade: k % 2 === 0 }));
+    row(c.totalRow.k, okIdx.map((i) => fmt(c.totalRow.vals[i])), { total: true });
+    if (c.totalYearRow) row(c.totalYearRow.k, okIdx.map((i) => fmt(c.totalYearRow.vals[i])), { shade: true });
     section("🏥 ความคุ้มครอง");
-    c.benefitRows.forEach((r, k) => row(r.k, cols.map(({ i }) => (r.vals[i] == null || r.vals[i] === "" ? "-" : String(r.vals[i]))), { shade: k % 2 === 0, diff: r.diff }));
+    c.blocks.forEach((bl) => {
+        if (!bl.rows.length) return;
+        y += 8; y += L.para(P, y, `▸ ${bl.name}${bl.same ? " — เหมือนกันทุกแผน" : ""}`, 25, 600, BRAND.navy, W - P * 2, 36) + 4;
+        if (bl.same) { row("ความคุ้มครอง", bl.rows.map((r) => `• ${r.k}: ${compareFmtVal(r.vals[okIdx[0]])}`).join("\n"), { shade: true }); return; }
+        bl.rows.forEach((r, k) => {
+            if (r.same) row(r.k, compareFmtVal(r.vals[okIdx[0]]) + " (ทุกแผน)", { shade: k % 2 === 0 });
+            else row(r.k, okIdx.map((i) => compareFmtVal(r.vals[i])), { diff: true });
+        });
+    });
     y = imgFooter(L, c, y);
     return renderImgLayout(L, y);
 }
@@ -2367,7 +2384,7 @@ function App() {
     const [phDeduct, setPhDeduct] = useState(null);
     const [phArea, setPhArea] = useState("thailand");
     // ค่าแผนสุขภาพปัจจุบัน — ใช้เป็นค่าเริ่มต้นเมื่อคำนวณแผนอื่นเพื่อเทียบ (calcVH/HH/HHP/VHKIDS/PH และตารางเบี้ยรับ ov ได้)
-    const CUR = { vhPlan, vhkidsPlan, hhpPlan, hhpDeduct, hhPlan, hhDeduct, phPlan, phDeduct, phArea };
+    const CUR = { vhPlan, vhkidsPlan, hhpPlan, hhpDeduct, hhPlan, hhDeduct, phPlan, phDeduct, phArea, opdPlan };
     const [psave104SI, setPsave104SI] = useState(0);
     const [psave126SI, setPsave126SI] = useState(0);
     const [hs208SI, setHs208SI] = useState(0);
@@ -3092,7 +3109,7 @@ function App() {
             return mainDisabled(p);
         return riderDisabled(p);
     }
-    const compareBtn = (id) => React.createElement("button", { onClick: () => setHealthCompare(id), className: "w-full mt-2 rounded-xl py-2.5 text-[19px] font-semibold", style: { background: "#FFFFFF", color: BRAND.navy, border: `1.5px solid ${BRAND.sky}` } }, "📊 เทียบทุกแผน (เบี้ย + ความคุ้มครอง)");
+    const compareBtn = (id) => React.createElement("button", { onClick: () => setHealthCompare(id), className: "w-full mt-2 rounded-xl py-2.5 text-[19px] font-semibold", style: { background: "#FFFFFF", color: BRAND.navy, border: `1.5px solid ${BRAND.sky}` } }, "📊 เทียบแผนนี้ทั้งแพ็กเกจ (เบี้ยรวม + ความคุ้มครอง)");
     function renderProductChildren(p) {
         switch (p.id) {
             case "CS": return selected.CS && (React.createElement(React.Fragment, null,
@@ -3923,7 +3940,7 @@ function App() {
                 ["หมายเหตุ", "*หมวดที่ 9-11 ใช้วงเงินตามเอกสารแนบ โปรดตรวจสอบตัวเลขแยกแต่ละหมวดกับตารางฉบับเต็มก่อนนำเสนอลูกค้า"],
             ] };
     }
-    function calcCS() {
+    function calcCS(ov) {
         if (age < 0 || age > 14)
             return { ok: false, msg: "คช. คุ้มครองเฉพาะผู้เยาว์อายุแรกเกิด - 14 ปีเท่านั้น (อ้างอิงอายุด้านบนสุด)" };
         if (csForbiddenMainId)
@@ -3949,7 +3966,7 @@ function App() {
         const rate = table[durIdx][bi];
         if (rate === null || rate === undefined)
             return { ok: false, msg: "ช่วงอายุ/ระยะเวลานี้เกินเงื่อนไขคุ้มครองสูงสุดถึงอายุ 65 ปีของผู้ปกครอง" };
-        const baseSum = grandTotal();
+        const baseSum = ov && ov.baseSum != null ? ov.baseSum : grandTotal();
         const premium = (baseSum * rate) / 100;
         return { ok: true, premium, benefits: [
                 ["อายุผู้เยาว์ (ผู้เอาประกันภัย, อ้างอิงจากอายุด้านบนสุด)", age + " ปี"],
@@ -3959,7 +3976,10 @@ function App() {
                 ["หากผู้ชำระเบี้ย (ผู้ปกครอง) เสียชีวิต หรือทุพพลภาพโดยสิ้นเชิง", `บริษัทยกเว้นการชำระเบี้ย (ไม่ต้องจ่ายเบี้ย) ของกรมธรรม์นี้ จนผู้ปกครองอายุครบ 65 ปี หรือเด็กอายุครบ 21 ปี หรือสิ้นสุดระยะชำระเบี้ยของกรมธรรม์หลัก แล้วแต่ถึงก่อน (แผนนี้ ${csDuration} ปี)`],
             ] };
     }
-    function calcOPD() {
+    function calcOPD(ov) {
+        const { vhPlan, vhkidsPlan, phPlan } = Object.assign({}, CUR, ov || {});
+        let opdPlan = ov && ov.opdPlan != null ? ov.opdPlan : CUR.opdPlan;
+        let capNote = "";
         const bi = bandIndex(age, OPD_BANDS);
         if (bi < 0)
             return { ok: false, msg: "อายุรับประกัน 1-80 ปี (ชำระเบี้ยได้ถึงอายุ 98 ปี)" };
@@ -3989,13 +4009,17 @@ function App() {
             if (maxOpd < OPD_PLANS[0])
                 return { ok: false, msg: "วงเงิน OPD รวมเต็ม 2,000 บาทแล้ว (OPD สบายใจ เพรสทีจ 2,000) จึงซื้อ OPD สบายใจ เพิ่มไม่ได้" };
         }
+        if (ov && ov.autoCap && opdPlan > maxOpd) { // ตารางเทียบแพ็กเกจ: ลดวงเงิน OPD ให้เท่าที่แผนนั้นซื้อได้
+            const capped = OPD_PLANS.filter((x) => x <= maxOpd).pop();
+            if (capped) { capNote = `ปรับวงเงิน OPD เป็น ${baht(capped)} อัตโนมัติ (แผนนี้ซื้อได้สูงสุด ${baht(maxOpd)})`; opdPlan = capped; }
+        }
         const pi = OPD_PLANS.indexOf(opdPlan);
         if (pi < 0)
             return { ok: false, msg: "กรุณาเลือกวงเงินผลประโยชน์ต่อครั้ง" };
         if (opdPlan > maxOpd)
             return { ok: false, msg: `วงเงินสูงสุดที่ซื้อได้ตอนนี้คือ ${baht(maxOpd)} ต่อครั้ง (ขึ้นกับค่าห้องของ ${sourceNote})` };
         const premium = OPD_RATES[bi][pi];
-        return { ok: true, premium, benefits: [
+        return { ok: true, premium, capNote, opdPlan, benefits: [
                 ["ผลประโยชน์ต่อครั้ง", "จ่ายตามจริง ไม่เกิน " + baht(opdPlan) + " (สูงสุด 1 ครั้ง/วัน ไม่เกิน 30 ครั้ง/รอบปีกรมธรรม์)"],
                 ["วงเงินสูงสุดที่ซื้อได้ตามสัญญาหลักที่แนบ", baht(maxOpd) + ` (อ้างอิง ${sourceNote})`],
                 ["ความคุ้มครอง (ผู้ป่วยนอก)", "ค่าแพทย์ ค่าบริการพยาบาลและโรงพยาบาลกรณีผู้ป่วยนอก ค่ายา ค่าตรวจทางเทคนิคการแพทย์และรังสีวิทยา ค่ากายภาพบำบัด ค่าเครื่องมือและอุปกรณ์การแพทย์"],
@@ -4029,7 +4053,8 @@ function App() {
                 ["ระยะเวลาคุ้มครอง", "สัญญาปีต่อปี รับประกันอายุ 11-80 ปี ต่ออายุได้ถึงอายุ 98 ปี"],
             ] };
     }
-    function calcOPDP() {
+    function calcOPDP(ov) {
+        const phPlan = ov && ov.phPlan != null ? ov.phPlan : CUR.phPlan;
         if (age < 11 || age > 80)
             return { ok: false, msg: "อายุรับประกัน 11-80 ปี (ชำระเบี้ยได้ถึงอายุ 98 ปี)" };
         const amt = selected.PH ? opdpAmountForPh(phPlan) : 0;
@@ -5534,28 +5559,65 @@ function App() {
         const cfg = HEALTH_COMPARE[id];
         if (!cfg) return null;
         const prod = PRODUCTS.find((x) => x.id === id) || {};
-        const cols = cfg.plans().map((p) => {
-            const r = cfg.calc(p);
-            if (!r.ok) return { plan: p, label: cfg.label(p), ok: false, msg: r.msg, rows: [] };
-            // ข้อความวงเงินร่วมหมวด (เฉพาะบางแผน) ย้ายจากหัวข้อมาไว้ในค่า เพื่อให้หัวข้อตรงกันทุกแผน
-            const rows = customerBenefits(finalizeBenefits(id, r.benefits, r.premium), id).filter(([k]) => k !== "ลดหย่อนภาษี").map(([k, v]) => {
-                const m = k.match(/^(.*?) — แผนนี้ใช้วงเงินก้อนเดียวกันร่วมกับหมวดที่ (\S+)/);
-                const v2 = String(v).replace(/^แผน \d+ · /, "");
-                return m ? [m[1], `${v2} (รวมกับหมวด ${m[2]})`] : [k, v2];
+        const mode = allowedPayModes.includes(payMode) ? payMode : "year";
+        const modeDef = PAY_MODE.find((m) => m.key === mode);
+        const factorOf = (pid) => ((mode === "year" || isSinglePremiumMain(pid)) ? 1 : (pid === "HS2515" && mode === "month") ? 1 / 12 : modeDef.factor);
+        const items = PRODUCTS_DISPLAY.filter((p) => selected[p.id] || p.id === id);
+        const cols = cfg.plans().map((plan) => {
+            const ov = cfg.ov(plan);
+            const res = {};
+            let baseSum = 0;
+            items.forEach((p) => {
+                if (p.id === "CS") return;
+                const r = p.id === id ? cfg.calc(plan)
+                    : p.id === "OPD" ? calcOPD(Object.assign({}, ov, { autoCap: true }))
+                        : p.id === "OPDP" ? calcOPDP(ov)
+                            : CALC[p.id]();
+                res[p.id] = r;
+                if (r.ok && r.premium) baseSum += r.premium;
             });
-            return { plan: p, label: cfg.label(p), ok: true, premium: r.premium, rows };
+            if (items.some((p) => p.id === "CS")) res.CS = calcCS({ baseSum });
+            let total = 0, totalYear = 0;
+            items.forEach((p) => { const r = res[p.id]; if (r && r.ok) { total += r.premium * factorOf(p.id); totalYear += r.premium; } });
+            return { plan, label: cfg.label(plan), res, total, totalYear, ok: !!(res[id] && res[id].ok), msg: res[id] ? res[id].msg : "" };
         });
         const ordered = (lists) => { const seen = []; lists.forEach((l) => l.forEach((k) => { if (!seen.includes(k)) seen.push(k); })); return seen; };
-        // แสดงเฉพาะเบี้ยของอายุที่ใช้คำนวณ
-        const premiumRows = [{ k: `อายุ ${age} ปี`, cur: false, vals: cols.map((c) => (c.ok ? c.premium : null)) }];
-        const bLabels = ordered(cols.map((c) => c.rows.map(([k]) => k)));
-        const benefitRows = bLabels.map((k) => {
-            const vals = cols.map((c) => { const f = c.rows.find(([kk]) => kk === k); return c.ok && f ? f[1] : null; });
-            const okVals = vals.filter((v, i) => cols[i].ok);
-            return { k, vals, diff: new Set(okVals.map((v) => String(v))).size > 1 };
+        const premiumRows = items.map((p) => ({ k: nameFor(p) + (isSinglePremiumMain(p.id) && mode !== "year" ? " (ชำระครั้งเดียว)" : ""), id: p.id,
+            vals: cols.map((c) => { const r = c.res[p.id]; return r && r.ok ? r.premium * factorOf(p.id) : null; }),
+            msgs: cols.map((c) => { const r = c.res[p.id]; return r && !r.ok ? r.msg : ""; }) }));
+        const totalRow = { k: `รวมเบี้ยทั้งแพ็กเกจ (${modeDef.label})`, vals: cols.map((c) => c.total) };
+        const totalYearRow = mode !== "year" ? { k: "เทียบเท่าเบี้ยรายปีรวม", vals: cols.map((c) => c.totalYear) } : null;
+        const blocks = items.map((p) => {
+            const perCol = cols.map((c) => {
+                const r = c.res[p.id];
+                if (!c.ok || !r || !r.ok) return null;
+                let rows = customerBenefits(finalizeBenefits(p.id, r.benefits, r.premium), p.id).filter(([k]) => k !== "ลดหย่อนภาษี").map(([k, v]) => {
+                    // ข้อความวงเงินร่วมหมวด (เฉพาะบางแผน) ย้ายจากหัวข้อมาไว้ในค่า และไม่แสดงชื่อแผน (แผน N)
+                    const m = k.match(/^(.*?) — แผนนี้ใช้วงเงินก้อนเดียวกันร่วมกับหมวดที่ (\S+)/);
+                    const v2 = String(v).replace(/^แผน \d+ · /, "");
+                    return m ? [m[1], `${v2} (รวมกับหมวด ${m[2]})`] : [k, v2];
+                });
+                if (r.capNote) rows = [["หมายเหตุ", r.capNote], ...rows];
+                return rows;
+            });
+            const okCols = perCol.map((rs, i) => (cols[i].ok ? i : -1)).filter((i) => i >= 0);
+            const labels = ordered(perCol.filter(Boolean).map((rs) => rs.map(([k]) => k)));
+            const rows = labels.map((k) => {
+                const vals = perCol.map((rs) => { if (!rs) return null; const f = rs.find(([kk]) => kk === k); return f ? f[1] : null; });
+                const same = okCols.every((i) => vals[i] != null) && new Set(okCols.map((i) => String(vals[i]))).size === 1;
+                return { k, vals, same };
+            });
+            const same = okCols.every((i) => perCol[i]) && rows.every((r) => r.same);
+            return { id: p.id, name: nameFor(p), same, rows };
         });
-        return { id, name: prod.name || "", cols, cur: cfg.cur(), note: cfg.note(), premiumRows, benefitRows,
-            customer: customerName.trim(), gender, age, agent: agentInfo, notes: shareNotes([{ name: prod.name, renewalNote: prod.renewalNote }]) };
+        return { id, name: nameFor(prod), cols, cur: cfg.cur(), note: cfg.note(), payLabel: modeDef.label, premiumRows, totalRow, totalYearRow, blocks,
+            customer: customerName.trim(), gender, age, agent: agentInfo, notes: shareNotes(items.map((p) => ({ name: p.name, renewalNote: p.renewalNote }))) };
+    }
+    function pickComparePlan(c, col) {
+        HEALTH_COMPARE[c.id].pick(col.plan);
+        const o = col.res.OPD;
+        if (o && o.ok && o.opdPlan && o.opdPlan !== opdPlan) setOpdPlan(o.opdPlan); // ใช้วงเงิน OPD ที่ปรับให้แผนนั้นแล้ว
+        setHealthCompare(null);
     }
     function handleCalculate() {
         const errs = [];
@@ -5768,6 +5830,9 @@ function App() {
                         result.factor !== 1 && result.totalPay !== result.totalYear && React.createElement("p", { className: "text-[24px] mt-1 opacity-90" },
                             "\u0E40\u0E17\u0E35\u0E22\u0E1A\u0E40\u0E17\u0E48\u0E32\u0E40\u0E1A\u0E35\u0E49\u0E22\u0E23\u0E32\u0E22\u0E1B\u0E35\u0E23\u0E27\u0E21 ",
                             baht(result.totalYear))),
+                    HEALTH_COMPARE_IDS.some((hid) => selected[hid]) && React.createElement("div", { className: "flex gap-2 flex-wrap" },
+                        HEALTH_COMPARE_IDS.filter((hid) => selected[hid]).map((hid) => React.createElement("button", { key: hid, onClick: () => setHealthCompare(hid), className: "flex-1 min-w-[160px] rounded-xl py-3 text-[19px] font-semibold", style: { background: "#FFFFFF", color: BRAND.navy, border: `1.5px solid ${BRAND.sky}` } },
+                            "📊 เทียบแพ็กเกจ: เปลี่ยนแผน ", nameFor(PRODUCTS.find((x) => x.id === hid))))),
                     React.createElement("div", { className: "flex gap-2 flex-wrap" },
                         React.createElement("button", { onClick: () => { setShareNote(""); setShareModal({ id: "QUOTE", mode: "text" }); }, className: "flex-1 min-w-[160px] rounded-xl py-3 text-[21px] font-semibold text-white", style: { background: "#06C755" } }, "💬 ส่งข้อความ LINE (ทุกแบบ)"),
                         React.createElement("button", { onClick: () => { setShareNote(""); setShareModal({ id: "QUOTE", mode: "image" }); }, className: "flex-1 min-w-[160px] rounded-xl py-3 text-[21px] font-semibold text-white", style: { background: "#06C755" } }, "🖼️ ส่งรูป LINE (ทุกแบบ)")),
@@ -5871,37 +5936,61 @@ function App() {
                 if (!c) return null;
                 const h = React.createElement;
                 const okCols = c.cols.filter((x) => x.ok);
+                const span = c.cols.length;
                 const cell = "px-2 py-2 align-top text-[17px]";
                 const stickyTd = { position: "sticky", left: 0, zIndex: 1, background: "#FFFFFF", minWidth: 128, maxWidth: 170 };
                 const colStyle = (col) => (col.plan === c.cur ? { background: "#F3FBEF" } : {});
-                const sectionRow = (t) => h("tr", null, h("td", { colSpan: c.cols.length + 1, className: "px-2 pt-3 pb-1 text-[18px] font-semibold", style: { color: BRAND.navyDeep, background: BRAND.bg } }, t));
+                const fullRow = (key, content, style) => h("tr", { key }, h("td", { colSpan: span + 1, className: "px-2 pt-3 pb-1 text-[18px] font-semibold", style: Object.assign({ color: BRAND.navyDeep, background: BRAND.bg }, style || {}) }, content));
+                const mergedRow = (key, label, content, bgc) => h("tr", { key, style: { borderTop: "1px solid #EEF3F7" } },
+                    h("td", { className: cell, style: Object.assign({}, stickyTd, { color: BRAND.sub, background: bgc || "#FFFFFF" }) }, label),
+                    h("td", { colSpan: span, className: cell, style: { color: BRAND.dataBlack, background: bgc || "transparent", whiteSpace: "pre-line" } }, content));
+                const benefitRows = [];
+                c.blocks.forEach((bl, bi) => {
+                    if (!bl.rows.length) return;
+                    benefitRows.push(fullRow("bh" + bi, `▸ ${bl.name}${bl.same ? " — เหมือนกันทุกแผน" : ""}`, { color: BRAND.navy, background: "#FFFFFF", fontSize: 17 }));
+                    if (bl.same) {
+                        const first = c.cols.findIndex((x) => x.ok);
+                        benefitRows.push(mergedRow("bs" + bi, "ความคุ้มครอง", bl.rows.map((r) => `• ${r.k}: ${compareFmtVal(r.vals[first])}`).join("\n"), BRAND.bg));
+                        return;
+                    }
+                    bl.rows.forEach((r, k) => {
+                        if (r.same) { const first = c.cols.findIndex((x) => x.ok); benefitRows.push(mergedRow(`b${bi}-${k}`, r.k, compareFmtVal(r.vals[first]) + " (ทุกแผน)")); return; }
+                        benefitRows.push(h("tr", { key: `b${bi}-${k}`, style: { borderTop: "1px solid #EEF3F7", background: "#F7FCF3" } },
+                            h("td", { className: cell, style: Object.assign({}, stickyTd, { color: BRAND.sub, background: "#F7FCF3" }) }, r.k),
+                            c.cols.map((col, i) => h("td", { key: col.plan, className: cell, style: Object.assign({ color: BRAND.dataBlack, fontWeight: 600 }, colStyle(col)) }, col.ok ? compareFmtVal(r.vals[i]) : ""))));
+                    });
+                });
                 return h("div", { className: "fixed inset-0 z-50 flex items-end sm:items-center justify-center p-2 sm:p-4", style: { background: "rgba(8,30,62,0.55)" }, onClick: () => setHealthCompare(null) },
                     h("div", { className: "w-full max-w-3xl rounded-2xl p-4", style: { background: BRAND.card, maxHeight: "92vh", display: "flex", flexDirection: "column" }, onClick: (e) => e.stopPropagation() },
-                        h("h3", { className: "text-[23px] font-semibold", style: { color: BRAND.navy } }, "📊 เทียบทุกแผน · ", c.name),
-                        h("p", { className: "text-[18px] mb-2", style: { color: BRAND.sub } }, `${gender === "female" ? "หญิง" : "ชาย"} อายุ ${age} ปี · ชั้นอาชีพ ${occClass}${c.note ? " · " + c.note : ""}`),
+                        h("h3", { className: "text-[23px] font-semibold", style: { color: BRAND.navy } }, "📊 เทียบแพ็กเกจ · เปลี่ยนแผน ", c.name),
+                        h("p", { className: "text-[18px] mb-2", style: { color: BRAND.sub } }, `${gender === "female" ? "หญิง" : "ชาย"} อายุ ${age} ปี · ชั้นอาชีพ ${occClass}${c.note ? " · " + c.note : ""} · ทุนหลักและสัญญาเพิ่มเติมอื่นใช้ตามที่เลือกไว้`),
                         okCols.length === 0 && h("p", { className: "text-[19px] mb-2", style: { color: BRAND.danger } }, c.cols[0] ? c.cols[0].msg : "คำนวณไม่ได้"),
                         h("div", { className: "overflow-auto rounded-xl border", style: { borderColor: "#D7E8F0", flex: "1 1 auto", minHeight: 0 } },
-                            h("table", { className: "w-full border-collapse", style: { minWidth: 128 + c.cols.length * 118 } },
+                            h("table", { className: "w-full border-collapse", style: { minWidth: 128 + span * 118 } },
                                 h("thead", { style: { position: "sticky", top: 0, zIndex: 2 } },
                                     h("tr", { style: { background: BRAND.navy } },
-                                        h("th", { className: "px-2 py-2 text-left text-[17px] text-white", style: Object.assign({}, stickyTd, { background: BRAND.navy }) }, "แผน"),
+                                        h("th", { className: "px-2 py-2 text-left text-[17px] text-white", style: Object.assign({}, stickyTd, { background: BRAND.navy }) }, "ทางเลือก"),
                                         c.cols.map((col) => h("th", { key: col.plan, className: "px-2 py-2 text-left text-[18px] text-white align-top", style: { minWidth: 118 } },
                                             col.label, col.plan === c.cur && h("div", { className: "text-[14px] font-medium", style: { color: "#BFE3F5" } }, "✓ แผนที่เลือกอยู่"))))),
                                 h("tbody", null,
-                                    sectionRow("💳 เบี้ยประกันรายปี"),
+                                    fullRow("ph", `💳 เบี้ยประกัน (${c.payLabel})`),
                                     c.premiumRows.map((r, k) => h("tr", { key: "p" + k, style: { borderTop: "1px solid #EEF3F7" } },
-                                        h("td", { className: cell, style: Object.assign({}, stickyTd, { color: BRAND.sub }) }, r.k, r.cur ? " (ปีนี้)" : ""),
-                                        c.cols.map((col, i) => h("td", { key: col.plan, className: cell + " font-semibold", style: Object.assign({ color: r.cur ? BRAND.greenDeep : BRAND.dataBlack }, colStyle(col)) },
-                                            col.ok ? (r.vals[i] == null ? "-" : baht(Math.round(r.vals[i]))) : (k === 0 ? h("span", { className: "font-normal text-[15px]", style: { color: BRAND.danger } }, col.msg) : ""))))),
-                                    sectionRow("🏥 ความคุ้มครอง (ช่องสีเขียว = แผนต่างกัน)"),
-                                    c.benefitRows.map((r, k) => h("tr", { key: "b" + k, style: { borderTop: "1px solid #EEF3F7", background: r.diff ? "#F7FCF3" : "transparent" } },
-                                        h("td", { className: cell, style: Object.assign({}, stickyTd, { color: BRAND.sub, background: r.diff ? "#F7FCF3" : "#FFFFFF" }) }, r.k),
-                                        c.cols.map((col, i) => h("td", { key: col.plan, className: cell, style: Object.assign({ color: BRAND.dataBlack, fontWeight: r.diff ? 600 : 500 }, colStyle(col)) },
-                                            col.ok ? (r.vals[i] == null || r.vals[i] === "" ? "-" : r.vals[i]) : "")))),
+                                        h("td", { className: cell, style: Object.assign({}, stickyTd, { color: BRAND.sub }) }, r.k),
+                                        c.cols.map((col, i) => h("td", { key: col.plan, className: cell + " font-semibold", style: Object.assign({ color: BRAND.dataBlack }, colStyle(col)) },
+                                            !col.ok ? (r.id === c.id ? h("span", { className: "font-normal text-[15px]", style: { color: BRAND.danger } }, col.msg) : "")
+                                                : r.vals[i] == null ? h("span", { className: "font-normal text-[15px]", style: { color: BRAND.danger } }, r.msgs[i] || "-") : baht(Math.round(r.vals[i])))))),
+                                    h("tr", { style: { borderTop: "2px solid #CDE8B8", background: "#E8F6DD" } },
+                                        h("td", { className: cell + " font-semibold", style: Object.assign({}, stickyTd, { color: BRAND.navyDeep, background: "#E8F6DD" }) }, c.totalRow.k),
+                                        c.cols.map((col, i) => h("td", { key: col.plan, className: cell + " font-bold text-[19px]", style: { color: BRAND.greenDeep } }, col.ok ? baht(Math.round(c.totalRow.vals[i])) : ""))),
+                                    c.totalYearRow && h("tr", { style: { borderTop: "1px solid #EEF3F7" } },
+                                        h("td", { className: cell, style: Object.assign({}, stickyTd, { color: BRAND.sub }) }, c.totalYearRow.k),
+                                        c.cols.map((col, i) => h("td", { key: col.plan, className: cell, style: Object.assign({ color: BRAND.dataBlack }, colStyle(col)) }, col.ok ? baht(Math.round(c.totalYearRow.vals[i])) : ""))),
+                                    fullRow("bh", "🏥 ความคุ้มครอง (แถวสีเขียว = แต่ละแผนต่างกัน)"),
+                                    benefitRows,
                                     h("tr", { style: { borderTop: "1px solid #D7E8F0" } },
                                         h("td", { className: cell, style: stickyTd }, ""),
                                         c.cols.map((col) => h("td", { key: col.plan, className: "px-2 py-2", style: colStyle(col) },
-                                            col.ok && h("button", { onClick: () => { HEALTH_COMPARE[c.id].pick(col.plan); setHealthCompare(null); }, className: "w-full rounded-lg py-1.5 text-[16px] font-medium text-white", style: { background: col.plan === c.cur ? BRAND.greenDeep : BRAND.navy } }, col.plan === c.cur ? "✓ ใช้แผนนี้" : "เลือกแผนนี้"))))))),
+                                            col.ok && h("button", { onClick: () => pickComparePlan(c, col), className: "w-full rounded-lg py-1.5 text-[16px] font-medium text-white", style: { background: col.plan === c.cur ? BRAND.greenDeep : BRAND.navy } }, col.plan === c.cur ? "✓ ใช้แผนนี้" : "เลือกแผนนี้"))))))),
                         okCols.length > 0 && h("div", { className: "flex gap-2 mt-3 shrink-0" },
                             h("button", { onClick: () => { setShareNote(""); setShareModal({ id: "COMPARE", mode: "text", cmpId: c.id }); }, className: "flex-1 rounded-xl py-2.5 text-[19px] font-semibold text-white", style: { background: "#06C755" } }, "💬 ส่งข้อความ LINE"),
                             h("button", { onClick: () => { setShareNote(""); setShareModal({ id: "COMPARE", mode: "image", cmpId: c.id }); }, className: "flex-1 rounded-xl py-2.5 text-[19px] font-semibold text-white", style: { background: "#06C755" } }, "🖼️ ส่งรูป LINE")),
