@@ -8,7 +8,7 @@ const BRAND = {
     ink: "#000000", sub: "#404040", danger: "#B93232", warn: "#6B4508",
     label: "#000000", nameBlue: "#1668D6", mainBlue: "#0C2F63", dataBlack: "#000000",
 };
-const APP_VERSION = "v2.43.0 (2569-10-13)";
+const APP_VERSION = "v2.43.1 (2569-10-13)";
 const RATE_SOURCE = "อัตราเบี้ยตามคู่มือตัวแทน V.14 (14-02-2026)"; // วันที่ตารางค่าคอมอยู่ในป๊อปอัปค่าคอม (ตัวแทนเท่านั้น)
 const CASES_KEY = "blacal-cases-v1"; // อัปเดตเลขนี้ทุกครั้งที่มีการแก้ไข/เพิ่มแบบประกันใหม่ เพื่อให้รู้ว่าไฟล์ที่ใช้อยู่เป็นเวอร์ชันล่าสุดหรือไม่
 const fmt = (n) => (n === null || n === undefined || isNaN(n) ? "0" : Math.round(n).toLocaleString("th-TH"));
@@ -5536,22 +5536,18 @@ function App() {
         const prod = PRODUCTS.find((x) => x.id === id) || {};
         const cols = cfg.plans().map((p) => {
             const r = cfg.calc(p);
-            if (!r.ok) return { plan: p, label: cfg.label(p), ok: false, msg: r.msg, rows: [], sched: [] };
+            if (!r.ok) return { plan: p, label: cfg.label(p), ok: false, msg: r.msg, rows: [] };
             // ข้อความวงเงินร่วมหมวด (เฉพาะบางแผน) ย้ายจากหัวข้อมาไว้ในค่า เพื่อให้หัวข้อตรงกันทุกแผน
             const rows = customerBenefits(finalizeBenefits(id, r.benefits, r.premium), id).filter(([k]) => k !== "ลดหย่อนภาษี").map(([k, v]) => {
                 const m = k.match(/^(.*?) — แผนนี้ใช้วงเงินก้อนเดียวกันร่วมกับหมวดที่ (\S+)/);
                 const v2 = String(v).replace(/^แผน \d+ · /, "");
                 return m ? [m[1], `${v2} (รวมกับหมวด ${m[2]})`] : [k, v2];
             });
-            let sched = buildPremiumSchedule(id, cfg.ov(p));
-            if (id === "PH") sched = sched.filter((s, i) => i === 0 || ((parseInt(s.label.replace(/\D+/g, ""), 10) - PH_MIN_AGE) % 5 === 0));
-            return { plan: p, label: cfg.label(p), ok: true, premium: r.premium, rows, sched };
+            return { plan: p, label: cfg.label(p), ok: true, premium: r.premium, rows };
         });
         const ordered = (lists) => { const seen = []; lists.forEach((l) => l.forEach((k) => { if (!seen.includes(k)) seen.push(k); })); return seen; };
-        const pLabels = ordered(cols.map((c) => c.sched.map((s) => s.label)));
-        const premiumRows = pLabels.length
-            ? pLabels.map((k, idx) => ({ k, cur: idx === 0, vals: cols.map((c) => { const s = c.sched.find((x) => x.label === k); return c.ok && s ? s.premium : null; }) }))
-            : [{ k: "เบี้ยประกันปีนี้", cur: true, vals: cols.map((c) => (c.ok ? c.premium : null)) }];
+        // แสดงเฉพาะเบี้ยของอายุที่ใช้คำนวณ
+        const premiumRows = [{ k: `อายุ ${age} ปี`, cur: false, vals: cols.map((c) => (c.ok ? c.premium : null)) }];
         const bLabels = ordered(cols.map((c) => c.rows.map(([k]) => k)));
         const benefitRows = bLabels.map((k) => {
             const vals = cols.map((c) => { const f = c.rows.find(([kk]) => kk === k); return c.ok && f ? f[1] : null; });
@@ -5892,7 +5888,7 @@ function App() {
                                         c.cols.map((col) => h("th", { key: col.plan, className: "px-2 py-2 text-left text-[18px] text-white align-top", style: { minWidth: 118 } },
                                             col.label, col.plan === c.cur && h("div", { className: "text-[14px] font-medium", style: { color: "#BFE3F5" } }, "✓ แผนที่เลือกอยู่"))))),
                                 h("tbody", null,
-                                    sectionRow("💳 เบี้ยประกันรายปี (ตามอายุ)"),
+                                    sectionRow("💳 เบี้ยประกันรายปี"),
                                     c.premiumRows.map((r, k) => h("tr", { key: "p" + k, style: { borderTop: "1px solid #EEF3F7" } },
                                         h("td", { className: cell, style: Object.assign({}, stickyTd, { color: BRAND.sub }) }, r.k, r.cur ? " (ปีนี้)" : ""),
                                         c.cols.map((col, i) => h("td", { key: col.plan, className: cell + " font-semibold", style: Object.assign({ color: r.cur ? BRAND.greenDeep : BRAND.dataBlack }, colStyle(col)) },
