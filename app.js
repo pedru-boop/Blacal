@@ -8,7 +8,7 @@ const BRAND = {
     ink: "#000000", sub: "#404040", danger: "#B93232", warn: "#6B4508",
     label: "#000000", nameBlue: "#1668D6", mainBlue: "#0C2F63", dataBlack: "#000000",
 };
-const APP_VERSION = "v2.44.7 (2569-10-13)";
+const APP_VERSION = "v2.45.0 (2569-10-13)";
 const RATE_SOURCE = "อัตราเบี้ยตามคู่มือตัวแทน V.14 (14-02-2026)"; // วันที่ตารางค่าคอมอยู่ในป๊อปอัปค่าคอม (ตัวแทนเท่านั้น)
 const CASES_KEY = "blacal-cases-v1"; // อัปเดตเลขนี้ทุกครั้งที่มีการแก้ไข/เพิ่มแบบประกันใหม่ เพื่อให้รู้ว่าไฟล์ที่ใช้อยู่เป็นเวอร์ชันล่าสุดหรือไม่
 // ปัดเศษแบบคู่มือ (ทศนิยมตั้งแต่ 0.5 ปัดขึ้น) — กันเลขทศนิยมของคอมพิวเตอร์ เช่น 7663.4999999 ที่ควรเป็น 7663.5 → 7664
@@ -513,6 +513,12 @@ function makeImgLayout() {
             lines.forEach((t, i) => L.text(x, y + i * lh, t, size, weight, color));
             return lines.length * lh;
         },
+        paraC(cx, y, txt, size, weight, color, maxW, lh) {
+            probe.font = `${weight} ${size}px ${IMG_FONT}`;
+            const lines = imgWrap(probe, txt, size, maxW);
+            lines.forEach((t, i) => ops.push({ t: "text", x: cx, y: y + i * lh, txt: t, size, weight, color, align: "center" }));
+            return lines.length * lh;
+        },
     };
     return L;
 }
@@ -549,11 +555,13 @@ function imgCustomer(L, d, y, extra) {
     return y + 24;
 }
 // แถว "หัวข้อ — ค่า": หัวข้อซ้าย ค่าคอลัมน์ขวา (ชิดซ้ายในคอลัมน์ของตัวเอง) ตัดบรรทัดอัตโนมัติ
-function imgKeyRow(L, y, label, value, shade) {
-    const P = IMG_P, W = IMG_W, split = P + (W - P * 2) * 0.46, pad = 12;
+function imgKeyRow(L, y, label0, value0, shade) {
+    const P = IMG_P, W = IMG_W, pad = 12;
+    const bc = benefitCell(label0, value0), label = bc.k, value = bc.v;
+    const numW = 170, split = bc.num ? W - P - numW : P + (W - P * 2) * 0.46;
     const start = L.ops.length;
     const h1 = L.para(P, y + pad, label, 27, 500, BRAND.sub, split - P - 16, 38);
-    const h2 = L.para(split, y + pad, value, 28, 600, BRAND.navy, W - P - split, 38);
+    const h2 = bc.num ? L.paraC(split + numW / 2, y + pad, value, 28, 600, BRAND.navy, numW, 38) : L.para(split, y + pad, value, 28, 600, BRAND.navy, W - P - split, 38);
     const h = Math.max(h1, h2) + pad * 2;
     if (shade) L.ops.splice(start, 0, { t: "rect", x: P - 12, y, w: W - P * 2 + 24, h, color: BRAND.bg });
     return y + h;
@@ -847,6 +855,25 @@ function buildQuoteText(q) {
 // ===== ตารางเทียบแพ็กเกจ: ทุนหลัก + สัญญาเพิ่มเติมที่เลือกไว้คงเดิม เปลี่ยนเฉพาะแผนสุขภาพ 1 แบบ =====
 // c = { name, gender, age, customer, agent, note, payLabel, cols:[{label, ok, msg}], premiumRows:[{k, vals}], totalRow, totalYearRow,
 //       blocks:[{ name, same, rows:[{k, vals, same}] }], notes }
+// ===== ช่องผลประโยชน์ในตาราง: ช่องตัวเลขล้วนแสดงแค่ตัวเลข (หน่วย "ต่อวัน/ต่อครั้ง" ย้ายไปท้ายชื่อแถว) · ช่องที่มีข้อความตัดเฉพาะคำว่า "บาท" =====
+const BEN_NUM_ONLY = /^([\d,]+(?:\.\d+)?)\s*บาท\s*(ต่อ\S+)?$/;
+function stripBaht(t) { return String(t).replace(/([\d,]+(?:\.\d+)?)\s*บาท/g, "$1").replace(/[ \t]{2,}/g, " ").trim(); }
+function benefitCell(k, v) {
+    if (typeof v !== "string" && typeof v !== "number") return { k, v, num: false };
+    const m = String(v).trim().match(BEN_NUM_ONLY);
+    if (m) return { k: m[2] ? `${k} (${m[2]})` : k, v: m[1], num: true };
+    return { k, v: stripBaht(v), num: false };
+}
+// แถวที่มีหลายคอลัมน์ (เทียบแผน): ทุกช่องเป็นตัวเลขล้วนหน่วยเดียวกัน → ย้ายหน่วยไปชื่อแถว · ไม่เช่นนั้นตัดคำว่าบาททีละช่อง
+function compareCells(k, vals) {
+    const list = vals.filter((v) => v != null && v !== "");
+    const ms = list.map((v) => String(v).trim().match(BEN_NUM_ONLY));
+    const unit = ms.length && ms.every((m) => m) ? (ms[0][2] || "") : null;
+    if (unit !== null && ms.every((m) => (m[2] || "") === unit)) return { k: unit ? `${k} (${unit})` : k, vals: vals.map((v) => (v == null || v === "" ? v : String(v).trim().match(BEN_NUM_ONLY)[1])) };
+    return { k, vals: vals.map((v) => (v == null || v === "" ? v : stripBaht(v))) };
+}
+// แยก "200,000 (รวมกับหมวด 4)" → ตัวเลขบรรทัดบน + ข้อความเล็กบรรทัดล่าง
+function splitNumCell(v) { const m = String(v).match(/^([\d,]+(?:\.\d+)?)(?:\s+(.+))?$/); return m ? { n: m[1], rest: m[2] || "" } : { n: "", rest: String(v) }; }
 function compareFmtVal(v) { return v == null || v === "" ? "-" : String(v); }
 // สำหรับส่ง LINE: ตัดคำว่า "บาท" ออกจากช่องตาราง และย้ายหน่วย "ต่อวัน/ต่อครั้ง" ไปไว้ที่ชื่อแถว (ถ้าทุกแผนใช้หน่วยเดียวกัน)
 const CMP_NUM_ONLY = /^([\d,]+(?:\.\d+)?)\s*บาท\s*(ต่อ\S+)?$/;
@@ -868,11 +895,11 @@ function buildCompareText(c) {
     out.push(`📊 เปรียบเทียบแพ็กเกจ · เปลี่ยนแผน ${c.name}`);
     out.push(`👤 ${c.gender === "female" ? "เพศหญิง" : "เพศชาย"} อายุ ${c.age} ปี${c.note ? " · " + c.note : ""}`);
     out.push(`🔀 ทางเลือก: ${okIdx.map((i, n) => `${n + 1}) ${lbl(i)}`).join("  ")}`);
-    out.push("", `━━ 💳 เบี้ยประกัน (${c.payLabel} · บาท) ━━`);
+    out.push("", `━━ 💳 เบี้ยประกัน (${c.payLabel}) ━━`);
     c.premiumRows.forEach((r) => out.push(`• ${r.k}: ${okIdx.map((i) => (r.vals[i] == null ? "-" : fmt(r.vals[i]))).join(" | ")}`));
     out.push(`💰 ${c.totalRow.k}: ${okIdx.map((i) => fmt(c.totalRow.vals[i])).join(" | ")}`);
     if (c.totalYearRow) out.push(`   ${c.totalYearRow.k}: ${okIdx.map((i) => fmt(c.totalYearRow.vals[i])).join(" | ")}`);
-    out.push("", "━━ 🏥 ความคุ้มครอง (บาท) ━━");
+    out.push("", "━━ 🏥 ความคุ้มครอง ━━");
     c.blocks.forEach((bl) => {
         if (!bl.rows.length) return;
         out.push("", `▸ ${bl.name}${bl.same ? " (เหมือนกันทุกแผน)" : ""}`);
@@ -895,37 +922,63 @@ function drawCompareImage(c) {
     const L = makeImgLayout();
     const okIdx = c.cols.map((col, i) => (col.ok ? i : -1)).filter((i) => i >= 0);
     const n = Math.max(okIdx.length, 1);
-    const labelW = (W - P * 2) * (n >= 5 ? 0.28 : 0.32);
-    const colW = (W - P * 2 - labelW) / n;
-    const fs = n >= 5 ? 21 : 23, lh = n >= 5 ? 29 : 32;
+    const fs = n >= 5 ? 21 : 23, lh = n >= 5 ? 29 : 32, sfs = fs - 5, slh = lh - 7;
+    const TW = W - P * 2;
+    // เตรียมข้อมูลทุกแถว
+    const prem = c.premiumRows.map((r) => ({ k: r.k, vals: okIdx.map((i) => (r.vals[i] == null ? "-" : fmt(r.vals[i]))) }));
+    const tot = { k: c.totalRow.k, vals: okIdx.map((i) => fmt(c.totalRow.vals[i])) };
+    const totY = c.totalYearRow ? { k: c.totalYearRow.k, vals: okIdx.map((i) => fmt(c.totalYearRow.vals[i])) } : null;
+    const heads = okIdx.map((i) => { const t = String(c.cols[i].label); const sp = t.lastIndexOf(" "); return sp > 0 ? t.slice(0, sp) + "\n" + t.slice(sp + 1) : t; });
+    const blocks = c.blocks.filter((bl) => bl.rows.length).map((bl) => ({ name: bl.name, same: bl.same,
+        rows: bl.same ? bl.rows.map((r) => benefitCell(r.k, r.vals[okIdx[0]]))
+            : bl.rows.map((r) => (r.same ? Object.assign({ merged: true }, benefitCell(r.k, r.vals[okIdx[0]])) : Object.assign({ merged: false }, compareCells(r.k, okIdx.map((i) => r.vals[i]))))) }));
+    // ความกว้างคอลัมน์ตัวเลข = พอดีกับตัวเลขที่ยาวที่สุด
+    L.probe.font = `600 ${fs}px ${IMG_FONT}`;
+    const nums = [].concat(...prem.map((r) => r.vals), tot.vals, totY ? totY.vals : [], ...heads.map((h) => h.split("\n")));
+    blocks.forEach((bl) => { if (!bl.same) bl.rows.forEach((r) => { if (!r.merged) r.vals.forEach((v) => { if (v != null && v !== "") { const x = splitNumCell(v); if (x.n) nums.push(x.n); } }); }); });
+    const need = Math.max(...nums.map((t) => imgTextW(L.probe, String(t), fs)), 60);
+    const colW = Math.min(Math.max(need + 16, 90), TW * 0.6 / n);
+    const labelW = TW - colW * n;
     let y = imgHeader(L, "เปรียบเทียบแพ็กเกจประกัน", "เปลี่ยนแผน " + c.name);
     y = imgCustomer(L, c, y, c.note ? " · " + c.note : "");
     const bg = (start, h, color) => L.ops.splice(start, 0, { t: "rect", x: P - 12, y, w: W - P * 2 + 24, h, color });
+    const cellX = (j) => P + labelW + colW * j + colW / 2;
     // vals: array (หนึ่งค่าต่อคอลัมน์) หรือ string (รวมเป็นช่องเดียวทุกแผน)
     const row = (label, vals, o) => {
         const pad = 10, start = L.ops.length;
         const head = o.head, color = head ? "#FFFFFF" : (o.total ? BRAND.greenDeep : BRAND.navy);
-        let h = L.para(P, y + pad, label, head ? fs : fs - 1, head || o.total ? 600 : 500, head ? "#FFFFFF" : (o.total ? BRAND.navyDeep : BRAND.sub), labelW - 12, lh);
-        if (typeof vals === "string") h = Math.max(h, L.para(P + labelW + 6, y + pad, vals, fs - 1, 500, BRAND.navy, W - P * 2 - labelW - 12, lh));
-        else vals.forEach((v, j) => { h = Math.max(h, L.para(P + labelW + colW * j + 6, y + pad, v, fs, 600, color, colW - 12, lh)); });
+        let h = L.para(P, y + pad, label, head ? fs : fs - 1, head || o.total ? 600 : 500, head ? "#FFFFFF" : (o.total ? BRAND.navyDeep : BRAND.sub), labelW - 14, lh);
+        if (typeof vals === "string") h = Math.max(h, L.para(P + labelW + 4, y + pad, vals, fs - 1, 500, BRAND.navy, colW * n - 8, lh));
+        else vals.forEach((v, j) => {
+            const cx = cellX(j);
+            if (head) { h = Math.max(h, L.paraC(cx, y + pad, v, fs, 600, color, colW - 6, lh)); return; }
+            const x = splitNumCell(compareFmtVal(v));
+            let hh = 0;
+            if (x.n) hh += L.paraC(cx, y + pad, x.n, fs, 600, color, colW - 4, lh);
+            if (x.rest) hh += L.paraC(cx, y + pad + hh, x.rest, sfs, 500, color, colW - 6, slh);
+            h = Math.max(h, hh);
+        });
         h += pad * 2;
         if (head) bg(start, h, BRAND.navy); else if (o.total) bg(start, h, "#E8F6DD"); else if (o.diff) bg(start, h, "#F3FBEF"); else if (o.shade) bg(start, h, BRAND.bg);
         y += h;
     };
     const section = (t) => { y += 18; y += L.para(P, y, t, 28, 600, BRAND.navyDeep, W - P * 2, 40) + 6; };
-    row("ทางเลือก", okIdx.map((i) => c.cols[i].label), { head: true });
-    section(`💳 เบี้ยประกัน (${c.payLabel} · บาท)`);
-    c.premiumRows.forEach((r, k) => row(r.k, okIdx.map((i) => (r.vals[i] == null ? "-" : fmt(r.vals[i]))), { shade: k % 2 === 0 }));
-    row(c.totalRow.k, okIdx.map((i) => fmt(c.totalRow.vals[i])), { total: true });
-    if (c.totalYearRow) row(c.totalYearRow.k, okIdx.map((i) => fmt(c.totalYearRow.vals[i])), { shade: true });
-    section("🏥 ความคุ้มครอง (บาท)");
-    c.blocks.forEach((bl) => {
-        if (!bl.rows.length) return;
+    row("ทางเลือก", heads, { head: true });
+    section(`💳 เบี้ยประกัน (${c.payLabel})`);
+    prem.forEach((r, k) => row(r.k, r.vals, { shade: k % 2 === 0 }));
+    row(tot.k, tot.vals, { total: true });
+    if (totY) row(totY.k, totY.vals, { shade: true });
+    section("🏥 ความคุ้มครอง");
+    blocks.forEach((bl) => {
         y += 8; y += L.para(P, y, `▸ ${bl.name}${bl.same ? " — เหมือนกันทุกแผน" : ""}`, 25, 600, BRAND.navy, W - P * 2, 36) + 4;
-        if (bl.same) { row("ความคุ้มครอง", bl.rows.map((r) => `• ${r.k}: ${compareFmtVal(r.vals[okIdx[0]])}`).join("\n"), { shade: true }); return; }
+        if (bl.same) {
+            const start = L.ops.length, pad = 10;
+            const h = L.para(P, y + pad, bl.rows.map((r) => `• ${r.k}: ${compareFmtVal(r.v)}`).join("\n"), fs - 1, 500, BRAND.navy, TW, lh) + pad * 2;
+            bg(start, h, BRAND.bg); y += h; return;
+        }
         bl.rows.forEach((r, k) => {
-            if (r.same) { const x = compareLineRow(r.k, r.vals[okIdx[0]]); row(x.k, compareFmtVal(x.vals) + " (ทุกแผน)", { shade: k % 2 === 0 }); }
-            else { const x = compareLineRow(r.k, okIdx.map((i) => r.vals[i])); row(x.k, x.vals.map(compareFmtVal), { diff: true }); }
+            if (r.merged) row(r.k, compareFmtVal(r.v) + " (ทุกแผน)", { shade: k % 2 === 0 });
+            else row(r.k, r.vals, { diff: true });
         });
     });
     y = imgFooter(L, c, y);
@@ -943,7 +996,7 @@ function drawQuoteImage(q) {
         let h = 18;
         h += L.para(P + 8, y + h, `${i + 1}) ${c.name}`, 34, 600, BRAND.nameBlue, W - P * 2 - 16, 46) + 4;
         if (c.div) h += imgBadge(L, P + 8, y + h, c.div.badge) + 8;
-        h += L.para(P + 8, y + h, `เบี้ย ${baht(c.pay)}${c.single ? " (ชำระครั้งเดียว)" : ` (${q.payLabel})`}${c.renewalNote ? " · " + c.renewalNote : ""}`, 30, 600, BRAND.ink, W - P * 2 - 16, 42) + 18;
+        h += L.para(P + 8, y + h, `เบี้ย ${fmt(c.pay)}${c.single ? " (ชำระครั้งเดียว)" : ` (${q.payLabel})`}${c.renewalNote ? " · " + c.renewalNote : ""}`, 30, 600, BRAND.ink, W - P * 2 - 16, 42) + 18;
         L.ops.splice(start, 0, { t: "rect", x: P - 12, y, w: W - P * 2 + 24, h, color: "#E6F2F8" }, { t: "rect", x: P - 12, y, w: 8, h, color: BRAND.skyDeep });
         y += h;
         let shade = 0;
@@ -5890,9 +5943,9 @@ function App() {
                                 ")")),
                             OCC_EXTRA_MAIN_IDS.includes(c.id) && (React.createElement("p", { className: "text-[17px] mt-2 px-3 py-2 rounded-lg", style: { background: "#FFF8E6", color: "#7A5A00", border: "1px solid #F3DFA8" } }, OCC_EXTRA_NOTE)),
                             OCC_EXTRA_WITH_RIDER_MAIN_IDS.includes(c.id) && result.cards.some((x) => !x.isMain) && (React.createElement("p", { className: "text-[17px] mt-2 px-3 py-2 rounded-lg", style: { background: "#FFF8E6", color: "#7A5A00", border: "1px solid #F3DFA8" } }, OCC_EXTRA_RIDER_NOTE)),
-                            openCards[c.id] && (React.createElement("div", { className: "mt-3 pt-2 rounded-xl overflow-hidden", style: { border: "1px solid #E7EEF3" } }, c.benefits.map(([k, v], i) => (React.createElement("div", { key: i, className: "px-3 py-3", style: { background: i % 2 === 0 ? "#FBFDFE" : "#FFFFFF", borderTop: i === 0 ? "none" : "1px solid #EEF3F7" } },
-                                React.createElement("p", { className: "text-[21px] font-medium leading-snug", style: { color: BRAND.label } }, k),
-                                React.createElement("p", { className: "text-[27px] font-bold leading-snug mt-0.5", style: { color: BRAND.dataBlack } }, v)))))))))))))),
+                            openCards[c.id] && (React.createElement("div", { className: "mt-3 pt-2 rounded-xl overflow-hidden", style: { border: "1px solid #E7EEF3" } }, c.benefits.map(([k0, v0], i) => { const bc = benefitCell(k0, v0); return (React.createElement("div", { key: i, className: bc.num ? "px-3 py-3 flex items-start gap-3" : "px-3 py-3", style: { background: i % 2 === 0 ? "#FBFDFE" : "#FFFFFF", borderTop: i === 0 ? "none" : "1px solid #EEF3F7" } },
+                                React.createElement("p", { className: "text-[21px] font-medium leading-snug" + (bc.num ? " flex-1" : ""), style: { color: BRAND.label } }, bc.k),
+                                React.createElement("p", { className: bc.num ? "text-[27px] font-bold leading-snug text-center shrink-0" : "text-[27px] font-bold leading-snug mt-0.5", style: Object.assign({ color: BRAND.dataBlack }, bc.num ? { minWidth: 110, whiteSpace: "nowrap" } : {}) }, bc.v))); }))))))))))),
             React.createElement("footer", { className: "max-w-5xl mx-auto px-5 pt-2 pb-8 text-center text-[14px] leading-relaxed", style: { color: "#8A9AAB" } }, APP_VERSION, " · ", RATE_SOURCE),
             modal && (React.createElement("div", { className: "fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4", style: { background: "rgba(8,30,62,0.55)" } },
                 React.createElement("div", { className: "w-full max-w-md rounded-2xl p-5", style: { background: BRAND.card } },
@@ -5969,7 +6022,10 @@ function App() {
                 const okCols = c.cols.filter((x) => x.ok);
                 const span = c.cols.length;
                 const cell = "px-2 py-2 align-top text-[17px]";
-                const stickyTd = { position: "sticky", left: 0, zIndex: 1, background: "#FFFFFF", minWidth: 128, maxWidth: 170 };
+                const numCell = "px-1 py-2 align-top text-[16px] text-center";
+                const numStyle = { width: "1%", whiteSpace: "nowrap" };
+                const stickyTd = { background: "#FFFFFF", minWidth: 110 };
+                const numView = (v) => { const x = splitNumCell(compareFmtVal(v)); return x.n ? [x.n, x.rest && h("div", { key: "r", className: "text-[13px] font-medium leading-tight", style: { whiteSpace: "normal", minWidth: 52 } }, x.rest)] : h("div", { className: "text-[13px] font-medium leading-tight", style: { whiteSpace: "normal", minWidth: 52 } }, x.rest); };
                 const colStyle = (col) => (col.plan === c.cur ? { background: "#F3FBEF" } : {});
                 const fullRow = (key, content, style) => h("tr", { key }, h("td", { colSpan: span + 1, className: "px-2 pt-3 pb-1 text-[18px] font-semibold", style: Object.assign({ color: BRAND.navyDeep, background: BRAND.bg }, style || {}) }, content));
                 const mergedRow = (key, label, content, bgc) => h("tr", { key, style: { borderTop: "1px solid #EEF3F7" } },
@@ -5981,14 +6037,17 @@ function App() {
                     benefitRows.push(fullRow("bh" + bi, `▸ ${bl.name}${bl.same ? " — เหมือนกันทุกแผน" : ""}`, { color: BRAND.navy, background: "#FFFFFF", fontSize: 17 }));
                     if (bl.same) {
                         const first = c.cols.findIndex((x) => x.ok);
-                        benefitRows.push(mergedRow("bs" + bi, "ความคุ้มครอง", bl.rows.map((r) => `• ${r.k}: ${compareFmtVal(r.vals[first])}`).join("\n"), BRAND.bg));
+                        benefitRows.push(h("tr", { key: "bs" + bi, style: { borderTop: "1px solid #EEF3F7" } },
+                            h("td", { colSpan: span + 1, className: cell, style: { color: BRAND.dataBlack, background: BRAND.bg, whiteSpace: "pre-line" } },
+                                bl.rows.map((r) => { const x = benefitCell(r.k, r.vals[first]); return `• ${x.k}: ${compareFmtVal(x.v)}`; }).join("\n"))));
                         return;
                     }
                     bl.rows.forEach((r, k) => {
-                        if (r.same) { const first = c.cols.findIndex((x) => x.ok); benefitRows.push(mergedRow(`b${bi}-${k}`, r.k, compareFmtVal(r.vals[first]) + " (ทุกแผน)")); return; }
+                        if (r.same) { const first = c.cols.findIndex((x) => x.ok); const x = benefitCell(r.k, r.vals[first]); benefitRows.push(mergedRow(`b${bi}-${k}`, x.k, compareFmtVal(x.v) + " (ทุกแผน)")); return; }
+                        const x = compareCells(r.k, r.vals);
                         benefitRows.push(h("tr", { key: `b${bi}-${k}`, style: { borderTop: "1px solid #EEF3F7", background: "#F7FCF3" } },
-                            h("td", { className: cell, style: Object.assign({}, stickyTd, { color: BRAND.sub, background: "#F7FCF3" }) }, r.k),
-                            c.cols.map((col, i) => h("td", { key: col.plan, className: cell, style: Object.assign({ color: BRAND.dataBlack, fontWeight: 600 }, colStyle(col)) }, col.ok ? compareFmtVal(r.vals[i]) : ""))));
+                            h("td", { className: cell, style: Object.assign({}, stickyTd, { color: BRAND.sub, background: "#F7FCF3" }) }, x.k),
+                            c.cols.map((col, i) => h("td", { key: col.plan, className: numCell, style: Object.assign({ color: BRAND.dataBlack, fontWeight: 600 }, numStyle, colStyle(col)) }, col.ok ? numView(x.vals[i]) : ""))));
                     });
                 });
                 return h("div", { className: "fixed inset-0 z-50 flex items-end sm:items-center justify-center p-2 sm:p-4", style: { background: "rgba(8,30,62,0.55)" }, onClick: () => setHealthCompare(null) },
@@ -5997,31 +6056,31 @@ function App() {
                         h("p", { className: "text-[18px] mb-2", style: { color: BRAND.sub } }, `${gender === "female" ? "หญิง" : "ชาย"} อายุ ${age} ปี · ชั้นอาชีพ ${occClass}${c.note ? " · " + c.note : ""} · ทุนหลักและสัญญาเพิ่มเติมอื่นใช้ตามที่เลือกไว้`),
                         okCols.length === 0 && h("p", { className: "text-[19px] mb-2", style: { color: BRAND.danger } }, c.cols[0] ? c.cols[0].msg : "คำนวณไม่ได้"),
                         h("div", { className: "overflow-auto rounded-xl border", style: { borderColor: "#D7E8F0", flex: "1 1 auto", minHeight: 0 } },
-                            h("table", { className: "w-full border-collapse", style: { minWidth: 128 + span * 118 } },
+                            h("table", { className: "w-full border-collapse", style: { width: "100%" } },
                                 h("thead", { style: { position: "sticky", top: 0, zIndex: 2 } },
                                     h("tr", { style: { background: BRAND.navy } },
                                         h("th", { className: "px-2 py-2 text-left text-[17px] text-white", style: Object.assign({}, stickyTd, { background: BRAND.navy }) }, "ทางเลือก"),
-                                        c.cols.map((col) => h("th", { key: col.plan, className: "px-2 py-2 text-left text-[18px] text-white align-top", style: { minWidth: 118 } },
-                                            col.label, col.plan === c.cur && h("div", { className: "text-[14px] font-medium", style: { color: "#BFE3F5" } }, "✓ แผนที่เลือกอยู่"))))),
+                                        c.cols.map((col) => { const t = String(col.label), sp = t.lastIndexOf(" "); return h("th", { key: col.plan, className: "px-1 py-2 text-center text-[15px] leading-tight text-white align-top", style: { width: "1%", whiteSpace: "nowrap" } },
+                                            sp > 0 ? [t.slice(0, sp), h("br", { key: "br" }), t.slice(sp + 1)] : t, col.plan === c.cur && h("div", { className: "text-[12px] font-medium mt-0.5", style: { color: "#BFE3F5" } }, "✓")); }))),
                                 h("tbody", null,
                                     fullRow("ph", `💳 เบี้ยประกัน (${c.payLabel})`),
                                     c.premiumRows.map((r, k) => h("tr", { key: "p" + k, style: { borderTop: "1px solid #EEF3F7" } },
                                         h("td", { className: cell, style: Object.assign({}, stickyTd, { color: BRAND.sub }) }, r.k),
-                                        c.cols.map((col, i) => h("td", { key: col.plan, className: cell + " font-semibold", style: Object.assign({ color: BRAND.dataBlack }, colStyle(col)) },
-                                            !col.ok ? (r.id === c.id ? h("span", { className: "font-normal text-[15px]", style: { color: BRAND.danger } }, col.msg) : "")
-                                                : r.vals[i] == null ? h("span", { className: "font-normal text-[15px]", style: { color: BRAND.danger } }, r.msgs[i] || "-") : baht(roundHalfUp(r.vals[i])))))),
+                                        c.cols.map((col, i) => h("td", { key: col.plan, className: numCell + " font-semibold", style: Object.assign({ color: BRAND.dataBlack }, numStyle, colStyle(col)) },
+                                            !col.ok ? (r.id === c.id ? h("div", { className: "font-normal text-[13px] leading-tight", style: { color: BRAND.danger, whiteSpace: "normal", minWidth: 80 } }, col.msg) : "")
+                                                : r.vals[i] == null ? h("div", { className: "font-normal text-[13px] leading-tight", style: { color: BRAND.danger, whiteSpace: "normal", minWidth: 80 } }, r.msgs[i] || "-") : fmt(roundHalfUp(r.vals[i])))))),
                                     h("tr", { style: { borderTop: "2px solid #CDE8B8", background: "#E8F6DD" } },
                                         h("td", { className: cell + " font-semibold", style: Object.assign({}, stickyTd, { color: BRAND.navyDeep, background: "#E8F6DD" }) }, c.totalRow.k),
-                                        c.cols.map((col, i) => h("td", { key: col.plan, className: cell + " font-bold text-[19px]", style: { color: BRAND.greenDeep } }, col.ok ? baht(roundHalfUp(c.totalRow.vals[i])) : ""))),
+                                        c.cols.map((col, i) => h("td", { key: col.plan, className: numCell + " font-bold", style: Object.assign({ color: BRAND.greenDeep }, numStyle) }, col.ok ? fmt(roundHalfUp(c.totalRow.vals[i])) : ""))),
                                     c.totalYearRow && h("tr", { style: { borderTop: "1px solid #EEF3F7" } },
                                         h("td", { className: cell, style: Object.assign({}, stickyTd, { color: BRAND.sub }) }, c.totalYearRow.k),
-                                        c.cols.map((col, i) => h("td", { key: col.plan, className: cell, style: Object.assign({ color: BRAND.dataBlack }, colStyle(col)) }, col.ok ? baht(roundHalfUp(c.totalYearRow.vals[i])) : ""))),
+                                        c.cols.map((col, i) => h("td", { key: col.plan, className: numCell, style: Object.assign({ color: BRAND.dataBlack }, numStyle, colStyle(col)) }, col.ok ? fmt(roundHalfUp(c.totalYearRow.vals[i])) : ""))),
                                     fullRow("bh", "🏥 ความคุ้มครอง (แถวสีเขียว = แต่ละแผนต่างกัน)"),
                                     benefitRows,
                                     h("tr", { style: { borderTop: "1px solid #D7E8F0" } },
                                         h("td", { className: cell, style: stickyTd }, ""),
                                         c.cols.map((col) => h("td", { key: col.plan, className: "px-2 py-2", style: colStyle(col) },
-                                            col.ok && h("button", { onClick: () => pickComparePlan(c, col), className: "w-full rounded-lg py-1.5 text-[16px] font-medium text-white", style: { background: col.plan === c.cur ? BRAND.greenDeep : BRAND.navy } }, col.plan === c.cur ? "✓ ใช้แผนนี้" : "เลือกแผนนี้"))))))),
+                                            col.ok && h("button", { onClick: () => pickComparePlan(c, col), className: "w-full rounded-lg px-1 py-1.5 text-[14px] leading-tight font-medium text-white", style: { background: col.plan === c.cur ? BRAND.greenDeep : BRAND.navy } }, col.plan === c.cur ? "✓ ใช้แผนนี้" : "เลือกแผนนี้"))))))),
                         okCols.length > 0 && h("div", { className: "flex gap-2 mt-3 shrink-0" },
                             h("button", { onClick: () => { setShareNote(""); setShareModal({ id: "COMPARE", mode: "text", cmpId: c.id }); }, className: "flex-1 rounded-xl py-2.5 text-[19px] font-semibold text-white", style: { background: "#06C755" } }, "💬 ส่งข้อความ LINE"),
                             h("button", { onClick: () => { setShareNote(""); setShareModal({ id: "COMPARE", mode: "image", cmpId: c.id }); }, className: "flex-1 rounded-xl py-2.5 text-[19px] font-semibold text-white", style: { background: "#06C755" } }, "🖼️ ส่งรูป LINE")),
