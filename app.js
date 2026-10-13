@@ -8,7 +8,7 @@ const BRAND = {
     ink: "#000000", sub: "#404040", danger: "#B93232", warn: "#6B4508",
     label: "#000000", nameBlue: "#1668D6", mainBlue: "#0C2F63", dataBlack: "#000000",
 };
-const APP_VERSION = "v2.44.5 (2569-10-13)";
+const APP_VERSION = "v2.44.6 (2569-10-13)";
 const RATE_SOURCE = "อัตราเบี้ยตามคู่มือตัวแทน V.14 (14-02-2026)"; // วันที่ตารางค่าคอมอยู่ในป๊อปอัปค่าคอม (ตัวแทนเท่านั้น)
 const CASES_KEY = "blacal-cases-v1"; // อัปเดตเลขนี้ทุกครั้งที่มีการแก้ไข/เพิ่มแบบประกันใหม่ เพื่อให้รู้ว่าไฟล์ที่ใช้อยู่เป็นเวอร์ชันล่าสุดหรือไม่
 // ปัดเศษแบบคู่มือ (ทศนิยมตั้งแต่ 0.5 ปัดขึ้น) — กันเลขทศนิยมของคอมพิวเตอร์ เช่น 7663.4999999 ที่ควรเป็น 7663.5 → 7664
@@ -848,6 +848,20 @@ function buildQuoteText(q) {
 // c = { name, gender, age, customer, agent, note, payLabel, cols:[{label, ok, msg}], premiumRows:[{k, vals}], totalRow, totalYearRow,
 //       blocks:[{ name, same, rows:[{k, vals, same}] }], notes }
 function compareFmtVal(v) { return v == null || v === "" ? "-" : String(v); }
+// สำหรับส่ง LINE: ตัดคำว่า "บาท" ออกจากช่องตาราง และย้ายหน่วย "ต่อวัน/ต่อครั้ง" ไปไว้ที่ชื่อแถว (ถ้าทุกแผนใช้หน่วยเดียวกัน)
+const CMP_NUM_UNIT = /^([\d,]+(?:\.\d+)?)\s*บาท\s*(ต่อ\S+)?\s*/;
+function compareLineRow(k, vals) {
+    const list = Array.isArray(vals) ? vals : [vals];
+    const units = list.filter((v) => v != null && v !== "").map((v) => { const m = String(v).match(CMP_NUM_UNIT); return m ? (m[2] || "") : null; });
+    const unit = units.length && units.every((u) => u !== null && u === units[0]) ? units[0] : "";
+    const clean = (v) => {
+        if (v == null || v === "") return v;
+        let t = String(v);
+        if (unit) t = t.replace(CMP_NUM_UNIT, (m0, n) => n + " ");
+        return t.replace(/([\d,]+(?:\.\d+)?)\s*บาท/g, "$1").replace(/\s+/g, " ").trim();
+    };
+    return { k: unit ? `${k} (${unit})` : k, vals: Array.isArray(vals) ? vals.map(clean) : clean(vals) };
+}
 function buildCompareText(c) {
     const out = [];
     const okIdx = c.cols.map((col, i) => (col.ok ? i : -1)).filter((i) => i >= 0);
@@ -856,17 +870,18 @@ function buildCompareText(c) {
     out.push(`📊 เปรียบเทียบแพ็กเกจ · เปลี่ยนแผน ${c.name}`);
     out.push(`👤 ${c.gender === "female" ? "เพศหญิง" : "เพศชาย"} อายุ ${c.age} ปี${c.note ? " · " + c.note : ""}`);
     out.push(`🔀 ทางเลือก: ${okIdx.map((i, n) => `${n + 1}) ${lbl(i)}`).join("  ")}`);
-    out.push("", `━━ 💳 เบี้ยประกัน (${c.payLabel}) ━━`);
+    out.push("", `━━ 💳 เบี้ยประกัน (${c.payLabel} · บาท) ━━`);
     c.premiumRows.forEach((r) => out.push(`• ${r.k}: ${okIdx.map((i) => (r.vals[i] == null ? "-" : fmt(r.vals[i]))).join(" | ")}`));
     out.push(`💰 ${c.totalRow.k}: ${okIdx.map((i) => fmt(c.totalRow.vals[i])).join(" | ")}`);
     if (c.totalYearRow) out.push(`   ${c.totalYearRow.k}: ${okIdx.map((i) => fmt(c.totalYearRow.vals[i])).join(" | ")}`);
-    out.push("", "━━ 🏥 ความคุ้มครอง ━━");
+    out.push("", "━━ 🏥 ความคุ้มครอง (บาท) ━━");
     c.blocks.forEach((bl) => {
         if (!bl.rows.length) return;
         out.push("", `▸ ${bl.name}${bl.same ? " (เหมือนกันทุกแผน)" : ""}`);
         bl.rows.forEach((r) => {
-            if (bl.same || r.same) { out.push(`  - ${r.k}: ${compareFmtVal(r.vals[okIdx[0]])}${!bl.same ? " (ทุกแผน)" : ""}`); return; }
-            out.push(`  - ${r.k}: ${okIdx.map((i) => compareFmtVal(r.vals[i])).join(" | ")}`);
+            if (bl.same || r.same) { const x = compareLineRow(r.k, r.vals[okIdx[0]]); out.push(`  - ${x.k}: ${compareFmtVal(x.vals)}${!bl.same ? " (ทุกแผน)" : ""}`); return; }
+            const x = compareLineRow(r.k, okIdx.map((i) => r.vals[i]));
+            out.push(`  - ${x.k}: ${x.vals.map(compareFmtVal).join(" | ")}`);
         });
     });
     out.push("", "————————");
@@ -900,18 +915,18 @@ function drawCompareImage(c) {
     };
     const section = (t) => { y += 18; y += L.para(P, y, t, 28, 600, BRAND.navyDeep, W - P * 2, 40) + 6; };
     row("ทางเลือก", okIdx.map((i) => c.cols[i].label), { head: true });
-    section(`💳 เบี้ยประกัน (${c.payLabel})`);
+    section(`💳 เบี้ยประกัน (${c.payLabel} · บาท)`);
     c.premiumRows.forEach((r, k) => row(r.k, okIdx.map((i) => (r.vals[i] == null ? "-" : fmt(r.vals[i]))), { shade: k % 2 === 0 }));
     row(c.totalRow.k, okIdx.map((i) => fmt(c.totalRow.vals[i])), { total: true });
     if (c.totalYearRow) row(c.totalYearRow.k, okIdx.map((i) => fmt(c.totalYearRow.vals[i])), { shade: true });
-    section("🏥 ความคุ้มครอง");
+    section("🏥 ความคุ้มครอง (บาท)");
     c.blocks.forEach((bl) => {
         if (!bl.rows.length) return;
         y += 8; y += L.para(P, y, `▸ ${bl.name}${bl.same ? " — เหมือนกันทุกแผน" : ""}`, 25, 600, BRAND.navy, W - P * 2, 36) + 4;
-        if (bl.same) { row("ความคุ้มครอง", bl.rows.map((r) => `• ${r.k}: ${compareFmtVal(r.vals[okIdx[0]])}`).join("\n"), { shade: true }); return; }
+        if (bl.same) { row("ความคุ้มครอง", bl.rows.map((r) => { const x = compareLineRow(r.k, r.vals[okIdx[0]]); return `• ${x.k}: ${compareFmtVal(x.vals)}`; }).join("\n"), { shade: true }); return; }
         bl.rows.forEach((r, k) => {
-            if (r.same) row(r.k, compareFmtVal(r.vals[okIdx[0]]) + " (ทุกแผน)", { shade: k % 2 === 0 });
-            else row(r.k, okIdx.map((i) => compareFmtVal(r.vals[i])), { diff: true });
+            if (r.same) { const x = compareLineRow(r.k, r.vals[okIdx[0]]); row(x.k, compareFmtVal(x.vals) + " (ทุกแผน)", { shade: k % 2 === 0 }); }
+            else { const x = compareLineRow(r.k, okIdx.map((i) => r.vals[i])); row(x.k, x.vals.map(compareFmtVal), { diff: true }); }
         });
     });
     y = imgFooter(L, c, y);
@@ -5606,7 +5621,7 @@ function App() {
             const perCol = cols.map((c) => {
                 const r = c.res[p.id];
                 if (!c.ok || !r || !r.ok) return null;
-                let rows = customerBenefits(finalizeBenefits(p.id, r.benefits, r.premium), p.id).filter(([k]) => k !== "ลดหย่อนภาษี").map(([k, v]) => {
+                let rows = customerBenefits(finalizeBenefits(p.id, r.benefits, r.premium), p.id).filter(([k]) => k !== "ลดหย่อนภาษี" && k !== "เบี้ยที่ คช. ยกเว้นให้").map(([k, v]) => {
                     // ข้อความวงเงินร่วมหมวด (เฉพาะบางแผน) ย้ายจากหัวข้อมาไว้ในค่า และไม่แสดงชื่อแผน (แผน N)
                     const m = k.match(/^(.*?) — แผนนี้ใช้วงเงินก้อนเดียวกันร่วมกับหมวดที่ (\S+)/);
                     const v2 = String(v).replace(/^แผน \d+ · /, "");
