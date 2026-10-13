@@ -8,7 +8,7 @@ const BRAND = {
     ink: "#000000", sub: "#404040", danger: "#B93232", warn: "#6B4508",
     label: "#000000", nameBlue: "#1668D6", mainBlue: "#0C2F63", dataBlack: "#000000",
 };
-const APP_VERSION = "v2.42.0 (2569-10-13)";
+const APP_VERSION = "v2.42.1 (2569-10-13)";
 const RATE_SOURCE = "อัตราเบี้ยตามคู่มือตัวแทน V.14 (14-02-2026)"; // วันที่ตารางค่าคอมอยู่ในป๊อปอัปค่าคอม (ตัวแทนเท่านั้น)
 const CASES_KEY = "blacal-cases-v1"; // อัปเดตเลขนี้ทุกครั้งที่มีการแก้ไข/เพิ่มแบบประกันใหม่ เพื่อให้รู้ว่าไฟล์ที่ใช้อยู่เป็นเวอร์ชันล่าสุดหรือไม่
 const fmt = (n) => (n === null || n === undefined || isNaN(n) ? "0" : Math.round(n).toLocaleString("th-TH"));
@@ -2101,7 +2101,7 @@ const CS_REQUIRED_MAIN_IDS = ["SUD", "LIFE99", "CANCERMAX", "HAPPYKID", "HRPDIV"
 // แบบประกันหลักที่ไม่อนุญาตให้ซื้อ ฉก. / ฉป. (คู่มือ: เพรสทีจ ไลฟ์ ข้อ 6, แฮปปี้ โฮลไลฟ์ ข้อ 6, แฮปปี้ โฮลไลฟ์ 9901 ข้อ 4)
 const CHAK_FORBIDDEN_MAIN_IDS = ["PRESTIGE", "HAPPYWL", "HAPPYWL9901"];
 // ตลอดชีพ 99/99 ซื้อสัญญาเพิ่มเติมได้เฉพาะ สุขภาพ / OPD / คช. เท่านั้น (คู่มือหน้า 2)
-const LIFE99_ALLOWED_RIDER_IDS = ["VH", "VHKIDS", "HH", "HHP", "PH", "OPD", "OPDP", "CS"];
+const LIFE99_ALLOWED_RIDER_IDS = ["VH", "VHKIDS", "HH", "HHP", "PH", "OPD", "OPDP", "ACC3", "RPPR", "CS"]; // ป้าเป็ดยืนยัน: อบ.3 พลัส และ รพ.ปร. นับเป็นสัญญาสุขภาพ
 // ผู้เยาว์อายุต่ำกว่า 15 ปี: ทุนประกันแบบตลอดชีพ / คุ้มครองจำกัดเวลา สูงสุด 10 ล้านบาท (ระเบียบการรับประกัน รบข.27/2558)
 // ไม่รวมแฮปปี้ โฮลไลฟ์ / 9901 (คู่มือยกเว้นเงื่อนไขนี้) และแบบสะสมทรัพย์ (ไม่จำกัด)
 const MINOR_SI_CAP_MAIN_IDS = ["SUD", "LIFE99", "PRESTIGE", "HRP9920", "HRPDIV", "HRP9901", "HAPPYKID"];
