@@ -8,7 +8,7 @@ const BRAND = {
     ink: "#000000", sub: "#404040", danger: "#B93232", warn: "#6B4508",
     label: "#000000", nameBlue: "#1668D6", mainBlue: "#0C2F63", dataBlack: "#000000",
 };
-const APP_VERSION = "v2.44.6 (2569-10-13)";
+const APP_VERSION = "v2.44.7 (2569-10-13)";
 const RATE_SOURCE = "อัตราเบี้ยตามคู่มือตัวแทน V.14 (14-02-2026)"; // วันที่ตารางค่าคอมอยู่ในป๊อปอัปค่าคอม (ตัวแทนเท่านั้น)
 const CASES_KEY = "blacal-cases-v1"; // อัปเดตเลขนี้ทุกครั้งที่มีการแก้ไข/เพิ่มแบบประกันใหม่ เพื่อให้รู้ว่าไฟล์ที่ใช้อยู่เป็นเวอร์ชันล่าสุดหรือไม่
 // ปัดเศษแบบคู่มือ (ทศนิยมตั้งแต่ 0.5 ปัดขึ้น) — กันเลขทศนิยมของคอมพิวเตอร์ เช่น 7663.4999999 ที่ควรเป็น 7663.5 → 7664
@@ -849,17 +849,15 @@ function buildQuoteText(q) {
 //       blocks:[{ name, same, rows:[{k, vals, same}] }], notes }
 function compareFmtVal(v) { return v == null || v === "" ? "-" : String(v); }
 // สำหรับส่ง LINE: ตัดคำว่า "บาท" ออกจากช่องตาราง และย้ายหน่วย "ต่อวัน/ต่อครั้ง" ไปไว้ที่ชื่อแถว (ถ้าทุกแผนใช้หน่วยเดียวกัน)
-const CMP_NUM_UNIT = /^([\d,]+(?:\.\d+)?)\s*บาท\s*(ต่อ\S+)?\s*/;
+const CMP_NUM_ONLY = /^([\d,]+(?:\.\d+)?)\s*บาท\s*(ต่อ\S+)?$/;
 function compareLineRow(k, vals) {
-    const list = Array.isArray(vals) ? vals : [vals];
-    const units = list.filter((v) => v != null && v !== "").map((v) => { const m = String(v).match(CMP_NUM_UNIT); return m ? (m[2] || "") : null; });
-    const unit = units.length && units.every((u) => u !== null && u === units[0]) ? units[0] : "";
-    const clean = (v) => {
-        if (v == null || v === "") return v;
-        let t = String(v);
-        if (unit) t = t.replace(CMP_NUM_UNIT, (m0, n) => n + " ");
-        return t.replace(/([\d,]+(?:\.\d+)?)\s*บาท/g, "$1").replace(/\s+/g, " ").trim();
-    };
+    // ทำเฉพาะแถวที่ทุกช่องเป็นตัวเลขล้วน (ตัวเลข + บาท + ต่อครั้ง/ต่อวัน) — แถวที่มีตัวหนังสือคงข้อความเดิม
+    const list = (Array.isArray(vals) ? vals : [vals]).filter((v) => v != null && v !== "");
+    const ms = list.map((v) => String(v).trim().match(CMP_NUM_ONLY));
+    if (!ms.length || ms.some((m) => !m)) return { k, vals };
+    const unit = ms[0][2] || "";
+    if (ms.some((m) => (m[2] || "") !== unit)) return { k, vals };
+    const clean = (v) => (v == null || v === "" ? v : String(v).trim().match(CMP_NUM_ONLY)[1]);
     return { k: unit ? `${k} (${unit})` : k, vals: Array.isArray(vals) ? vals.map(clean) : clean(vals) };
 }
 function buildCompareText(c) {
@@ -879,7 +877,8 @@ function buildCompareText(c) {
         if (!bl.rows.length) return;
         out.push("", `▸ ${bl.name}${bl.same ? " (เหมือนกันทุกแผน)" : ""}`);
         bl.rows.forEach((r) => {
-            if (bl.same || r.same) { const x = compareLineRow(r.k, r.vals[okIdx[0]]); out.push(`  - ${x.k}: ${compareFmtVal(x.vals)}${!bl.same ? " (ทุกแผน)" : ""}`); return; }
+            if (bl.same) { out.push(`  - ${r.k}: ${compareFmtVal(r.vals[okIdx[0]])}`); return; }
+            if (r.same) { const x = compareLineRow(r.k, r.vals[okIdx[0]]); out.push(`  - ${x.k}: ${compareFmtVal(x.vals)} (ทุกแผน)`); return; }
             const x = compareLineRow(r.k, okIdx.map((i) => r.vals[i]));
             out.push(`  - ${x.k}: ${x.vals.map(compareFmtVal).join(" | ")}`);
         });
@@ -923,7 +922,7 @@ function drawCompareImage(c) {
     c.blocks.forEach((bl) => {
         if (!bl.rows.length) return;
         y += 8; y += L.para(P, y, `▸ ${bl.name}${bl.same ? " — เหมือนกันทุกแผน" : ""}`, 25, 600, BRAND.navy, W - P * 2, 36) + 4;
-        if (bl.same) { row("ความคุ้มครอง", bl.rows.map((r) => { const x = compareLineRow(r.k, r.vals[okIdx[0]]); return `• ${x.k}: ${compareFmtVal(x.vals)}`; }).join("\n"), { shade: true }); return; }
+        if (bl.same) { row("ความคุ้มครอง", bl.rows.map((r) => `• ${r.k}: ${compareFmtVal(r.vals[okIdx[0]])}`).join("\n"), { shade: true }); return; }
         bl.rows.forEach((r, k) => {
             if (r.same) { const x = compareLineRow(r.k, r.vals[okIdx[0]]); row(x.k, compareFmtVal(x.vals) + " (ทุกแผน)", { shade: k % 2 === 0 }); }
             else { const x = compareLineRow(r.k, okIdx.map((i) => r.vals[i])); row(x.k, x.vals.map(compareFmtVal), { diff: true }); }
