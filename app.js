@@ -8,7 +8,7 @@ const BRAND = {
     ink: "#000000", sub: "#404040", danger: "#B93232", warn: "#6B4508",
     label: "#000000", nameBlue: "#1668D6", mainBlue: "#0C2F63", dataBlack: "#000000",
 };
-const APP_VERSION = "v2.45.0 (2569-10-13)";
+const APP_VERSION = "v2.46.0 (2569-10-14)";
 const RATE_SOURCE = "อัตราเบี้ยตามคู่มือตัวแทน V.14 (14-02-2026)"; // วันที่ตารางค่าคอมอยู่ในป๊อปอัปค่าคอม (ตัวแทนเท่านั้น)
 const CASES_KEY = "blacal-cases-v1"; // อัปเดตเลขนี้ทุกครั้งที่มีการแก้ไข/เพิ่มแบบประกันใหม่ เพื่อให้รู้ว่าไฟล์ที่ใช้อยู่เป็นเวอร์ชันล่าสุดหรือไม่
 // ปัดเศษแบบคู่มือ (ทศนิยมตั้งแต่ 0.5 ปัดขึ้น) — กันเลขทศนิยมของคอมพิวเตอร์ เช่น 7663.4999999 ที่ควรเป็น 7663.5 → 7664
@@ -472,6 +472,40 @@ function openLineText(text) {
 }
 // ===== วาดรูปด้วย Canvas — จัดตำแหน่งชิดซ้ายเองทั้งหมด (ไม่ใช้ textAlign ของเบราว์เซอร์ ซึ่งบน iPhone วางข้อความไทยผิดที่จนล้นขอบ) =====
 const IMG_W = 1080, IMG_P = 48, IMG_FONT = "'IBM Plex Sans Thai','Prompt',sans-serif";
+// สีของรูปส่ง LINE — โทนกรุงเทพประกันชีวิต (น้ำเงิน/ฟ้า/เขียวมะนาว) · ตัวหนังสือดำ อ่านง่าย · เทาเข้มเฉพาะหมายเหตุ
+const IMGB = Object.assign({}, BRAND, {
+    navy: "#0B4EA2", navyDeep: "#08397A", sky: "#1E9BE9", skyDeep: "#1487D4", green: "#8DB51E", greenDeep: "#4E7A0C",
+    bg: "#EEF5FC", ink: "#000000", sub: "#000000", note: "#404040", nameBlue: "#0B4EA2", dataBlack: "#000000",
+});
+// หมวดความคุ้มครอง (สี + ไอคอน) ใช้แยกรูป/ข้อความส่ง LINE
+const SHARE_CATS = {
+    life: { label: "ชีวิต", icon: "🛡️", color: "#0B4EA2", tint: "#E4EEFA" },
+    saving: { label: "ออมทรัพย์", icon: "💰", color: "#0A7F94", tint: "#E1F3F6" },
+    pension: { label: "บำนาญ", icon: "🏖️", color: "#0A7F94", tint: "#E1F3F6" },
+    ci: { label: "โรคร้ายแรง", icon: "🎗️", color: "#5A47B5", tint: "#ECE9FA" },
+    accident: { label: "อุบัติเหตุ", icon: "🚑", color: "#1278C2", tint: "#E1F1FC" },
+    health: { label: "สุขภาพ", icon: "🏥", color: "#4E7A0C", tint: "#EDF5DC" },
+};
+const SHARE_CAT_IDS = {
+    saving: ["PSAVE104", "PSAVE126", "HS208", "HS126", "HS157", "HS147", "HS168", "HS1810", "HS2515", "TAXSAVER105", "BLASAVE168", "HS999", "PUNSUK", "HAPPYSAVING", "SAVECARE168"],
+    pension: ["HAPPYPENSION", "PENSION888", "PENSIONCARE888"],
+    ci: ["UNJAI", "CANCERMAX", "SUPER", "HAPPYCI", "LLC", "SS"],
+    accident: ["ACC", "ACC1", "ACC2", "ACC3"],
+    health: ["VH", "VHKIDS", "HHP", "HH", "PH", "OPD", "OPDP", "RPPR"],
+};
+// แบบที่ไม่อยู่ในรายการ = หมวดชีวิต (ตลอดชีพ, ฉก./ฉป., ทุพพลภาพ, คช. ฯลฯ)
+function shareCatOf(id) { for (const k in SHARE_CAT_IDS) if (SHARE_CAT_IDS[k].includes(id)) return k; return "life"; }
+// จัดกลุ่มรายการตามหมวด (เรียงตามลำดับที่พบครั้งแรก — แบบหลักขึ้นก่อน) · no = ลำดับเดิมทั้งชุด
+function groupCardsByCat(cards) {
+    const out = [];
+    cards.forEach((c, i) => {
+        const k = c.cat || "life";
+        let g = out.find((x) => x.key === k);
+        if (!g) { g = { key: k, cat: SHARE_CATS[k], cards: [] }; out.push(g); }
+        g.cards.push(Object.assign({ no: i + 1 }, c));
+    });
+    return out;
+}
 // กว้างของข้อความ: ใช้ค่าที่มากกว่าระหว่างที่เบราว์เซอร์วัดได้กับค่าประมาณ กันวัดผิดแล้วล้นขอบ
 function imgTextW(ctx, text, size) {
     let m = 0;
@@ -538,20 +572,20 @@ function renderImgLayout(L, H) {
     });
     return c;
 }
-function imgHeader(L, subtitle, title) {
+function imgHeader(L, subtitle, title, color) {
     const P = IMG_P, W = IMG_W;
     const start = L.ops.length;
     let y = 36;
     y += L.para(P, y, subtitle, 30, 500, "#BFE3F5", W - P * 2, 42) + 8;
     y += L.para(P, y, title, 44, 600, "#FFFFFF", W - P * 2, 58) + 30;
-    L.ops.splice(start, 0, { t: "rect", x: 0, y: 0, w: W, h: y, grad: [BRAND.navy, BRAND.navyDeep] });
+    L.ops.splice(start, 0, color ? { t: "rect", x: 0, y: 0, w: W, h: y, color } : { t: "rect", x: 0, y: 0, w: W, h: y, grad: [IMGB.navy, IMGB.navyDeep] });
     return y;
 }
 function imgCustomer(L, d, y, extra) {
     const P = IMG_P;
     y += 28;
-    y += L.para(P, y, d.customer ? `เรียน คุณ${d.customer}` : "ผู้เอาประกันภัย", 34, 600, BRAND.ink, IMG_W - P * 2, 46);
-    y += L.para(P, y, `${d.gender === "female" ? "เพศหญิง" : "เพศชาย"} อายุ ${d.age} ปี${extra || ""}`, 30, 500, BRAND.sub, IMG_W - P * 2, 42);
+    y += L.para(P, y, d.customer ? `เรียน คุณ${d.customer}` : "ผู้เอาประกันภัย", 34, 600, IMGB.ink, IMG_W - P * 2, 46);
+    y += L.para(P, y, `${d.gender === "female" ? "เพศหญิง" : "เพศชาย"} อายุ ${d.age} ปี${extra || ""}`, 30, 500, IMGB.sub, IMG_W - P * 2, 42);
     return y + 24;
 }
 // แถว "หัวข้อ — ค่า": หัวข้อซ้าย ค่าคอลัมน์ขวา (ชิดซ้ายในคอลัมน์ของตัวเอง) ตัดบรรทัดอัตโนมัติ
@@ -560,10 +594,10 @@ function imgKeyRow(L, y, label0, value0, shade) {
     const bc = benefitCell(label0, value0), label = bc.k, value = bc.v;
     const numW = 170, split = bc.num ? W - P - numW : P + (W - P * 2) * 0.46;
     const start = L.ops.length;
-    const h1 = L.para(P, y + pad, label, 27, 500, BRAND.sub, split - P - 16, 38);
-    const h2 = bc.num ? L.paraC(split + numW / 2, y + pad, value, 28, 600, BRAND.navy, numW, 38) : L.para(split, y + pad, value, 28, 600, BRAND.navy, W - P - split, 38);
+    const h1 = L.para(P, y + pad, label, 27, 500, IMGB.sub, split - P - 16, 38);
+    const h2 = bc.num ? L.paraC(split + numW / 2, y + pad, value, 28, 600, IMGB.ink, numW, 38) : L.para(split, y + pad, value, 28, 600, IMGB.ink, W - P - split, 38);
     const h = Math.max(h1, h2) + pad * 2;
-    if (shade) L.ops.splice(start, 0, { t: "rect", x: P - 12, y, w: W - P * 2 + 24, h, color: BRAND.bg });
+    if (shade) L.ops.splice(start, 0, { t: "rect", x: P - 12, y, w: W - P * 2 + 24, h, color: IMGB.bg });
     return y + h;
 }
 function imgFooter(L, d, y) {
@@ -575,10 +609,10 @@ function imgFooter(L, d, y) {
     const contact = [d.agent.phone ? `📞 ${d.agent.phone}` : "", d.agent.lineId ? `LINE: ${d.agent.lineId}` : ""].filter(Boolean).join("     ");
     if (contact) h += L.para(P, y + h, contact, 30, 500, "#BFE3F5", W - P * 2, 42);
     h += 26;
-    L.ops.splice(start, 0, { t: "rect", x: 0, y, w: W, h, color: BRAND.navy });
+    L.ops.splice(start, 0, { t: "rect", x: 0, y, w: W, h, color: IMGB.navy });
     y += h + 18;
     (d.notes || shareNotes([])).forEach((n, i) => {
-        y += (i === 0 ? L.para(P, y, n, 25, 600, BRAND.navyDeep, W - P * 2, 36) : L.para(P, y, n, 22, 500, "#808080", W - P * 2, 32)) + 6;
+        y += (i === 0 ? L.para(P, y, n, 25, 600, IMGB.navyDeep, W - P * 2, 36) : L.para(P, y, n, 22, 500, IMGB.note, W - P * 2, 32)) + 6;
     });
     return y + 24;
 }
@@ -601,13 +635,13 @@ function drawShareImage(d, part) {
     if (d.customerNotes && d.customerNotes.length) {
         y += 14;
         const ns = L.ops.length; let nh = 14;
-        nh += L.para(P + 4, y + nh, "📌 ข้อควรรู้", 26, 600, BRAND.warn, W - P * 2 - 8, 36);
-        d.customerNotes.forEach((n) => { nh += L.para(P + 4, y + nh, NUM_RE.test(n) ? n : `• ${n}`, 23, 500, BRAND.sub, W - P * 2 - 8, 32); });
+        nh += L.para(P + 4, y + nh, "📌 ข้อควรรู้", 26, 600, IMGB.warn, W - P * 2 - 8, 36);
+        d.customerNotes.forEach((n) => { nh += L.para(P + 4, y + nh, NUM_RE.test(n) ? n : `• ${n}`, 23, 500, IMGB.note, W - P * 2 - 8, 32); });
         nh += 12;
         L.ops.splice(ns, 0, { t: "rect", x: P - 12, y, w: W - P * 2 + 24, h: nh, color: "#FFF8E6" });
         y += nh;
     }
-    if (part === "summary") { y += 20; y += L.para(P, y, `📊 ตาราง${d.type === "savings" ? "เงินคืน" : "บำนาญ"}ตลอดสัญญาอยู่ในรูปที่ 2`, 26, 600, BRAND.navy, W - P * 2, 36); }
+    if (part === "summary") { y += 20; y += L.para(P, y, `📊 ตาราง${d.type === "savings" ? "เงินคืน" : "บำนาญ"}ตลอดสัญญาอยู่ในรูปที่ 2`, 26, 600, IMGB.navy, W - P * 2, 36); }
     }
     else y = imgCustomer(L, d, y);
     y += 36;
@@ -622,14 +656,14 @@ function drawShareImage(d, part) {
         const FS = 24, line = (yy, h, color) => L.rect(X0, yy, TW, h, color);
         const heads = [["อายุ"], ["เบี้ยต่อปี", "(ณ ต้นปีกรมธรรม์)"], ["เงินคืน %"], ["เงินคืน (บาท)", "(ณ สิ้นปีกรมธรรม์)"], ["ความคุ้มครอง (บาท)"], ["หมายเหตุ"]];
         const headH = 78;
-        L.rect(X0, y, TW, headH, BRAND.bg);
+        L.rect(X0, y, TW, headH, IMGB.bg);
         heads.forEach(([h, sub], i) => {
             L.probe.font = `600 ${FS}px ${IMG_FONT}`;
             const hl = imgWrap(L.probe, h, FS, colW(i) - 10);
             const total = hl.length * 30 + (sub ? 24 : 0);
             let yy = y + (headH - total) / 2;
-            hl.forEach((t) => { ctext(i, yy, t, FS, 600, BRAND.navy); yy += 30; });
-            if (sub) ctext(i, yy, sub, 17, 400, BRAND.sub);
+            hl.forEach((t) => { ctext(i, yy, t, FS, 600, IMGB.navy); yy += 30; });
+            if (sub) ctext(i, yy, sub, 17, 400, IMGB.sub);
         });
         y += headH;
         d.rows.forEach((r) => {
@@ -639,25 +673,25 @@ function drawShareImage(d, part) {
             line(y, rowH, r.note ? "#FFF9EE" : "#FFFFFF");
             line(y, 1, "#EEF3F7");
             const ty = y + (rowH - 30) / 2;
-            ctext(0, ty, r.age, FS, 500, BRAND.dataBlack);
-            ctext(1, ty, r.premium > 0 ? fmt(r.premium) : "-", FS, 500, BRAND.dataBlack);
-            ctext(2, ty, `${r.cashPct}%`, FS, 500, BRAND.dataBlack);
-            ctext(3, ty, fmt(r.cashBaht), FS, 600, BRAND.greenDeep);
-            ctext(4, ty, fmt(r.coverageBaht), FS, 500, BRAND.dataBlack);
-            nl.forEach((t, k) => ctext(5, y + (rowH - nl.length * 26) / 2 + k * 26, t, 20, 500, BRAND.warn));
+            ctext(0, ty, r.age, FS, 500, IMGB.dataBlack);
+            ctext(1, ty, r.premium > 0 ? fmt(r.premium) : "-", FS, 500, IMGB.dataBlack);
+            ctext(2, ty, `${r.cashPct}%`, FS, 500, IMGB.dataBlack);
+            ctext(3, ty, fmt(r.cashBaht), FS, 600, IMGB.greenDeep);
+            ctext(4, ty, fmt(r.coverageBaht), FS, 500, IMGB.dataBlack);
+            nl.forEach((t, k) => ctext(5, y + (rowH - nl.length * 26) / 2 + k * 26, t, 20, 500, IMGB.warn));
             y += rowH;
         });
-        line(y, 2, BRAND.navy);
-        line(y + 2, 52, BRAND.bg);
-        ctext(0, y + 13, "รวม", FS, 700, BRAND.navy);
-        ctext(1, y + 13, fmt(d.totalPremium), FS, 700, BRAND.navy);
-        ctext(3, y + 13, fmt(d.totalCash), FS, 700, BRAND.greenDeep);
+        line(y, 2, IMGB.navy);
+        line(y + 2, 52, IMGB.bg);
+        ctext(0, y + 13, "รวม", FS, 700, IMGB.navy);
+        ctext(1, y + 13, fmt(d.totalPremium), FS, 700, IMGB.navy);
+        ctext(3, y + 13, fmt(d.totalCash), FS, 700, IMGB.greenDeep);
         y += 54 + 14;
         const diff = d.totalCash - d.totalPremium;
         const lbl = "ส่วนต่าง (เงินคืนรวม − เบี้ยรวม): ";
         L.probe.font = `500 24px ${IMG_FONT}`;
-        L.text(P, y, lbl, 24, 500, BRAND.sub);
-        L.text(P + imgTextW(L.probe, lbl, 24) + 6, y, (diff >= 0 ? "+" : "") + fmt(diff), 24, 700, diff >= 0 ? BRAND.greenDeep : BRAND.danger);
+        L.text(P, y, lbl, 24, 500, IMGB.sub);
+        L.text(P + imgTextW(L.probe, lbl, 24) + 6, y, (diff >= 0 ? "+" : "") + fmt(diff), 24, 700, diff >= 0 ? IMGB.greenDeep : IMGB.danger);
         y += 40;
     }
     else {
@@ -665,7 +699,7 @@ function drawShareImage(d, part) {
         const cols = isSav ? ["ปีที่", "อายุ", "เบี้ย", "เงินคืน", "คุ้มครอง"] : ["อายุ", "เบี้ย", "บำนาญ", "เบี้ยสะสม", "บำนาญสะสม"];
         const colW = isSav ? [0.11, 0.11, 0.24, 0.25, 0.29] : [0.11, 0.21, 0.21, 0.23, 0.24];
         const tx = (i) => P + 8 + colW.slice(0, i).reduce((a, b) => a + b, 0) * (W - P * 2);
-        L.rect(P - 12, y, W - P * 2 + 24, 56, BRAND.navy);
+        L.rect(P - 12, y, W - P * 2 + 24, 56, IMGB.navy);
         cols.forEach((h, i) => L.text(tx(i), y + 13, h, 25, 600, "#FFFFFF"));
         y += 56;
         const rowH = 44;
@@ -675,14 +709,14 @@ function drawShareImage(d, part) {
             const vals = isSav
                 ? [idx + 1, r.age, r.premium > 0 ? fmt(r.premium) : "-", fmt(r.cashBaht), fmt(r.coverageBaht)]
                 : [r.age, r.premium > 0 ? fmt(r.premium) : "-", r.pension > 0 ? fmt(r.pension) : "-", fmt(r.cumPremium), fmt(r.cumPension)];
-            vals.forEach((v, i) => L.text(tx(i), y + 8, v, 25, 500, (isSav ? i === 3 : i === 2) ? BRAND.greenDeep : BRAND.ink));
+            vals.forEach((v, i) => L.text(tx(i), y + 8, v, 25, 500, (isSav ? i === 3 : i === 2) ? IMGB.greenDeep : IMGB.ink));
             y += rowH;
         });
         if (isSav) {
-            L.rect(P - 12, y, W - P * 2 + 24, 52, BRAND.bg);
-            L.text(tx(0), y + 11, "รวม", 26, 600, BRAND.navy);
-            L.text(tx(2), y + 11, fmt(d.totalPremium), 26, 600, BRAND.navy);
-            L.text(tx(3), y + 11, fmt(d.totalCash), 26, 600, BRAND.greenDeep);
+            L.rect(P - 12, y, W - P * 2 + 24, 52, IMGB.bg);
+            L.text(tx(0), y + 11, "รวม", 26, 600, IMGB.navy);
+            L.text(tx(2), y + 11, fmt(d.totalPremium), 26, 600, IMGB.navy);
+            L.text(tx(3), y + 11, fmt(d.totalCash), 26, 600, IMGB.greenDeep);
             y += 52;
         }
     }
@@ -690,11 +724,11 @@ function drawShareImage(d, part) {
     return renderImgLayout(L, y);
 }
 // แถบหัวข้อ (4 คำถามที่ลูกค้าสงสัย) คืนค่าความสูง
-function imgSection(L, y, title) {
+function imgSection(L, y, title, cat) {
     const P = IMG_P, W = IMG_W;
     const start = L.ops.length;
-    const h = L.para(P + 8, y + 22, title, 29, 700, BRAND.navy, W - P * 2 - 16, 40) + 30;
-    L.ops.splice(start, 0, { t: "rect", x: P - 12, y: y + 10, w: W - P * 2 + 24, h: h - 10, color: "#DCEEF7" }, { t: "rect", x: P - 12, y: y + 10, w: 8, h: h - 10, color: BRAND.navy });
+    const h = L.para(P + 8, y + 22, title, 29, 700, cat ? cat.color : IMGB.navy, W - P * 2 - 16, 40) + 30;
+    L.ops.splice(start, 0, { t: "rect", x: P - 12, y: y + 10, w: W - P * 2 + 24, h: h - 10, color: cat ? cat.tint : "#DFEBF8" }, { t: "rect", x: P - 12, y: y + 10, w: 8, h: h - 10, color: cat ? cat.color : IMGB.navy });
     return h;
 }
 // ตารางยาว (เกิน 20 แถว) แยกเป็น 2 รูป: รูปสรุปที่อ่านจบในจอเดียว + รูปตารางเต็ม
@@ -834,15 +868,25 @@ function buildQuoteText(q) {
     if (q.customer) out.push(`เรียน คุณ${q.customer}`, "");
     out.push("📋 สรุปแผนประกัน · กรุงเทพประกันชีวิต");
     out.push(`👤 ${q.gender === "female" ? "เพศหญิง" : "เพศชาย"} อายุ ${q.age} ปี · ชำระ${q.payLabel}`);
-    q.cards.forEach((c, i) => {
-        out.push("", `━━ ${i + 1}) ${c.name} ━━`);
-        if (c.div) out.push(c.div.badge);
-        out.push(`💳 เบี้ย ${baht(c.pay)}${c.single ? " (ชำระครั้งเดียว)" : ` (${q.payLabel})`}${c.renewalNote ? " · " + c.renewalNote : ""}`);
-        c.benefits.forEach(([k, v]) => out.push(k === "§" ? `▸ ${v}` : `• ${k}: ${v}`));
-        if (c.div) { out.push(`${c.div.badge} — เงื่อนไข`); c.div.lines.forEach((n) => out.push(`  - ${n}`)); }
-        if (c.notes && c.notes.length) { out.push("📌 ข้อควรรู้"); c.notes.forEach((n) => out.push(`  ${NUM_RE.test(n) ? "" : "- "}${n}`)); }
+    const groups = groupCardsByCat(q.cards);
+    const multi = groups.length >= 2;
+    if (multi) {
+        out.push("", `🔎 ภาพรวม ${groups.length} ความคุ้มครอง`);
+        groups.forEach((g) => g.cards.forEach((c) => out.push(`${g.cat.icon} ${g.cat.label}: ${c.no}) ${c.name} — ${baht(c.pay)}${c.single ? " (ชำระครั้งเดียว)" : ""}`)));
+        out.push(`💰 รวมเบี้ย (${q.payLabel}): ${baht(q.totalPay)}`);
+    }
+    groups.forEach((g) => {
+        if (multi) out.push("", "━━━━━━━━━━", `${g.cat.icon} ความคุ้มครอง${g.cat.label}`, "━━━━━━━━━━");
+        g.cards.forEach((c) => {
+            out.push("", `▶️ ${c.no}) ${c.name}`);
+            if (c.div) out.push(c.div.badge);
+            out.push(`💳 เบี้ย ${baht(c.pay)}${c.single ? " (ชำระครั้งเดียว)" : ` (${q.payLabel})`}${c.renewalNote ? " · " + c.renewalNote : ""}`);
+            c.benefits.forEach(([k, v]) => out.push(k === "§" ? `▸ ${v}` : `• ${k}: ${v}`));
+            if (c.div) { out.push(`${c.div.badge} — เงื่อนไข`); c.div.lines.forEach((n) => out.push(`  - ${n}`)); }
+            if (c.notes && c.notes.length) { out.push("📌 ข้อควรรู้"); c.notes.forEach((n) => out.push(`  ${NUM_RE.test(n) ? "" : "- "}${n}`)); }
+        });
     });
-    out.push("", `💰 รวมเบี้ย (${q.payLabel}): ${baht(q.totalPay)}`);
+    out.push("", "━━━━━━━━━━", `💰 รวมเบี้ย (${q.payLabel}): ${baht(q.totalPay)}`);
     if (q.totalPay !== q.totalYear) out.push(`   เทียบเท่าเบี้ยรายปีรวม ${baht(q.totalYear)}`);
     if (q.singleNote) out.push(q.singleNote);
     out.push("", "————————");
@@ -946,9 +990,9 @@ function drawCompareImage(c) {
     // vals: array (หนึ่งค่าต่อคอลัมน์) หรือ string (รวมเป็นช่องเดียวทุกแผน)
     const row = (label, vals, o) => {
         const pad = 10, start = L.ops.length;
-        const head = o.head, color = head ? "#FFFFFF" : (o.total ? BRAND.greenDeep : BRAND.navy);
-        let h = L.para(P, y + pad, label, head ? fs : fs - 1, head || o.total ? 600 : 500, head ? "#FFFFFF" : (o.total ? BRAND.navyDeep : BRAND.sub), labelW - 14, lh);
-        if (typeof vals === "string") h = Math.max(h, L.para(P + labelW + 4, y + pad, vals, fs - 1, 500, BRAND.navy, colW * n - 8, lh));
+        const head = o.head, color = head ? "#FFFFFF" : (o.total ? IMGB.greenDeep : IMGB.navy);
+        let h = L.para(P, y + pad, label, head ? fs : fs - 1, head || o.total ? 600 : 500, head ? "#FFFFFF" : (o.total ? IMGB.navyDeep : IMGB.sub), labelW - 14, lh);
+        if (typeof vals === "string") h = Math.max(h, L.para(P + labelW + 4, y + pad, vals, fs - 1, 500, IMGB.navy, colW * n - 8, lh));
         else vals.forEach((v, j) => {
             const cx = cellX(j);
             if (head) { h = Math.max(h, L.paraC(cx, y + pad, v, fs, 600, color, colW - 6, lh)); return; }
@@ -959,10 +1003,10 @@ function drawCompareImage(c) {
             h = Math.max(h, hh);
         });
         h += pad * 2;
-        if (head) bg(start, h, BRAND.navy); else if (o.total) bg(start, h, "#E8F6DD"); else if (o.diff) bg(start, h, "#F3FBEF"); else if (o.shade) bg(start, h, BRAND.bg);
+        if (head) bg(start, h, IMGB.navy); else if (o.total) bg(start, h, "#E8F6DD"); else if (o.diff) bg(start, h, "#F3FBEF"); else if (o.shade) bg(start, h, IMGB.bg);
         y += h;
     };
-    const section = (t) => { y += 18; y += L.para(P, y, t, 28, 600, BRAND.navyDeep, W - P * 2, 40) + 6; };
+    const section = (t) => { y += 18; y += L.para(P, y, t, 28, 600, IMGB.navyDeep, W - P * 2, 40) + 6; };
     row("ทางเลือก", heads, { head: true });
     section(`💳 เบี้ยประกัน (${c.payLabel})`);
     prem.forEach((r, k) => row(r.k, r.vals, { shade: k % 2 === 0 }));
@@ -970,11 +1014,11 @@ function drawCompareImage(c) {
     if (totY) row(totY.k, totY.vals, { shade: true });
     section("🏥 ความคุ้มครอง");
     blocks.forEach((bl) => {
-        y += 8; y += L.para(P, y, `▸ ${bl.name}${bl.same ? " — เหมือนกันทุกแผน" : ""}`, 25, 600, BRAND.navy, W - P * 2, 36) + 4;
+        y += 8; y += L.para(P, y, `▸ ${bl.name}${bl.same ? " — เหมือนกันทุกแผน" : ""}`, 25, 600, IMGB.navy, W - P * 2, 36) + 4;
         if (bl.same) {
             const start = L.ops.length, pad = 10;
-            const h = L.para(P, y + pad, bl.rows.map((r) => `• ${r.k}: ${compareFmtVal(r.v)}`).join("\n"), fs - 1, 500, BRAND.navy, TW, lh) + pad * 2;
-            bg(start, h, BRAND.bg); y += h; return;
+            const h = L.para(P, y + pad, bl.rows.map((r) => `• ${r.k}: ${compareFmtVal(r.v)}`).join("\n"), fs - 1, 500, IMGB.navy, TW, lh) + pad * 2;
+            bg(start, h, IMGB.bg); y += h; return;
         }
         bl.rows.forEach((r, k) => {
             if (r.merged) row(r.k, compareFmtVal(r.v) + " (ทุกแผน)", { shade: k % 2 === 0 });
@@ -985,45 +1029,110 @@ function drawCompareImage(c) {
     return renderImgLayout(L, y);
 }
 const LINE_TEXT_SOFT_LIMIT = 4500;
-function drawQuoteImage(q) {
+// กล่องรายการ 1 แบบ (หัวสีตามหมวด + ผลประโยชน์ + ข้อควรรู้)
+function imgQuoteCard(L, y, q, c, no) {
     const P = IMG_P, W = IMG_W;
+    const cat = SHARE_CATS[c.cat] || SHARE_CATS.life;
+    y += 14;
+    const start = L.ops.length;
+    let h = 18;
+    h += L.para(P + 8, y + h, `${no}) ${c.name}`, 34, 600, "#FFFFFF", W - P * 2 - 16, 46) + 4;
+    h += L.para(P + 8, y + h, `เบี้ย ${fmt(c.pay)}${c.single ? " (ชำระครั้งเดียว)" : ` (${q.payLabel})`}${c.renewalNote ? " · " + c.renewalNote : ""}`, 30, 600, "#FFFFFF", W - P * 2 - 16, 42) + 18;
+    L.ops.splice(start, 0, { t: "rect", x: P - 12, y, w: W - P * 2 + 24, h, color: cat.color });
+    y += h;
+    if (c.div) { y += 12; y += imgBadge(L, P, y, c.div.badge); }
+    let shade = 0;
+    c.benefits.forEach(([k, v]) => { if (k === "§") { y += imgSection(L, y, v, cat); shade = 0; } else y = imgKeyRow(L, y, k, v, (shade++) % 2 === 1); });
+    if (c.div) y += imgDividendBox(L, y, c.div);
+    if (c.notes && c.notes.length) {
+        const ns = L.ops.length; let nh = 14;
+        nh += L.para(P + 4, y + nh, "📌 ข้อควรรู้", 26, 600, IMGB.warn, W - P * 2 - 8, 36);
+        c.notes.forEach((n) => { nh += L.para(P + 4, y + nh, NUM_RE.test(n) ? n : `• ${n}`, 23, 500, IMGB.note, W - P * 2 - 8, 32); });
+        nh += 12;
+        L.ops.splice(ns, 0, { t: "rect", x: P - 12, y, w: W - P * 2 + 24, h: nh, color: "#FFF8E6" });
+        y += nh;
+    }
+    return y + 16;
+}
+// กล่องรวมเบี้ย (สีน้ำเงินบริษัท)
+function imgTotalBox(L, y, label, amount, extra) {
+    const P = IMG_P, W = IMG_W;
+    const start = L.ops.length;
+    let h = 22;
+    h += L.para(P, y + h, label, 30, 500, "#FFFFFF", W - P * 2, 42);
+    h += L.para(P, y + h, baht(amount), 52, 700, "#FFFFFF", W - P * 2, 66);
+    (extra || []).filter(Boolean).forEach((t) => { h += L.para(P, y + h, t, 26, 500, "#FFFFFF", W - P * 2, 38); });
+    h += 22;
+    L.ops.splice(start, 0, { t: "rect", x: P - 12, y, w: W - P * 2 + 24, h, color: IMGB.navy });
+    return y + h;
+}
+function quoteTotalExtras(q) { return [q.totalPay !== q.totalYear ? `เทียบเท่าเบี้ยรายปีรวม ${baht(q.totalYear)}` : "", q.singleNote || ""]; }
+// รูปเดียว: ทุกแบบในรูปเดียว (ใช้เมื่อมีหมวดเดียว)
+function drawQuoteImage(q) {
     const L = makeImgLayout();
     let y = imgHeader(L, "สรุปแผนประกัน · กรุงเทพประกันชีวิต", q.cards.length === 1 ? q.cards[0].name : `แผนประกัน ${q.cards.length} รายการ`);
     y = imgCustomer(L, q, y, ` · ชำระ${q.payLabel}`);
-    q.cards.forEach((c, i) => {
-        y += 14;
-        const start = L.ops.length;
-        let h = 18;
-        h += L.para(P + 8, y + h, `${i + 1}) ${c.name}`, 34, 600, BRAND.nameBlue, W - P * 2 - 16, 46) + 4;
-        if (c.div) h += imgBadge(L, P + 8, y + h, c.div.badge) + 8;
-        h += L.para(P + 8, y + h, `เบี้ย ${fmt(c.pay)}${c.single ? " (ชำระครั้งเดียว)" : ` (${q.payLabel})`}${c.renewalNote ? " · " + c.renewalNote : ""}`, 30, 600, BRAND.ink, W - P * 2 - 16, 42) + 18;
-        L.ops.splice(start, 0, { t: "rect", x: P - 12, y, w: W - P * 2 + 24, h, color: "#E6F2F8" }, { t: "rect", x: P - 12, y, w: 8, h, color: BRAND.skyDeep });
-        y += h;
-        let shade = 0;
-        c.benefits.forEach(([k, v]) => { if (k === "§") { y += imgSection(L, y, v); shade = 0; } else y = imgKeyRow(L, y, k, v, (shade++) % 2 === 1); });
-        if (c.div) y += imgDividendBox(L, y, c.div);
-        if (c.notes && c.notes.length) {
-            const ns = L.ops.length; let nh = 14;
-            nh += L.para(P + 4, y + nh, "📌 ข้อควรรู้", 26, 600, BRAND.warn, W - P * 2 - 8, 36);
-            c.notes.forEach((n) => { nh += L.para(P + 4, y + nh, NUM_RE.test(n) ? n : `• ${n}`, 23, 500, BRAND.sub, W - P * 2 - 8, 32); });
-            nh += 12;
-            L.ops.splice(ns, 0, { t: "rect", x: P - 12, y, w: W - P * 2 + 24, h: nh, color: "#FFF8E6" });
-            y += nh;
-        }
-        y += 16;
-    });
-    y += 10;
-    const start = L.ops.length;
-    let h = 22;
-    h += L.para(P, y + h, `รวมเบี้ยประกัน (${q.payLabel})`, 30, 500, "#FFFFFF", W - P * 2, 42);
-    h += L.para(P, y + h, baht(q.totalPay), 52, 700, "#FFFFFF", W - P * 2, 66);
-    if (q.totalPay !== q.totalYear) h += L.para(P, y + h, `เทียบเท่าเบี้ยรายปีรวม ${baht(q.totalYear)}`, 26, 500, "#FFFFFF", W - P * 2, 38);
-    if (q.singleNote) h += L.para(P, y + h, q.singleNote, 24, 500, "#FFFFFF", W - P * 2, 34);
-    h += 22;
-    L.ops.splice(start, 0, { t: "rect", x: P - 12, y, w: W - P * 2 + 24, h, grad: [BRAND.green, BRAND.greenDeep] });
-    y += h;
+    q.cards.forEach((c, i) => { y = imgQuoteCard(L, y, q, c, i + 1); });
+    y = imgTotalBox(L, y + 10, `รวมเบี้ยประกัน (${q.payLabel})`, q.totalPay, quoteTotalExtras(q));
     y = imgFooter(L, q, y + 10);
     return renderImgLayout(L, y);
+}
+// รูปที่ 1: ภาพรวมทุกหมวด (แต่ละหมวดมีแถบสี + รายการ + เบี้ย) และยอดรวม
+function drawQuoteSummaryImage(q, groups) {
+    const P = IMG_P, W = IMG_W;
+    const L = makeImgLayout();
+    const N = groups.length + 1;
+    let y = imgHeader(L, `รูปที่ 1/${N} · สรุปแผนประกัน · กรุงเทพประกันชีวิต`, `ภาพรวม ${groups.length} ความคุ้มครอง`);
+    y = imgCustomer(L, q, y, ` · ชำระ${q.payLabel}`);
+    groups.forEach((g) => {
+        y += 14;
+        const hs = L.ops.length;
+        const hh = L.para(P + 8, y + 14, `${g.cat.icon} ${g.cat.label}`, 32, 700, "#FFFFFF", W - P * 2 - 16, 44) + 28;
+        L.ops.splice(hs, 0, { t: "rect", x: P - 12, y, w: W - P * 2 + 24, h: hh, color: g.cat.color });
+        y += hh;
+        g.cards.forEach((c, k) => {
+            const pad = 14, numW = 230, rs = L.ops.length;
+            const h1 = L.para(P + 8, y + pad, `${c.no}) ${c.name}`, 28, 500, IMGB.ink, W - P * 2 - numW - 24, 40);
+            const amt = c.single ? `${fmt(c.pay)}*` : fmt(c.pay);
+            L.probe.font = `600 30px ${IMG_FONT}`;
+            L.text(W - P - imgTextW(L.probe, amt, 30), y + pad, amt, 30, 600, IMGB.ink);
+            const h = Math.max(h1, 40) + pad * 2;
+            L.ops.splice(rs, 0, { t: "rect", x: P - 12, y, w: W - P * 2 + 24, h, color: k % 2 ? "#FFFFFF" : g.cat.tint });
+            y += h;
+        });
+    });
+    y += 8;
+    L.probe.font = `500 22px ${IMG_FONT}`;
+    y += L.para(P, y, `ตัวเลขด้านขวา = เบี้ยประกัน (${q.payLabel})${q.cards.some((c) => c.single) ? " · * ชำระครั้งเดียว" : ""}`, 22, 500, IMGB.note, W - P * 2, 32) + 6;
+    y = imgTotalBox(L, y + 6, `รวมเบี้ยประกัน (${q.payLabel})`, q.totalPay, quoteTotalExtras(q));
+    y += 18;
+    y += L.para(P, y, `📄 รายละเอียดความคุ้มครองแต่ละหมวดอยู่ในรูปที่ 2–${N}`, 26, 600, IMGB.navy, W - P * 2, 36);
+    y = imgFooter(L, q, y + 10);
+    return renderImgLayout(L, y);
+}
+// รูปรายหมวด: หัวรูปสีของหมวด + ทุกแบบในหมวดนั้น
+function drawQuoteCatImage(q, g, idx, N) {
+    const L = makeImgLayout();
+    let y = imgHeader(L, `รูปที่ ${idx}/${N} · สรุปแผนประกัน · กรุงเทพประกันชีวิต`, `${g.cat.icon} ความคุ้มครอง${g.cat.label}`, g.cat.color);
+    y = imgCustomer(L, q, y, ` · ชำระ${q.payLabel}`);
+    g.cards.forEach((c) => { y = imgQuoteCard(L, y, q, c, c.no); });
+    if (g.cards.length > 1) {
+        const sum = g.cards.reduce((t, c) => t + (c.pay || 0), 0);
+        const P = IMG_P, W = IMG_W, start = L.ops.length;
+        y += 6;
+        const h = L.para(P + 8, y + 16, `รวมเบี้ยหมวด${g.cat.label} (${q.payLabel}): ${baht(sum)}`, 30, 700, g.cat.color, W - P * 2 - 16, 42) + 32;
+        L.ops.splice(start, 0, { t: "rect", x: P - 12, y, w: W - P * 2 + 24, h, color: g.cat.tint });
+        y += h;
+    }
+    y = imgFooter(L, q, y + 10);
+    return renderImgLayout(L, y);
+}
+// มีตั้งแต่ 2 หมวด → รูปภาพรวม + รูปหมวดละ 1 รูป (ข้อมูลตัวแทน/หมายเหตุอยู่ทุกรูป) · หมวดเดียว → รูปเดียวเหมือนเดิม
+function drawQuoteImages(q) {
+    const groups = groupCardsByCat(q.cards);
+    if (groups.length < 2) return [drawQuoteImage(q)];
+    const N = groups.length + 1;
+    return [drawQuoteSummaryImage(q, groups)].concat(groups.map((g, i) => drawQuoteCatImage(q, g, i + 2, N)));
 }
 // โหลดฟอนต์ล่วงหน้า (เรียกตอนเปิดหน้าต่างส่ง) ให้รูปใช้ฟอนต์เดียวกับแอป
 function preloadShareFonts() {
@@ -1956,7 +2065,7 @@ function catRows(cats, planKey) {
 }
 // บีแอลเอ แฮปปี้ เฮลธ์ พรีเมียร์ — ตารางผลประโยชน์ครบทุกหมวด
 const HHP_CATS = [
-    { no: "1", desc: "ค่าห้อง ค่าอาหาร และค่าบริการโรงพยาบาล (ผู้ป่วยใน) สูงสุด 180 วัน — ห้อง ICU จ่ายตามจริง สูงสุด 60 วัน (นับรวมใน 180 วัน)", unit: "", vals: { 1000000: "3,000 บาทต่อวัน หรือค่าห้องเดี่ยวราคาเริ่มต้นของ รพ. แล้วแต่อย่างใดสูงกว่า", 5000000: "3,000 บาทต่อวัน หรือค่าห้องเดี่ยวราคาเริ่มต้นของ รพ. แล้วแต่อย่างใดสูงกว่า", 10000000: "5,000 บาทต่อวัน หรือค่าห้องเดี่ยวราคาเริ่มต้นของ รพ. แล้วแต่อย่างใดสูงกว่า" } },
+    { no: "1", desc: "ค่าห้อง ค่าอาหาร และค่าบริการโรงพยาบาล (ผู้ป่วยใน) สูงสุด 180 วัน — ห้อง ICU จ่ายตามจริง สูงสุด 60 วัน (นับรวมใน 180 วัน)", unit: "", vals: { 1000000: "ค่าห้องเดี่ยวมาตรฐาน", 5000000: "ค่าห้องเดี่ยวมาตรฐาน", 10000000: "ค่าห้องเดี่ยวมาตรฐาน" } },
     { no: "2", desc: "ค่าตรวจวินิจฉัย/บำบัดรักษา/โลหิตและส่วนประกอบ/พยาบาล/ยา/เวชภัณฑ์", unit: "", vals: { 1000000: "จ่ายตามจริง", 5000000: "จ่ายตามจริง", 10000000: "จ่ายตามจริง" } },
     { no: "2.4", desc: "ค่ายาและเวชภัณฑ์สิ้นเปลืองสำหรับกลับบ้าน (สูงสุด 7 วัน)", unit: "", vals: { 1000000: 20000, 5000000: 20000, 10000000: 50000 } },
     { no: "3", desc: "ค่าแพทย์ตรวจรักษา สูงสุด 180 วัน", unit: "", vals: { 1000000: "จ่ายตามจริง", 5000000: "จ่ายตามจริง", 10000000: "จ่ายตามจริง" } },
@@ -2587,7 +2696,7 @@ function App() {
         if (!result) return null;
         const cards = result.cards.map((c) => {
             const f = c.factor !== undefined ? c.factor : result.factor;
-            return { name: c.name, pay: c.premium * f, single: c.single, renewalNote: c.renewalNote, benefits: numberBenefitRows(groupBenefits(customerBenefits(c.benefits, c.id))), notes: numberedNotes(CUSTOMER_NOTES[c.id] || []), div: dividendOf(c.id) };
+            return { id: c.id, cat: shareCatOf(c.id), name: c.name, pay: c.premium * f, single: c.single, renewalNote: c.renewalNote, benefits: numberBenefitRows(groupBenefits(customerBenefits(c.benefits, c.id))), notes: numberedNotes(CUSTOMER_NOTES[c.id] || []), div: dividendOf(c.id) };
         });
         return { cards, payLabel: result.payLabel, totalPay: result.totalPay, totalYear: result.totalYear, singleNote: result.singleNote,
             customer: customerName.trim(), gender, age, agent: agentInfo, notes: shareNotes(cards) };
@@ -2629,7 +2738,7 @@ function App() {
             const q = buildQuoteData();
             if (!q) return [];
             if (g) q.cards = q.cards.map((c, i) => (g[i] ? Object.assign({}, c, { benefits: g[i].rows.map((r) => (r.sec ? ["§", r.k] : [r.k, r.v])) }) : c));
-            return [drawQuoteImage(q)];
+            return drawQuoteImages(q);
         }
         const d = buildShareData(shareModal.id, shareModal.pl);
         if (g && g[0]) d.keyLines = g[0].rows.map((r) => (r.sec ? ["§", "", r.k] : [r.ic || "", r.k, r.v]));
@@ -4127,7 +4236,7 @@ function App() {
                 ["กรณีโรคมะเร็ง/หัวใจ/หลอดเลือดสมอง", baht(HH_BEN.ci[hhPlan]) + " ต่อครั้ง (สลักหลังโรคร้ายแรง +10% · ไม่คุ้มครอง 120 วันแรก)"],
                 ["ความรับผิดส่วนแรก (Deductible)", baht(hhDeduct) + " ต่อการเข้ารักษาครั้งใดครั้งหนึ่ง (ถ้าสวัสดิการ/ประกันอื่นจ่ายเกินส่วนแรกแล้ว บริษัทจ่ายส่วนที่เหลือ)"],
                 ["ชั้นอาชีพ", occClass === 3 ? "ชั้น 3" : "ชั้น 1-2"],
-                ["ค่าห้อง/ICU, แพทย์, ผ่าตัด, Day Surgery, รถพยาบาล, ผ่าตัดเล็ก", "จ่ายตามจริง (ห้องเดี่ยวราคาเริ่มต้นของ รพ.) ภายในวงเงินต่อครั้ง"],
+                ["ค่าห้อง/ICU, แพทย์, ผ่าตัด, Day Surgery, รถพยาบาล, ผ่าตัดเล็ก", "ค่าห้องเดี่ยวมาตรฐาน · ICU, แพทย์, ผ่าตัด, Day Surgery, รถพยาบาล, ผ่าตัดเล็ก จ่ายตามจริงภายในวงเงินต่อครั้ง"],
                 ["ยากลับบ้าน (ไม่เกิน 7 วัน)", baht(HH_BEN.takeHome[hhPlan])],
                 ["ตรวจวินิจฉัยก่อน-หลังนอน รพ. 30 วัน / OPD ต่อเนื่อง", baht(HH_BEN.prePost[hhPlan]) + " ต่อการเข้าพักรักษาครั้งหนึ่ง"],
                 ["ล้างไต / รังสีรักษา / เคมีบำบัด (หมวด 9-11)", baht(HH_BEN.yearly[hhPlan]) + " ต่อรอบปีกรมธรรม์ (3 หมวดใช้วงเงินรวมกัน)"],
@@ -4613,7 +4722,7 @@ function App() {
                 ["แผนความคุ้มครอง", baht(phPlan) + " ต่อรอบปีกรมธรรม์"],
                 ["พื้นที่ความคุ้มครอง", PH_AREAS.find((a) => a.key === area).label],
                 ["ความรับผิดส่วนแรก (Deductible)", phDeduct === 0 ? "ไม่มี" : baht(phDeduct) + " ต่อการเข้ารักษาตัวครั้งใดครั้งหนึ่ง"],
-                ["หมวดที่ 1: ค่าห้อง/ค่าอาหาร/ค่าบริการพยาบาล (ผู้ป่วยใน) ต่อการเข้าพักรักษาตัวครั้งใดครั้งหนึ่ง", baht(roomLimit) + "/วัน หรือค่าห้องเดี่ยวราคาเริ่มต้นของโรงพยาบาลต่อวัน แล้วแต่จำนวนใดสูงกว่า (ใช้สำหรับโรงพยาบาลในประเทศไทยเท่านั้น) · กรณี ICU จ่ายตามจริง รวมหมวด 1 ทั้งหมดสูงสุดไม่เกิน 365 วัน"],
+                ["หมวดที่ 1: ค่าห้อง/ค่าอาหาร/ค่าบริการพยาบาล (ผู้ป่วยใน) ต่อการเข้าพักรักษาตัวครั้งใดครั้งหนึ่ง", "ค่าห้องเดี่ยวมาตรฐาน (ใช้สำหรับโรงพยาบาลในประเทศไทยเท่านั้น) · กรณี ICU จ่ายตามจริง รวมหมวด 1 ทั้งหมดสูงสุดไม่เกิน 365 วัน"],
                 ["หมวดที่ 2: ค่าตรวจวินิจฉัย/บำบัดรักษา/โลหิต/พยาบาล/ยา/เวชภัณฑ์ (ผู้ป่วยใน)", "จ่ายตามจริง (กายภาพบำบัด/กิจกรรมบำบัดในหมวดย่อย 2.2 สูงสุด 30 วันต่อโรค, ยากลับบ้านหมวดย่อย 2.4 สูงสุด 30 วัน)"],
                 ["หมวดที่ 3: ค่าแพทย์ตรวจรักษา (ผู้ป่วยใน)", "จ่ายตามจริง สูงสุดไม่เกิน 365 วันต่อการเข้าพักรักษาตัวครั้งใดครั้งหนึ่ง"],
                 ["หมวดที่ 4: ค่าผ่าตัด/หัตถการ (ห้องผ่าตัด, ยา, เวชภัณฑ์, แพทย์ผ่าตัด, วิสัญญีแพทย์)", "จ่ายตามจริง (ไม่รวมการผ่าตัดเปลี่ยนอวัยวะ)"],
@@ -6851,7 +6960,7 @@ const FREQ = {
   monthly: { label: "\u0E23\u0E32\u0E22\u0E40\u0E14\u0E37\u0E2D\u0E19", perYear: 12, min: 200 }
 };
 const ROUNDING_EDGE = 0.49;
-const APP_VERSION = "สุดคุ้ม v1.7 · 2026-10-13";
+const APP_VERSION = "สุดคุ้ม v1.8 · 2026-10-14";
 const fmt = (n) => roundHalfUp(n || 0).toLocaleString("en-US", { maximumFractionDigits: 0 });
 // ค่านายหน้าปีที่ 1 (%) — ตาราง 7 "ค่าตอบแทนสำหรับตัวแทน" 10-09-2026
 // ผู้ใหญ่ (กรุงเทพ สุดคุ้ม รบข.12/2567): [ทุน <300,000 / 300,000-599,999 / 600,000 ขึ้นไป] x [อายุ 15-45 / 46-55 / 56-65]
@@ -7201,12 +7310,12 @@ function drawSKImage(d) {
   y += L.para(P, y, "\u0E2A\u0E23\u0E38\u0E1B\u0E02\u0E49\u0E2D\u0E40\u0E2A\u0E19\u0E2D\u0E41\u0E1A\u0E1A\u0E1B\u0E23\u0E30\u0E01\u0E31\u0E19 \xB7 \u0E01\u0E23\u0E38\u0E07\u0E40\u0E17\u0E1E\u0E1B\u0E23\u0E30\u0E01\u0E31\u0E19\u0E0A\u0E35\u0E27\u0E34\u0E15", 28, 500, "#BAE6FD", TW, 40) + 6;
   y += L.para(P, y, `${d.productName} ${d.plan}`, 46, 600, "#FFFFFF", TW, 60) + 4;
   y += L.para(P, y, `${d.freqLabel} ${baht(d.perInstallment)} \xB7 ${d.isKids ? "\u0E1C\u0E39\u0E49\u0E40\u0E2D\u0E32\u0E1B\u0E23\u0E30\u0E01\u0E31\u0E19 " : ""}${genderTh(d.gender)} \u0E2D\u0E32\u0E22\u0E38 ${d.age} \u0E1B\u0E35 \xB7 \u0E0A\u0E33\u0E23\u0E30\u0E40\u0E1A\u0E35\u0E49\u0E22 ${d.pay} \u0E1B\u0E35 \xB7 \u0E04\u0E38\u0E49\u0E21\u0E04\u0E23\u0E2D\u0E07 ${d.term} \u0E1B\u0E35 (ถึงอายุ ${Number(d.age) + d.term} ปี)`, 30, 500, "#E0F2FE", TW, 42) + 26;
-  L.ops.splice(hs, 0, { t: "rect", x: 0, y: 0, w: W, h: y, grad: [C.navy, C.navyDeep] });
+  L.ops.splice(hs, 0, { t: "rect", x: 0, y: 0, w: W, h: y, grad: ["#0B4EA2", "#08397A"] });
   y += 24;
   const g = skGreeting(d);
   if (g.length) {
     g.forEach((t) => {
-      y += L.para(P, y, t, 34, 600, C.ink, TW, 46);
+      y += L.para(P, y, t, 34, 600, "#000000", TW, 46);
     });
     y += 16;
   }
@@ -7218,12 +7327,12 @@ function drawSKImage(d) {
   ];
   heads.forEach(([h, s], i) => {
     cell(cx(i), y, colW[i], headH, "#F0F9FF");
-    L.para(cx(i) + 14, y + 14, h, 26, 600, "#334155", colW[i] - 28, 34);
-    L.para(cx(i) + 14, y + 50, s, 19, 500, "#94A3B8", colW[i] - 28, 26);
+    L.para(cx(i) + 14, y + 14, h, 26, 600, "#000000", colW[i] - 28, 34);
+    L.para(cx(i) + 14, y + 50, s, 19, 500, "#404040", colW[i] - 28, 26);
   });
   cell(cx(3), y, colW[3], headH, "#DBEAFE");
-  L.text(cx(3) + 16, y + 12, "\u0E17\u0E38\u0E19\u0E1B\u0E23\u0E30\u0E01\u0E31\u0E19", 26, 600, C.navy);
-  L.text(cx(3) + 16, y + 48, fmt(d.sumInsured), 40, 700, C.navy);
+  L.text(cx(3) + 16, y + 12, "\u0E17\u0E38\u0E19\u0E1B\u0E23\u0E30\u0E01\u0E31\u0E19", 26, 600, "#0B4EA2");
+  L.text(cx(3) + 16, y + 48, fmt(d.sumInsured), 40, 700, "#0B4EA2");
   cell(cx(4), y, colW[4], headH, "#ECFDF5");
   L.para(cx(4) + 16, y + 14, "\u0E04\u0E27\u0E32\u0E21\u0E04\u0E38\u0E49\u0E21\u0E04\u0E23\u0E2D\u0E07\u0E23\u0E30\u0E2B\u0E27\u0E48\u0E32\u0E07\u0E2A\u0E31\u0E0D\u0E0D\u0E32", 26, 600, "#065F46", colW[4] - 32, 34);
   y += headH;
@@ -7237,10 +7346,10 @@ function drawSKImage(d) {
       sideL.rect(sx, sy, sw, 2, "#BAE6FD");
       sy += 16;
     }
-    sy += sideL.para(sx, sy, c.title, 25, 600, "#1E293B", sw, 34);
-    sy += sideL.para(sx, sy, c.formula, 23, 500, "#475569", sw, 32);
+    sy += sideL.para(sx, sy, c.title, 25, 600, "#000000", sw, 34);
+    sy += sideL.para(sx, sy, c.formula, 23, 500, "#000000", sw, 32);
     sy += sideL.para(sx, sy, (c.amountText != null ? c.amountText : baht(c.amount)), 32, 700, c.color, sw, 44);
-    if (c.note) sy += sideL.para(sx, sy, c.note, 19, 500, "#94A3B8", sw, 26);
+    if (c.note) sy += sideL.para(sx, sy, c.note, 19, 500, "#404040", sw, 26);
     sy += 12;
   });
   const h1 = sy - bodyTop;
@@ -7248,9 +7357,9 @@ function drawSKImage(d) {
   const fx = cx(4) + 18, fw = colW[4] - 36;
   fy += sideL.para(fx, fy, "\u{1F381} \u0E41\u0E16\u0E21\u0E1F\u0E23\u0E35 \u2014 \u0E04\u0E38\u0E49\u0E21\u0E04\u0E23\u0E2D\u0E07\u0E2D\u0E38\u0E1A\u0E31\u0E15\u0E34\u0E40\u0E2B\u0E15\u0E38", 25, 700, "#047857", fw, 34) + 8;
   skFree(d).forEach((f) => {
-    fy += sideL.para(fx, fy, f.label, 22, 500, "#475569", fw, 30);
-    fy += sideL.para(fx, fy, f.value, 25, 600, "#1E293B", fw, 34);
-    if (f.sub) fy += sideL.para(fx, fy, f.sub, 18, 500, "#94A3B8", fw, 25);
+    fy += sideL.para(fx, fy, f.label, 22, 500, "#000000", fw, 30);
+    fy += sideL.para(fx, fy, f.value, 25, 600, "#000000", fw, 34);
+    if (f.sub) fy += sideL.para(fx, fy, f.sub, 18, 500, "#404040", fw, 25);
     fy += 10;
   });
   const kids = skKids(d);
@@ -7258,11 +7367,11 @@ function drawSKImage(d) {
     sideL.rect(fx, fy, fw, 2, "#BAE6FD");
     fy += 14;
     fy += sideL.para(fx, fy, "\u{1F476} \u0E04\u0E27\u0E32\u0E21\u0E04\u0E38\u0E49\u0E21\u0E04\u0E23\u0E2D\u0E07\u0E2A\u0E33\u0E2B\u0E23\u0E31\u0E1A\u0E40\u0E14\u0E47\u0E01", 24, 700, C.blue, fw, 34);
-    fy += sideL.para(fx, fy, "(\u0E41\u0E19\u0E1A\u0E2A\u0E31\u0E0D\u0E0D\u0E32\u0E40\u0E1E\u0E34\u0E48\u0E21\u0E40\u0E15\u0E34\u0E21 \u0E1A\u0E35\u0E41\u0E2D\u0E25\u0E40\u0E2D \u0E0B\u0E35\u0E44\u0E2D \u0E04\u0E34\u0E14\u0E2A\u0E4C + \u0E04\u0E0A.)", 18, 500, "#94A3B8", fw, 25) + 6;
+    fy += sideL.para(fx, fy, "(\u0E41\u0E19\u0E1A\u0E2A\u0E31\u0E0D\u0E0D\u0E32\u0E40\u0E1E\u0E34\u0E48\u0E21\u0E40\u0E15\u0E34\u0E21 \u0E1A\u0E35\u0E41\u0E2D\u0E25\u0E40\u0E2D \u0E0B\u0E35\u0E44\u0E2D \u0E04\u0E34\u0E14\u0E2A\u0E4C + \u0E04\u0E0A.)", 18, 500, "#404040", fw, 25) + 6;
     kids.forEach((k) => {
-      fy += sideL.para(fx, fy, k.label, 23, 700, C.navy, fw, 32);
-      if (k.value) fy += sideL.para(fx, fy, k.value, 22, 600, "#1E293B", fw, 30);
-      if (k.sub) fy += sideL.para(fx, fy, k.sub, 18, 500, "#94A3B8", fw, 25);
+      fy += sideL.para(fx, fy, k.label, 23, 700, "#0B4EA2", fw, 32);
+      if (k.value) fy += sideL.para(fx, fy, k.value, 22, 600, "#000000", fw, 30);
+      if (k.sub) fy += sideL.para(fx, fy, k.sub, 18, 500, "#404040", fw, 25);
       fy += 10;
     });
   }
@@ -7274,8 +7383,8 @@ function drawSKImage(d) {
     const bg = r.isMaturity ? "#ECFDF5" : idx % 2 === 0 ? "#F8FAFC" : "#FFFFFF";
     [0, 1, 2].forEach((i) => cell(cx(i), ry, colW[i], rowH, bg));
     const ty = ry + (rowH - 30) / 2;
-    L.text(cx(0) + 18, ty, r.age ?? "-", 25, 600, "#1E293B");
-    L.text(cx(1) + 18, ty, r.isPayYear ? fmt(r.premiumThisYear) : "\u2014", 25, 500, r.isPayYear ? "#1E293B" : "#CBD5E1");
+    L.text(cx(0) + 18, ty, r.age ?? "-", 25, 600, "#000000");
+    L.text(cx(1) + 18, ty, r.isPayYear ? fmt(r.premiumThisYear) : "\u2014", 25, 500, r.isPayYear ? "#000000" : "#CBD5E1");
     L.text(cx(2) + 18, ty, r.isPayYear ? fmt(r.bonusThisYear) : "\u2014", 25, 500, r.isPayYear ? "#1E40AF" : "#CBD5E1");
   });
   cell(cx(3), bodyTop, colW[3], bodyH, "#F5F9FF");
@@ -7285,8 +7394,8 @@ function drawSKImage(d) {
   const sumH = 56;
   [0, 1, 2].forEach((i) => cell(cx(i), y, colW[i], sumH, "#E0F2FE"));
   cell(cx(3), y, colW[3] + colW[4], sumH, "#E0F2FE");
-  L.text(cx(0) + 18, y + 13, "\u0E23\u0E27\u0E21", 25, 600, "#334155");
-  L.text(cx(1) + 18, y + 13, fmt(d.totalPremium), 25, 600, "#1E293B");
+  L.text(cx(0) + 18, y + 13, "\u0E23\u0E27\u0E21", 25, 600, "#000000");
+  L.text(cx(1) + 18, y + 13, fmt(d.totalPremium), 25, 600, "#000000");
   L.text(cx(2) + 18, y + 13, fmt(d.totalBonus), 25, 600, "#1E40AF");
   y += sumH;
   const matH = 76;
@@ -7300,7 +7409,7 @@ function drawSKImage(d) {
     let nh = 16;
     nh += L.para(P + 8, y + nh, "\u{1F4CC} \u0E02\u0E49\u0E2D\u0E04\u0E27\u0E23\u0E23\u0E39\u0E49", 27, 700, "#B45309", TW - 16, 38);
     skNotes(d).forEach((n) => {
-      nh += L.para(P + 8, y + nh, /^\d+\.\s/.test(n) ? n : `\u2022 ${n}`, 24, 500, "#475569", TW - 16, 34);
+      nh += L.para(P + 8, y + nh, /^\d+\.\s/.test(n) ? n : `\u2022 ${n}`, 24, 500, "#404040", TW - 16, 34);
     });
     nh += 14;
     L.ops.splice(ns, 0, { t: "rect", x: P, y, w: TW, h: nh, color: "#FFF8E6" });
@@ -7313,9 +7422,9 @@ function drawSKImage(d) {
   const contact = [d.agent.phone ? `\u{1F4DE} ${d.agent.phone}` : "", d.agent.lineId ? `LINE: ${d.agent.lineId}` : ""].filter(Boolean).join("     ");
   if (contact) fh += L.para(P, y + fh, contact, 30, 500, "#BAE6FD", TW, 42);
   fh += 24;
-  L.ops.splice(fs, 0, { t: "rect", x: 0, y, w: W, h: fh, color: C.navy });
+  L.ops.splice(fs, 0, { t: "rect", x: 0, y, w: W, h: fh, color: "#0B4EA2" });
   y += fh + 18;
-  y += L.para(P, y, SHARE_MAIN_NOTE, 25, 600, C.navyDeep, TW, 36) + 28;
+  y += L.para(P, y, SHARE_MAIN_NOTE, 25, 600, "#08397A", TW, 36) + 28;
   return renderImgLayout(L, y, W);
 }
 function shareCanvasImage(canvas) {
